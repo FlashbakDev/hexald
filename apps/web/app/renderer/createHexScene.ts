@@ -1087,31 +1087,31 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
   };
 
   /**
-   * True si du territoire constructible (ou connu) reste dans la moitié
-   * centrale de l’écran — évite un viewport full nuages en panant trop loin.
+   * True si du territoire jouable (régions déjà construites ou centres
+   * constructibles) reste dans la moitié centrale de l’écran — évite un
+   * viewport full nuages en panant trop loin, sans bloquer le pan sur
+   * le monde déjà développé.
    */
-  const viewportHasConstructible = () => {
+  const viewportHasPlayableTerritory = () => {
     const bounds = visibleGroundAabb(HEX_SIZE * 0.35, 0.5);
-    if (revealableCenterWorld.length > 0) {
-      for (const p of revealableCenterWorld) {
-        if (pointInAabb(p.x, p.z, bounds)) return true;
-      }
-      return false;
+    for (const p of revealableCenterWorld) {
+      if (pointInAabb(p.x, p.z, bounds)) return true;
     }
-    // Plus rien à explorer : reste sur le territoire connu.
     for (const tile of biomeTiles) {
-      if (pointInAabb(tile.mesh.position.x, tile.mesh.position.z, bounds)) return true;
+      if (pointInAabb(tile.mesh.position.x, tile.mesh.position.z, bounds)) {
+        return true;
+      }
     }
-    return biomeTiles.length === 0;
+    return biomeTiles.length === 0 && revealableCenterWorld.length === 0;
   };
 
   /**
-   * Si le lookTarget sort trop loin (plus de constructible au centre),
+   * Si le lookTarget sort trop loin (plus de territoire jouable au centre),
    * ramène le long du segment depuis (fromX, fromZ).
    */
   const clampLookTargetToConstructible = (fromX: number, fromZ: number) => {
     applyCamera();
-    if (viewportHasConstructible()) return;
+    if (viewportHasPlayableTerritory()) return;
 
     const toX = lookTarget.x;
     const toZ = lookTarget.z;
@@ -1121,7 +1121,7 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
       const mid = (lo + hi) * 0.5;
       lookTarget.set(fromX + (toX - fromX) * mid, 0, fromZ + (toZ - fromZ) * mid);
       applyCamera();
-      if (viewportHasConstructible()) lo = mid;
+      if (viewportHasPlayableTerritory()) lo = mid;
       else hi = mid;
     }
     lookTarget.set(fromX + (toX - fromX) * lo, 0, fromZ + (toZ - fromZ) * lo);
