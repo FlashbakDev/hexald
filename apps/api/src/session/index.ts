@@ -1,6 +1,6 @@
 import cookie from "@fastify/cookie";
 import type { FastifyInstance } from "fastify";
-import { claimPlayerPseudo } from "@hexald/db";
+import { claimPlayerPseudo, isPseudoAvailable } from "@hexald/db";
 import type { SessionSnapshot } from "@hexald/shared";
 import { validatePseudo } from "@hexald/shared";
 import { env } from "../env.ts";
@@ -8,6 +8,11 @@ import {
   ensureAnonymousPlayer,
   requirePlayer
 } from "./player.ts";
+
+export type PseudoAvailability = {
+  available: boolean;
+  reason?: string;
+};
 
 function toSession(player: { id: string; pseudo: string | null }): SessionSnapshot {
   return {
@@ -34,6 +39,41 @@ export async function sessionRoutes(app: FastifyInstance) {
     const player = await requirePlayer(app, request, reply);
     if (!player) return;
     return toSession(player);
+  });
+
+  app.get("/session/pseudo/available", async (request, reply) => {
+    const query = request.query as { pseudo?: unknown };
+    const validation = validatePseudo(query.pseudo);
+
+    if (!validation.ok) {
+      return {
+        available: false,
+        reason: validation.reason
+      } satisfies PseudoAvailability;
+    }
+
+    const player = await ensureAnonymousPlayer(app, request, reply);
+    if (
+      player.pseudo &&
+      player.pseudo.toLowerCase() === validation.pseudo.toLowerCase()
+    ) {
+      return { available: true } satisfies PseudoAvailability;
+    }
+
+    const available = await isPseudoAvailable(
+      app.db,
+      validation.pseudo,
+      player.id
+    );
+
+    if (!available) {
+      return {
+        available: false,
+        reason: "pseudo_taken"
+      } satisfies PseudoAvailability;
+    }
+
+    return { available: true } satisfies PseudoAvailability;
   });
 
   app.post("/session/pseudo", async (request, reply) => {

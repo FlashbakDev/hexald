@@ -5,6 +5,7 @@ import {
   type PersistedPlayer
 } from "@hexald/db";
 import { env } from "../env.ts";
+import { touchPresence } from "../presence.ts";
 
 export const SESSION_COOKIE = "tw_sid";
 
@@ -48,12 +49,14 @@ export async function ensureAnonymousPlayer(
   if (existing) {
     request.player = { id: existing.id };
     setSessionCookie(reply, existing.id);
+    touchPresence(existing.id);
     return existing;
   }
 
   const player = await insertAnonymousPlayer(app.db);
   request.player = { id: player.id };
   setSessionCookie(reply, player.id);
+  touchPresence(player.id);
   return player;
 }
 
@@ -68,5 +71,6 @@ export async function requirePlayer(
     return null;
   }
   request.player = { id: player.id };
+  touchPresence(player.id);
   return player;
 }

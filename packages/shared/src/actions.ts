@@ -1,4 +1,4 @@
-import type { BuildingId, PrimaryBiomeId } from "./ids.ts";
+import type { BuildingId, PrimaryBiomeId, WorkerJob } from "./ids.ts";
 import type { HexCoord } from "./hex.ts";
 
 export type BuildAction = {
@@ -9,7 +9,8 @@ export type BuildAction = {
 
 export type AssignWorkersAction = {
   type: "assign_workers";
-  job: string;
+  job: Extract<WorkerJob, "woodcutter">;
+  /** Effectif cible (absolu) pour ce métier. */
   count: number;
 };
 

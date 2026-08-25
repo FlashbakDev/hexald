@@ -1,5 +1,5 @@
 import { and, desc, eq } from "drizzle-orm";
-import type { BiomeId } from "@hexald/shared";
+import type { BiomeId, BuildingId } from "@hexald/shared";
 import type { Database } from "./client.ts";
 import { worldRegions, worldTiles, worlds } from "./schema/index.ts";
 
@@ -7,6 +7,7 @@ export type WorldTileRow = {
   q: number;
   r: number;
   biome: BiomeId;
+  buildingId: BuildingId | null;
 };
 
 export type WorldRegionRow = {
@@ -15,11 +16,20 @@ export type WorldRegionRow = {
   biome: BiomeId;
 };
 
+export type WorldEconomyRow = {
+  populationTotal: number;
+  populationCap: number;
+  woodcutters: number;
+  woodStock: number;
+  woodLastCalculatedAt: Date;
+};
+
 export type PersistedWorld = {
   id: string;
   ownerId: string;
   createdAt: Date;
   updatedAt: Date;
+  economy: WorldEconomyRow;
   tiles: WorldTileRow[];
   regions: WorldRegionRow[];
 };
@@ -31,18 +41,52 @@ export type PersistedWorldSummary = {
   updatedAt: Date;
 };
 
+function economyFromRow(world: {
+  populationTotal: number;
+  populationCap: number;
+  woodcutters: number;
+  woodStock: number;
+  woodLastCalculatedAt: Date;
+}): WorldEconomyRow {
+  return {
+    populationTotal: world.populationTotal,
+    populationCap: world.populationCap,
+    woodcutters: world.woodcutters,
+    woodStock: world.woodStock,
+    woodLastCalculatedAt: world.woodLastCalculatedAt
+  };
+}
+
 export async function insertWorldWithTerrain(
   db: Database["db"],
   input: {
     ownerId: string;
     tiles: WorldTileRow[];
     regions: WorldRegionRow[];
+    economy?: Partial<WorldEconomyRow>;
   }
 ): Promise<PersistedWorld> {
   return db.transaction(async (tx) => {
     const [world] = await tx
       .insert(worlds)
-      .values({ ownerId: input.ownerId })
+      .values({
+        ownerId: input.ownerId,
+        ...(input.economy?.populationTotal !== undefined
+          ? { populationTotal: input.economy.populationTotal }
+          : {}),
+        ...(input.economy?.populationCap !== undefined
+          ? { populationCap: input.economy.populationCap }
+          : {}),
+        ...(input.economy?.woodcutters !== undefined
+          ? { woodcutters: input.economy.woodcutters }
+          : {}),
+        ...(input.economy?.woodStock !== undefined
+          ? { woodStock: input.economy.woodStock }
+          : {}),
+        ...(input.economy?.woodLastCalculatedAt !== undefined
+          ? { woodLastCalculatedAt: input.economy.woodLastCalculatedAt }
+          : {})
+      })
       .returning();
     if (!world) throw new Error("failed_to_create_world");
 
@@ -52,7 +96,8 @@ export async function insertWorldWithTerrain(
           worldId: world.id,
           q: tile.q,
           r: tile.r,
-          biome: tile.biome
+          biome: tile.biome,
+          buildingId: tile.buildingId
         }))
       );
     }
@@ -73,6 +118,7 @@ export async function insertWorldWithTerrain(
       ownerId: world.ownerId,
       createdAt: world.createdAt,
       updatedAt: world.updatedAt,
+      economy: economyFromRow(world),
       tiles: input.tiles,
       regions: input.regions
     };
@@ -90,7 +136,8 @@ export async function fetchWorld(
     .select({
       q: worldTiles.q,
       r: worldTiles.r,
-      biome: worldTiles.biome
+      biome: worldTiles.biome,
+      buildingId: worldTiles.buildingId
     })
     .from(worldTiles)
     .where(eq(worldTiles.worldId, worldId));
@@ -109,10 +156,12 @@ export async function fetchWorld(
     ownerId: world.ownerId,
     createdAt: world.createdAt,
     updatedAt: world.updatedAt,
+    economy: economyFromRow(world),
     tiles: tiles.map((tile) => ({
       q: tile.q,
       r: tile.r,
-      biome: tile.biome as BiomeId
+      biome: tile.biome as BiomeId,
+      buildingId: (tile.buildingId as BuildingId | null) ?? null
     })),
     regions: regions.map((region) => ({
       centerQ: region.centerQ,
@@ -154,6 +203,48 @@ export async function fetchWorldForOwner(
   return fetchWorld(db, worldId);
 }
 
+export async function updateWorldEconomy(
+  db: Database["db"],
+  worldId: string,
+  economy: WorldEconomyRow
+): Promise<void> {
+  await db
+    .update(worlds)
+    .set({
+      populationTotal: economy.populationTotal,
+      populationCap: economy.populationCap,
+      woodcutters: economy.woodcutters,
+      woodStock: economy.woodStock,
+      woodLastCalculatedAt: economy.woodLastCalculatedAt,
+      updatedAt: new Date()
+    })
+    .where(eq(worlds.id, worldId));
+}
+
+export async function setTileBuilding(
+  db: Database["db"],
+  worldId: string,
+  tile: { q: number; r: number; buildingId: BuildingId }
+): Promise<void> {
+  await db.transaction(async (tx) => {
+    await tx
+      .update(worldTiles)
+      .set({ buildingId: tile.buildingId })
+      .where(
+        and(
+          eq(worldTiles.worldId, worldId),
+          eq(worldTiles.q, tile.q),
+          eq(worldTiles.r, tile.r)
+        )
+      );
+
+    await tx
+      .update(worlds)
+      .set({ updatedAt: new Date() })
+      .where(eq(worlds.id, worldId));
+  });
+}
+
 export async function appendRegion(
   db: Database["db"],
   worldId: string,
@@ -177,7 +268,8 @@ export async function appendRegion(
           worldId,
           q: tile.q,
           r: tile.r,
-          biome: tile.biome
+          biome: tile.biome,
+          buildingId: tile.buildingId
         }))
       );
     }

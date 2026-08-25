@@ -1,4 +1,5 @@
 import {
+  doublePrecision,
   integer,
   pgTable,
   primaryKey,
@@ -14,7 +15,17 @@ export const worlds = pgTable("worlds", {
     .notNull()
     .references(() => players.id, { onDelete: "cascade" }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull()
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  /** Économie v0 — pop + bois */
+  populationTotal: integer("population_total").notNull().default(8),
+  populationCap: integer("population_cap").notNull().default(12),
+  woodcutters: integer("woodcutters").notNull().default(0),
+  woodStock: doublePrecision("wood_stock").notNull().default(30),
+  woodLastCalculatedAt: timestamp("wood_last_calculated_at", {
+    withTimezone: true
+  })
+    .defaultNow()
+    .notNull()
 });
 
 export const worldTiles = pgTable(
@@ -25,7 +36,8 @@ export const worldTiles = pgTable(
       .references(() => worlds.id, { onDelete: "cascade" }),
     q: integer("q").notNull(),
     r: integer("r").notNull(),
-    biome: text("biome").notNull()
+    biome: text("biome").notNull(),
+    buildingId: text("building_id")
   },
   (table) => [primaryKey({ columns: [table.worldId, table.q, table.r] })]
 );

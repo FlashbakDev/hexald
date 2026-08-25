@@ -7,8 +7,8 @@ export default defineNuxtConfig({
   css: ["~/assets/css/main.css"],
   fonts: {
     families: [
-      { name: "Syne", provider: "google", weights: [600, 700, 800] },
-      { name: "Figtree", provider: "google", weights: [400, 500, 600, 700] }
+      { name: "Fraunces", provider: "google", weights: [400, 500, 600] },
+      { name: "Source Sans 3", provider: "google", weights: [400, 500, 600] }
     ]
   },
   devServer: {
@@ -16,8 +16,8 @@ export default defineNuxtConfig({
     port: 9089
   },
   colorMode: {
-    preference: "dark",
-    fallback: "dark"
+    preference: "light",
+    fallback: "light"
   },
   runtimeConfig: {
     public: {

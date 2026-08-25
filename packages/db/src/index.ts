@@ -4,6 +4,7 @@ export {
   insertAnonymousPlayer,
   fetchPlayer,
   findPlayerByPseudo,
+  isPseudoAvailable,
   claimPlayerPseudo,
   type PersistedPlayer,
   type ClaimPseudoResult
@@ -14,8 +15,18 @@ export {
   fetchWorldForOwner,
   listWorldsByOwner,
   appendRegion,
+  updateWorldEconomy,
+  setTileBuilding,
   type PersistedWorld,
   type PersistedWorldSummary,
   type WorldTileRow,
-  type WorldRegionRow
+  type WorldRegionRow,
+  type WorldEconomyRow
 } from "./worlds.ts";
+export {
+  fetchAdminDbStats,
+  fetchPlayersByIds,
+  type AdminDbStats,
+  type AdminPlayerRow,
+  type AdminWorldRow
+} from "./admin.ts";

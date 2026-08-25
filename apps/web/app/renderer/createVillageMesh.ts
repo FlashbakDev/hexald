@@ -9,10 +9,6 @@ import {
   type Material
 } from "three";
 
-function disableRaycast(mesh: Mesh) {
-  mesh.raycast = () => {};
-}
-
 function house(
   x: number,
   z: number,
@@ -34,7 +30,6 @@ function house(
   geometries.push(wallGeom);
   const wall = new Mesh(wallGeom, walls);
   wall.position.y = wallH / 2;
-  disableRaycast(wall);
   group.add(wall);
 
   const roofGeom = new ConeGeometry(0.155 * scale, 0.12 * scale, 4);
@@ -42,14 +37,12 @@ function house(
   const roofMesh = new Mesh(roofGeom, roof);
   roofMesh.position.y = wallH + 0.055 * scale;
   roofMesh.rotation.y = Math.PI / 4;
-  disableRaycast(roofMesh);
   group.add(roofMesh);
 
   const doorGeom = new BoxGeometry(0.045 * scale, 0.07 * scale, 0.02 * scale);
   geometries.push(doorGeom);
   const door = new Mesh(doorGeom, timber);
   door.position.set(0, 0.035 * scale, wallD / 2 + 0.005);
-  disableRaycast(door);
   group.add(door);
 
   return group;
@@ -71,7 +64,6 @@ export function createVillageMesh() {
   geometries.push(yardGeom);
   const yard = new Mesh(yardGeom, earth);
   yard.position.y = 0.01;
-  disableRaycast(yard);
   group.add(yard);
 
   group.add(house(-0.28, 0.16, 0.35, 0.92, walls, roof, timber, geometries));
@@ -83,7 +75,6 @@ export function createVillageMesh() {
   geometries.push(chimneyGeom);
   const chimney = new Mesh(chimneyGeom, stone);
   chimney.position.set(0.06, 0.28, -0.02);
-  disableRaycast(chimney);
   hall.add(chimney);
   group.add(hall);
 
@@ -91,24 +82,20 @@ export function createVillageMesh() {
   geometries.push(wellGeom);
   const well = new Mesh(wellGeom, stone);
   well.position.set(-0.18, 0.035, -0.22);
-  disableRaycast(well);
   group.add(well);
 
   const postGeom = new BoxGeometry(0.018, 0.08, 0.018);
   geometries.push(postGeom);
   const postA = new Mesh(postGeom, timber);
   postA.position.set(-0.18, 0.09, -0.22);
-  disableRaycast(postA);
   const postB = postA.clone();
   postB.position.x += 0.05;
-  disableRaycast(postB);
   group.add(postA, postB);
 
   const beamGeom = new BoxGeometry(0.07, 0.012, 0.012);
   geometries.push(beamGeom);
   const beam = new Mesh(beamGeom, timber);
   beam.position.set(-0.155, 0.125, -0.22);
-  disableRaycast(beam);
   group.add(beam);
 
   return {

@@ -1,4 +1,4 @@
-import { eq, sql } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 import type { Database } from "./client.ts";
 import { players } from "./schema/index.ts";
 
@@ -60,6 +60,17 @@ export async function findPlayerByPseudo(
   return toPlayer(player);
 }
 
+/** True if no other player owns this account name (case-insensitive). */
+export async function isPseudoAvailable(
+  db: Database["db"],
+  pseudo: string,
+  exceptPlayerId?: string
+): Promise<boolean> {
+  const taken = await findPlayerByPseudo(db, pseudo);
+  if (!taken) return true;
+  return exceptPlayerId != null && taken.id === exceptPlayerId;
+}
+
 export type ClaimPseudoResult =
   | { ok: true; player: PersistedPlayer }
   | { ok: false; reason: "pseudo_taken" | "pseudo_locked" };
@@ -79,8 +90,8 @@ export async function claimPlayerPseudo(
     return { ok: false, reason: "pseudo_locked" };
   }
 
-  const taken = await findPlayerByPseudo(db, pseudo);
-  if (taken && taken.id !== playerId) {
+  const available = await isPseudoAvailable(db, pseudo, playerId);
+  if (!available) {
     return { ok: false, reason: "pseudo_taken" };
   }
 
@@ -88,13 +99,22 @@ export async function claimPlayerPseudo(
     const [updated] = await db
       .update(players)
       .set({ pseudo })
-      .where(eq(players.id, playerId))
+      .where(and(eq(players.id, playerId), isNull(players.pseudo)))
       .returning();
-    if (!updated) throw new Error("failed_to_claim_pseudo");
+    if (!updated) {
+      const refreshed = await fetchPlayer(db, playerId);
+      if (refreshed?.pseudo) {
+        if (refreshed.pseudo.toLowerCase() === pseudo.toLowerCase()) {
+          return { ok: true, player: refreshed };
+        }
+        return { ok: false, reason: "pseudo_locked" };
+      }
+      throw new Error("failed_to_claim_pseudo");
+    }
     return { ok: true, player: toPlayer(updated) };
   } catch (error) {
-    const takenAgain = await findPlayerByPseudo(db, pseudo);
-    if (takenAgain && takenAgain.id !== playerId) {
+    const availableAgain = await isPseudoAvailable(db, pseudo, playerId);
+    if (!availableAgain) {
       return { ok: false, reason: "pseudo_taken" };
     }
     throw error;

@@ -1218,6 +1218,16 @@ tr:last-child td {
   flex-shrink: 0;
 }
 
+.check-item.is-done {
+  color: var(--text);
+}
+
+.check-item.is-done .check-box {
+  border-color: var(--accent, #e8a54b);
+  background: var(--accent, #e8a54b);
+  box-shadow: inset 0 0 0 2px var(--bg, #0a1512);
+}
+
 .out-scope {
   display: flex;
   flex-wrap: wrap;

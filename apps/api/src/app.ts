@@ -3,6 +3,7 @@ import Fastify from "fastify";
 import { createDb } from "@hexald/db";
 import { env } from "./env.ts";
 import { actionRoutes } from "./routes/actions.ts";
+import { adminRoutes } from "./routes/admin.ts";
 import { contentRoutes } from "./routes/content.ts";
 import { healthRoutes } from "./routes/health.ts";
 import { worldRoutes } from "./routes/worlds.ts";
@@ -40,6 +41,7 @@ export async function buildApp() {
   await app.register(contentRoutes, { prefix: "/v1" });
   await app.register(worldRoutes, { prefix: "/v1" });
   await app.register(actionRoutes, { prefix: "/v1" });
+  await app.register(adminRoutes, { prefix: "/v1" });
 
   return app;
 }

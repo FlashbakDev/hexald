@@ -20,6 +20,17 @@ let step = 0;
 let timer: ReturnType<typeof setInterval> | null = null;
 let startTimer: ReturnType<typeof setTimeout> | null = null;
 
+/** Zoom serré sur le village ; biais mobile pour cadrer au-dessus du titre. */
+const isNarrow = ref(
+  import.meta.client && window.matchMedia("(max-width: 1023px)").matches
+);
+const viewSize = computed(() => (isNarrow.value ? 8.2 : 6.8));
+const frameBiasY = computed(() => (isNarrow.value ? 0.42 : 0.06));
+
+function syncViewport() {
+  isNarrow.value = window.matchMedia("(max-width: 1023px)").matches;
+}
+
 function enqueueNeighbors(center: { q: number; r: number }) {
   for (const offset of REGION_NEIGHBOR_OFFSETS) {
     const next = { q: center.q + offset.q, r: center.r + offset.r };
@@ -53,63 +64,84 @@ function expandOnce() {
 }
 
 onMounted(() => {
+  syncViewport();
+  window.addEventListener("resize", syncViewport);
+
   startTimer = setTimeout(() => {
     expandOnce();
-    timer = setInterval(expandOnce, 2400);
-  }, 700);
+    timer = setInterval(expandOnce, 3200);
+  }, 1200);
 });
 
 onBeforeUnmount(() => {
+  window.removeEventListener("resize", syncViewport);
   if (startTimer) clearTimeout(startTimer);
   if (timer) clearInterval(timer);
 });
 </script>
 
 <template>
-  <div class="landing-world absolute inset-0">
-    <HexPreview ref="preview" class="size-full min-h-dvh" />
-    <div class="landing-world__sheen pointer-events-none absolute inset-0" />
-    <div class="landing-world__pulse pointer-events-none absolute inset-0" />
+  <div class="landing-world pointer-events-none absolute inset-0 overflow-hidden">
+    <HexPreview
+      ref="preview"
+      class="size-full min-h-dvh"
+      :view-size="viewSize"
+      :frame-bias-y="frameBiasY"
+    />
+    <div class="landing-world__mist pointer-events-none absolute inset-0" />
+    <div class="landing-world__drift pointer-events-none absolute inset-0" />
   </div>
 </template>
 
 <style scoped>
-.landing-world__sheen {
+.landing-world__mist {
   background:
-    radial-gradient(ellipse 70% 55% at 72% 42%, rgb(56 189 248 / 0.22), transparent 55%),
-    radial-gradient(ellipse 50% 40% at 30% 70%, rgb(52 211 153 / 0.22), transparent 50%),
-    radial-gradient(ellipse 40% 30% at 80% 15%, rgb(251 191 36 / 0.2), transparent 45%);
-  mix-blend-mode: screen;
-  animation: landing-sheen 10s ease-in-out infinite alternate;
+    radial-gradient(ellipse 80% 60% at 50% 28%, rgb(232 240 236 / 0.22), transparent 60%),
+    radial-gradient(ellipse 55% 45% at 30% 70%, rgb(223 232 228 / 0.35), transparent 55%),
+    radial-gradient(ellipse 40% 35% at 75% 18%, rgb(255 255 255 / 0.22), transparent 50%);
+  animation: landing-mist 14s ease-in-out infinite alternate;
 }
 
-.landing-world__pulse {
-  background: radial-gradient(
-    circle at 68% 48%,
-    rgb(255 255 255 / 0.1),
-    transparent 42%
+@media (min-width: 1024px) {
+  .landing-world__mist {
+    background:
+      radial-gradient(ellipse 80% 60% at 70% 40%, rgb(232 240 236 / 0.35), transparent 60%),
+      radial-gradient(ellipse 55% 45% at 25% 75%, rgb(223 232 228 / 0.4), transparent 55%),
+      radial-gradient(ellipse 40% 35% at 85% 20%, rgb(255 255 255 / 0.25), transparent 50%);
+  }
+}
+
+.landing-world__drift {
+  background: linear-gradient(
+    115deg,
+    rgb(232 240 236 / 0.15) 0%,
+    transparent 40%,
+    rgb(255 255 255 / 0.12) 70%,
+    transparent 100%
   );
-  animation: landing-pulse 4.5s ease-in-out infinite;
+  background-size: 200% 200%;
+  animation: landing-drift 18s ease-in-out infinite alternate;
 }
 
-@keyframes landing-sheen {
+@keyframes landing-mist {
   from {
-    opacity: 0.55;
+    opacity: 0.65;
     transform: scale(1);
   }
   to {
     opacity: 1;
-    transform: scale(1.06);
+    transform: scale(1.04);
   }
 }
 
-@keyframes landing-pulse {
-  0%,
-  100% {
-    opacity: 0.35;
+@keyframes landing-drift {
+  from {
+    background-position: 0% 40%;
+    opacity: 0.5;
   }
-  50% {
-    opacity: 0.9;
+  to {
+    background-position: 100% 60%;
+    opacity: 0.85;
   }
 }
 </style>

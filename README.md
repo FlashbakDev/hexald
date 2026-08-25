@@ -99,8 +99,14 @@ Pour rester en localhost uniquement : `pnpm --filter @hexald/api dev -- --host 1
 | `POST` | `/v1/worlds` | Crée un monde de départ (owner = session) |
 | `GET` | `/v1/worlds/:id` | Charge un monde (owner uniquement) |
 | `POST` | `/v1/actions` | Action joueur → `game-core` (session requise) |
+| `GET` | `/v1/admin/overview` | Stats admin (sans auth pour l’instant) |
+| `POST` | `/v1/worlds/:id/workers` | Assigne des bûcherons (pop + bois v0) |
 
 La session anonyme est un cookie httpOnly signé. Les mondes appartiennent au `playerId` de la session.
+
+UI admin (dev) : [`/admin`](http://127.0.0.1:9089/admin).
+
+Économie v0 : pop fixe 8, camp de bûcherons implicite (max 4), bois lazy offline.
 
 ## Web
 
@@ -114,5 +120,6 @@ pnpm dev:web
 | --- | --- |
 | `/` | Landing : pseudo + CTA Jouer |
 | `/play` | Écran de jeu (session + pseudo requis) |
+| `/admin` | Stats joueurs / mondes / présence (sans auth) |
 | `/poc` | Grille hexagonale plein écran (dev) |
 | `/backend/**` | Proxy vers l’API Fastify `:9088` |

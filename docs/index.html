@@ -67,8 +67,8 @@
       </nav>
 
       <div class="sidebar-foot">
-        <div>Phase actuelle : <strong id="sidebar-phase">World POC</strong></div>
-        <div>Statut : <strong>Pre-production</strong></div>
+        <div>Phase actuelle : <strong id="sidebar-phase">Economy POC</strong></div>
+        <div>Statut : <strong>Pre-production · Prod live</strong></div>
       </div>
     </aside>
 
@@ -76,7 +76,8 @@
       <header class="topbar">
         <button class="menu-toggle" type="button" data-open-nav aria-label="Ouvrir le menu">☰</button>
         <span class="badge badge-warning">Pre-production</span>
-        <span class="badge badge-accent">Phase 2 — World POC</span>
+        <span class="badge badge-accent">Phase 3 — Economy POC</span>
+        <span class="badge badge-neutral">VPS · Docker</span>
         <button class="search-btn" type="button" data-open-search>
           <span>Rechercher une section</span>
           <kbd>Ctrl</kbd><kbd>K</kbd>
@@ -101,41 +102,43 @@
             <article class="card stat-card">
               <div class="label">Phase</div>
               <div class="value">POC</div>
-              <div class="hint">Phase 2 — World POC</div>
+              <div class="hint">Phase 3 — Economy POC</div>
             </article>
             <article class="card stat-card">
               <div class="label">Priority</div>
-              <div class="value">Persist</div>
-              <div class="hint">Sauver le monde généré</div>
+              <div class="value">Economy</div>
+              <div class="hint">Population + ressources de base</div>
             </article>
             <article class="card stat-card">
               <div class="label">Status</div>
-              <div class="value">Pre-production</div>
-              <div class="hint">Client Nuxt + API Fastify en place</div>
+              <div class="value">Live</div>
+              <div class="hint">Stack + deploy Docker sur VPS</div>
             </article>
             <article class="card stat-card">
-              <div class="label">Target</div>
-              <div class="value">Browser</div>
-              <div class="hint">Desktop d’abord</div>
+              <div class="label">Ports</div>
+              <div class="value">9089</div>
+              <div class="hint">Web public · API 9088 interne</div>
             </article>
           </div>
 
           <div class="grid grid-2" style="margin-top:14px">
             <article class="card">
               <h3>Stack en place</h3>
-              <p>Frontend Nuxt 4 / Vue / TypeScript / Three.js / Tailwind / Nuxt UI. Backend Node.js / Fastify. Données PostgreSQL + Drizzle plus tard. Serveur autoritaire, simulation hors ligne.</p>
+              <p>Frontend Nuxt 4 / Vue / TypeScript / Three.js / Tailwind / Nuxt UI. Backend Fastify autoritaire. PostgreSQL + Drizzle (sessions, mondes, tuiles). Deploy Docker Compose + GitHub Actions SSH. Admin ops <code>/admin</code>. Contenu design dans <code>packages/content</code>.</p>
               <div class="chip-row">
                 <span class="badge badge-accent">Nuxt 4</span>
                 <span class="badge badge-accent">Three.js</span>
                 <span class="badge badge-accent">Fastify</span>
-                <span class="badge badge-neutral">PostgreSQL</span>
+                <span class="badge badge-accent">PostgreSQL</span>
+                <span class="badge badge-accent">Docker</span>
+                <span class="badge badge-accent">Admin</span>
                 <span class="badge badge-neutral">Wiki contenu</span>
               </div>
             </article>
             <article class="card">
               <h3>Dernière décision importante</h3>
-              <p><span class="badge badge-accent">DEC-009</span> Réseau de centres coin (distance 3) + révélation au « + » / roue de biomes.</p>
-              <p>Validé aussi : DEC-008 (Nuxt UI). Prochaine étape Phase 2 : persistance.</p>
+              <p><span class="badge badge-accent">DEC-013</span> Population v0 : pop fixe 8, camp de bûcherons implicite, assign workers + prod bois lazy (cap 200).</p>
+              <p>Phase 3 : valider la boucle assigner → stock hors ligne, puis élargir (farm / mine / builds).</p>
             </article>
           </div>
 
@@ -143,11 +146,11 @@
             <article class="card">
               <h3>Prochaines étapes</h3>
               <ol class="next-list">
-                <li><span>01</span> Grille infinie + région de départ — fait</li>
-                <li><span>02</span> Sélection, village, décors biomes — fait</li>
-                <li><span>03</span> Génération dirigée (réseau coin, roue biomes) — fait</li>
-                <li><span>04</span> Fusions de bordure 40/40/20 — fait</li>
-                <li><span>05</span> Persistance du monde</li>
+                <li><span>01</span> Session anonyme + claim pseudo — fait</li>
+                <li><span>02</span> Landing <code>/</code> + écran <code>/play</code> — fait</li>
+                <li><span>03</span> Admin stats / présence (<code>/admin</code>) — fait</li>
+                <li><span>04</span> Pop + workers + bois (v0) — fait</li>
+                <li><span>05</span> Poser bâtiments / autres extracteurs</li>
               </ol>
             </article>
             <article class="card notes-card">
@@ -559,8 +562,8 @@
               <p>Orthographique, vraie géométrie 3D légère, perspective 2.5D. Caméra relativement fixe. Le joueur ne tourne pas librement autour du monde comme dans un jeu 3D classique.</p>
             </article>
             <article class="card">
-              <h3>POC visuel</h3>
-              <p>Three.js dans <code>/poc</code>. Grille infinie (tuiles inconnues), pan / zoom, sélection, village, décors forêt / plaine / montagne, rivages d’arête, mer basse, génération via « + » + roue de biomes.</p>
+              <h3>Client jouable</h3>
+              <p>Landing <code>/</code> (pseudo + CTA). Carte Three.js dans <code>/play</code> (session requise). Dev sandbox <code>/poc</code>. Admin ops <code>/admin</code> (stats, présence).</p>
             </article>
           </div>
 
@@ -592,27 +595,29 @@
             <div class="tab-panels">
               <div class="panel-front card">
                 <h3>Nuxt 4 · Vue · TypeScript · Three.js</h3>
-                <p>Nuxt gère l’UI, les pages, les menus, l’inventaire, les panneaux de gestion, la boutique, le compte. Three.js gère uniquement le rendu de la carte : hexagones, bâtiments, terrain, animations visuelles.</p>
+                <p>Routes : <code>/</code> landing, <code>/play</code> jeu, <code>/admin</code> ops, <code>/poc</code> sandbox. Proxy <code>/backend</code> → API. Three.js uniquement pour la carte (<code>app/renderer</code>).</p>
               </div>
               <div class="panel-back card">
                 <h3>Node.js · TypeScript · Fastify</h3>
-                <p>Le serveur est autoritaire. Le client demande une action (« construire une fonderie »). Le serveur vérifie ressources, terrain, conditions, population, coût, règles. Puis accepte ou refuse.</p>
+                <p>Serveur autoritaire. Session cookie <code>tw_sid</code>, claim pseudo, mondes, actions, content catalogue, admin overview. Présence « en ligne » en mémoire (TTL 5&nbsp;min).</p>
               </div>
               <div class="panel-data card">
                 <h3>PostgreSQL · Drizzle ORM</h3>
-                <p>Redis n’est pas prévu au début. Il pourra être ajouté plus tard pour le cache, les jobs, les files, les événements, les notifications.</p>
+                <p>Schéma : <code>players</code> (pseudo unique), <code>worlds</code>, tuiles / régions. Contenu design (biomes, bâtiments, recettes) reste dans <code>packages/content</code> — pas en DB.</p>
               </div>
               <div class="panel-arch">
                 <pre class="mono"><span class="tree-key">hexald/</span>
 ├── apps/
-│   ├── web/          <span class="tree-key">Nuxt + Three.js</span>
-│   └── api/          <span class="tree-key">Fastify</span>
+│   ├── web/          <span class="tree-key">Nuxt + Three.js · :9089</span>
+│   └── api/          <span class="tree-key">Fastify · :9088 interne</span>
 ├── packages/
 │   ├── shared/
 │   ├── game-core/    <span class="tree-key">règles du jeu</span>
-│   └── content/      <span class="tree-key">biomes, recettes, bâtiments</span>
+│   ├── content/      <span class="tree-key">biomes, recettes, bâtiments</span>
+│   └── db/           <span class="tree-key">Drizzle + PostgreSQL</span>
 ├── docs/             <span class="tree-key">Project Hub</span>
-└── ...</pre>
+├── docker-compose.yml
+└── .github/workflows/deploy.yml</pre>
               </div>
             </div>
           </div>
@@ -672,7 +677,7 @@
         <section id="decisions">
           <p class="section-kicker">Decision log</p>
           <h2>Technical Decisions</h2>
-          <p>Dupliquer le bloc en pointillés en bas de liste pour ajouter une décision. Incrémenter l’ID (DEC-010, etc.).</p>
+          <p>Dupliquer le bloc en pointillés en bas de liste pour ajouter une décision. Incrémenter l’ID (DEC-014, etc.).</p>
 
           <div class="decision-grid">
             <article class="decision">
@@ -822,6 +827,51 @@
                 <dt>Décision</dt><dd><code>water</code> plus bas que la terre. Aucune fusion terre↔eau : au tirage « fusion », on choisit l’un des deux parents. Le rivage est un <strong>décor d’arête</strong> selon le voisin terrestre (plage / rivage boisé / falaise). <code>water</code> non constructible ; toute terre l’est.</dd>
                 <dt>Raison</dt><dd>Aligné sur Civilization : terre et mer restent des types séparés ; le contact se dessine sur le contour.</dd>
                 <dt>Conséquences</dt><dd>Pas de <code>*_water</code>. Fusions limitées aux terre↔terre. Renderer : <code>createShoreEdgeDecor</code>. <code>isCoastBiome</code> reste exposé mais renvoie toujours false.</dd>
+              </dl>
+            </article>
+
+            <article class="decision">
+              <header>
+                <span class="id">DEC-011</span>
+                <span class="status status-accepted">Accepted</span>
+                <span class="badge badge-neutral">2026-08-25</span>
+              </header>
+              <h3>Deploy Docker Compose + ports figés</h3>
+              <dl>
+                <dt>Contexte</dt><dd>Il faut publier le POC sur un VPS, avec rebuild fiable à chaque push <code>main</code>.</dd>
+                <dt>Décision</dt><dd>Docker Compose (postgres + api + web). Deploy via SSH (<code>appleboy/ssh-action</code>). Web public sur <strong>9089</strong> (Nginx → conteneur). API sur <strong>9088</strong> uniquement sur le réseau Docker ; le client passe par le proxy Nitro <code>/backend</code>.</dd>
+                <dt>Raison</dt><dd>Même stack que le monorepo local. L’API n’a pas besoin d’être exposée : same-origin via le proxy Nuxt, cookies de session plus simples.</dd>
+                <dt>Conséquences</dt><dd><code>apps/api/.env</code> sur le VPS (<code>SESSION_SECRET</code>, CORS). Migrations au boot de l’API. Rebuild image web pour changer la cible proxy.</dd>
+              </dl>
+            </article>
+
+            <article class="decision">
+              <header>
+                <span class="id">DEC-012</span>
+                <span class="status status-accepted">Accepted</span>
+                <span class="badge badge-neutral">2026-08-25</span>
+              </header>
+              <h3>Admin ops léger ; contenu design en fichiers</h3>
+              <dl>
+                <dt>Contexte</dt><dd>Besoin de voir joueurs, mondes, présence et compteurs pendant le développement, sans bâtir un CMS de game design.</dd>
+                <dt>Décision</dt><dd>Page Nuxt <code>/admin</code> + <code>GET /v1/admin/overview</code> (sans auth pour l’instant). Présence en mémoire (activité API, TTL 5&nbsp;min). Biomes / bâtiments / recettes restent dans <code>packages/content</code>.</dd>
+                <dt>Raison</dt><dd>L’admin sert à observer et opérer le live. Éditer le contenu via UI trop tôt coûte cher (validation, versions, hot-edit) alors que les fichiers typés + Git restent le meilleur fit en pre-prod.</dd>
+                <dt>Conséquences</dt><dd>Ne pas exposer <code>/admin</code> en prod sans auth. Hot-edit du catalogue = décision future (contenu versionné), pas un CRUD libre. Repo GitHub : <code>FlashbakDev/hexald</code>.</dd>
+              </dl>
+            </article>
+
+            <article class="decision">
+              <header>
+                <span class="id">DEC-013</span>
+                <span class="status status-accepted">Accepted</span>
+                <span class="badge badge-neutral">2026-08-25</span>
+              </header>
+              <h3>Population v0 — pop fixe + camp bois implicite</h3>
+              <dl>
+                <dt>Contexte</dt><dd>Phase 3 doit valider assignation → production hors ligne sans poser encore tout le système de bâtiments.</dd>
+                <dt>Décision</dt><dd>Pop fixe <strong>8</strong> (cap 12 affiché). Camp de bûcherons implicite (max 4). Rate 12 bois/worker/h, cap stock 200, départ 30. <code>POST /v1/worlds/:id/workers</code>. Settle lazy au load / assign (DEC-006).</dd>
+                <dt>Raison</dt><dd>Prouve la boucle navigateur (Travian-like + idle) avec un scope minimal. Pas de croissance / food / pathfinding au v0.</dd>
+                <dt>Conséquences</dt><dd>Colonnes économie sur <code>worlds</code>. UI <code>/play</code> : panneau workers ± et stocks. Prochaine étape : instances de bâtiments sur la carte + autres extracteurs.</dd>
               </dl>
             </article>
 
@@ -1421,21 +1471,26 @@
                 <li>Village sur une tuile — fait</li>
               </ul>
             </article>
-            <article class="roadmap-item is-current">
-              <div class="roadmap-head"><h3>Phase 2 — World POC</h3><span class="status status-progress">In progress</span></div>
+            <article class="roadmap-item is-done">
+              <div class="roadmap-head"><h3>Phase 2 — World POC</h3><span class="status status-done">Done</span></div>
               <ul>
                 <li>Génération dirigée (réseau coin, distance 3) — fait</li>
                 <li>Roue de biomes au « + » — fait</li>
                 <li>Bordures 40/40/20 + fusions terre + rivages d’arête — fait</li>
                 <li>Décors : forêt (arbres), plaine (herbe légère), montagne — fait</li>
-                <li>Persistance du monde</li>
+                <li>Session anonyme + API mondes / schéma Drizzle — fait</li>
+                <li>Deploy Docker VPS (web :9089, api interne :9088) — fait</li>
+                <li>Client branché sur la persistance (charger / sauver) — fait</li>
               </ul>
             </article>
-            <article class="roadmap-item">
-              <div class="roadmap-head"><h3>Phase 3 — Economy POC</h3><span class="status status-planned">Planned</span></div>
+            <article class="roadmap-item is-current">
+              <div class="roadmap-head"><h3>Phase 3 — Economy POC</h3><span class="status status-progress">In progress</span></div>
               <ul>
-                <li>Population et travailleurs</li>
-                <li>Wood, food, stone, iron ore</li>
+                <li>Landing + session + claim pseudo — fait</li>
+                <li>Admin ops (<code>/admin</code>, overview API) — fait</li>
+                <li>Pop + workers + bois lazy (camp implicite) — fait</li>
+                <li>Poser bâtiments / farm / mine / stone</li>
+                <li>Croissance pop + food (plus tard)</li>
               </ul>
             </article>
             <article class="roadmap-item">
@@ -1490,17 +1545,21 @@
             <article class="card priority-col">
               <h3><span class="priority priority-p0">P0</span> Critical</h3>
               <ul>
-                <li>Three.js + région de départ (7 tuiles) — validés</li>
-                <li>Sélection au clic — validé</li>
-                <li>Village sur une tuile — validé</li>
+                <li>Three.js + région de départ — validé</li>
                 <li>Génération dirigée + fusions — validé</li>
-                <li>Persistance du monde</li>
+                <li>API / DB mondes + session — validé</li>
+                <li>Deploy Docker VPS — validé</li>
+                <li>Client → persistance monde — validé</li>
+                <li>Landing + pseudo + play — validé</li>
+                <li>Pop + bois v0 — validé</li>
+                <li>Bâtiments posés + autres ressources</li>
               </ul>
             </article>
             <article class="card priority-col">
               <h3><span class="priority priority-p1">P1</span> Important</h3>
               <ul>
                 <li>Chaînes industrielles</li>
+                <li>Sécuriser /admin</li>
                 <li>Routes</li>
                 <li>Villages additionnels</li>
               </ul>
@@ -1545,9 +1604,17 @@
             </div>
             <div class="kanban-col" data-column="todo">
               <h3>Todo</h3>
-              <article class="task" draggable="true" data-id="task-persist">
-                <strong>Persistance du monde</strong>
-                <p>Sauver les régions générées. Phase 2.</p>
+              <article class="task" draggable="true" data-id="task-place-buildings">
+                <strong>Poser bâtiments sur la carte</strong>
+                <p>Remplacer le camp implicite par une instance lumber_camp (puis farm / mine).</p>
+              </article>
+              <article class="task" draggable="true" data-id="task-economy-resources">
+                <strong>Autres ressources MVP</strong>
+                <p>Wheat, stone, iron ore — même modèle lazy que le bois.</p>
+              </article>
+              <article class="task" draggable="true" data-id="task-admin-auth">
+                <strong>Sécuriser /admin</strong>
+                <p>Auth / secret avant expo prod. Aujourd’hui ouvert volontairement.</p>
               </article>
             </div>
             <div class="kanban-col" data-column="doing">
@@ -1555,6 +1622,30 @@
             </div>
             <div class="kanban-col" data-column="done">
               <h3>Done</h3>
+              <article class="task" draggable="true" data-id="task-economy-pop">
+                <strong>Population + travailleurs + bois</strong>
+                <p>Pop 8, camp implicite max 4, rate 12/h, cap 200, <code>POST …/workers</code>.</p>
+              </article>
+              <article class="task" draggable="true" data-id="task-admin-ops">
+                <strong>Admin ops</strong>
+                <p><code>/admin</code> + <code>/v1/admin/overview</code> : stats, présence, joueurs / mondes récents.</p>
+              </article>
+              <article class="task" draggable="true" data-id="task-landing-session">
+                <strong>Landing + session + pseudo</strong>
+                <p>Cookie anonyme, claim pseudo unique, gate <code>/play</code>.</p>
+              </article>
+              <article class="task" draggable="true" data-id="task-persist-client">
+                <strong>Client → persistance</strong>
+                <p>Charger / sauver le monde via <code>/backend</code> (API autoritaire).</p>
+              </article>
+              <article class="task" draggable="true" data-id="task-deploy-docker">
+                <strong>Deploy Docker VPS</strong>
+                <p>Compose web+api+postgres, GH Actions SSH, ports 9089 / 9088.</p>
+              </article>
+              <article class="task" draggable="true" data-id="task-persist-api">
+                <strong>Persistance API + schéma</strong>
+                <p>Sessions, mondes, tuiles / régions (Drizzle + routes Fastify).</p>
+              </article>
               <article class="task" draggable="true" data-id="task-wiki">
                 <strong>Wiki contenu</strong>
                 <p>Référence biomes, ressources, bâtiments, chaînes, monde dans le hub.</p>
@@ -1672,6 +1763,11 @@
               <h3>Thèmes premium</h3>
               <p>Cosmétique uniquement. Phase 7.</p>
             </article>
+            <article class="card idea" data-status="confirmed">
+              <span class="status status-confirmed">Confirmed</span>
+              <h3>Admin ops (pas CMS contenu)</h3>
+              <p>Stats / joueurs / présence en UI. Contenu design reste versionné dans <code>packages/content</code> (DEC-012).</p>
+            </article>
             <article class="card idea" data-status="experiment">
               <span class="status status-experiment">Experiment</span>
               <h3>Visites de mondes</h3>
@@ -1726,6 +1822,10 @@
               <h3>Scope <span class="badge badge-danger">High</span></h3>
               <p>Risque d’ajouter PvP, social ou commerce trop tôt. Mitigation : hors scope MVP explicite, P3 jusqu’à la boucle fun.</p>
             </article>
+            <article class="risk-card">
+              <h3>Admin ouvert <span class="badge badge-warning">Medium</span></h3>
+              <p><code>/admin</code> et <code>/v1/admin/overview</code> sans auth (DEC-012). Mitigation : ne pas exposer en prod, ou protéger avant deploy public ; tâche backlog « Sécuriser /admin ».</p>
+            </article>
           </div>
         </section>
 
@@ -1737,17 +1837,18 @@
           <p class="lead">Une carte hexagonale agréable à regarder, quatre biomes primaires (forêt, plaine, montagne, eau) avec rivages en décor d’arête, la génération d’une nouvelle région, un village, de la population, l’affectation de travailleurs, la récolte, une mine, du minerai, une fonderie, un lingot, une forge, des outils, de la persistance, et une boucle suffisamment agréable pour donner envie de continuer à développer son monde.</p>
 
           <div class="check-grid">
-            <div class="check-item"><span class="check-box"></span>Carte hexagonale agréable</div>
-            <div class="check-item"><span class="check-box"></span>Biomes : forêt, plaine, montagne, eau (+ rivages d’arête)</div>
-            <div class="check-item"><span class="check-box"></span>Génération d’une nouvelle région</div>
-            <div class="check-item"><span class="check-box"></span>Village</div>
-            <div class="check-item"><span class="check-box"></span>Population</div>
-            <div class="check-item"><span class="check-box"></span>Affectation de travailleurs</div>
-            <div class="check-item"><span class="check-box"></span>Récolte</div>
+            <div class="check-item is-done"><span class="check-box"></span>Carte hexagonale agréable</div>
+            <div class="check-item is-done"><span class="check-box"></span>Biomes : forêt, plaine, montagne, eau (+ rivages d’arête)</div>
+            <div class="check-item is-done"><span class="check-box"></span>Génération d’une nouvelle région</div>
+            <div class="check-item is-done"><span class="check-box"></span>Village</div>
+            <div class="check-item is-done"><span class="check-box"></span>Population + affectation travailleurs (bois v0)</div>
+            <div class="check-item is-done"><span class="check-box"></span>Récolte bois (lazy offline)</div>
+            <div class="check-item"><span class="check-box"></span>Autres ressources (blé, pierre, minerai)</div>
             <div class="check-item"><span class="check-box"></span>Mine + minerai</div>
             <div class="check-item"><span class="check-box"></span>Fonderie + lingot</div>
             <div class="check-item"><span class="check-box"></span>Forge + outils</div>
-            <div class="check-item"><span class="check-box"></span>Persistance</div>
+            <div class="check-item is-done"><span class="check-box"></span>Persistance</div>
+            <div class="check-item is-done"><span class="check-box"></span>Session + pseudo + entrée jeu</div>
             <div class="check-item"><span class="check-box"></span>Boucle assez plaisante pour continuer</div>
           </div>
 
@@ -1767,7 +1868,7 @@
         </section>
 
         <footer class="page-foot">
-          Hexald — Project Hub. Site statique de documentation, pas le jeu. Ouvrir <code>docs/index.html</code> dans le navigateur. Dernière mise à jour du contenu : 25 août 2026 (Phase 2 — World POC + Wiki).
+          Hexald — Project Hub. Site statique de documentation, pas le jeu. Ouvrir <code>docs/index.html</code> dans le navigateur. Dernière mise à jour du contenu : 25 août 2026 (DEC-013 pop + bois v0 · Phase 3).
         </footer>
       </div>
     </div>

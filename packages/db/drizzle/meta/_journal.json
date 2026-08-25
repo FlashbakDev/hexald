@@ -22,6 +22,20 @@
       "when": 1787664990382,
       "tag": "0002_steep_red_shift",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1787672135641,
+      "tag": "0003_colorful_paladin",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1787672818327,
+      "tag": "0004_reflective_sway",
+      "breakpoints": true
     }
   ]
 }

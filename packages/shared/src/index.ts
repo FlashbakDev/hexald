@@ -25,7 +25,13 @@ export type {
   WorldSnapshot,
   WorldSummary,
   WorldTileSnapshot,
-  WorldRegionSnapshot
+  WorldRegionSnapshot,
+  WorldEconomySnapshot,
+  ExpandRegionRequest,
+  ExpandRegionResult,
+  AssignWorkersRequest,
+  BuildRequest,
+  BuildResult
 } from "./world.ts";
 export type { SessionSnapshot } from "./session.ts";
 export {

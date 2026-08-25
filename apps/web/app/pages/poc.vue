@@ -38,6 +38,13 @@ const biomeSwatch: Record<PrimaryBiomeId, string> = {
   water: "#4aa3d9"
 };
 
+const biomeIcon: Record<PrimaryBiomeId, string> = {
+  forest: "i-lucide-trees",
+  plains: "i-lucide-sprout",
+  mountain: "i-lucide-mountain",
+  water: "i-lucide-waves"
+};
+
 const showTilePanel = computed(
   () => selected.value != null && selected.value.biome != null
 );
@@ -100,7 +107,7 @@ const wheelSlots = computed(() => {
 });
 
 const cancelButtonStyle = {
-  transform: "translate(-50%, -50%) translate(0px, 100px)"
+  transform: "translate(-50%, -50%)"
 };
 function onSelect(tile: SelectedTile | null) {
   selected.value = tile;
@@ -141,43 +148,44 @@ function generate(biome: PrimaryBiomeId) {
     <div ref="stage" class="relative min-h-0 flex-1">
       <HexPreview ref="preview" @select="onSelect" />
 
-      <div
-        v-if="showBiomeWheel"
-        class="pointer-events-none absolute inset-0 z-20"
-      >
+      <Transition name="biome-wheel">
         <div
-          class="absolute"
-          :class="wheelInteractive ? 'pointer-events-auto' : 'pointer-events-none'"
-          :style="wheelStyle"
+          v-if="showBiomeWheel"
+          class="pointer-events-none absolute inset-0 z-20"
         >
-          <button
-            type="button"
-            class="absolute left-0 top-0 flex size-9 items-center justify-center rounded-full border border-default/80 bg-default/90 text-muted shadow-md backdrop-blur-sm"
-            :style="cancelButtonStyle"
-            aria-label="Annuler"
-            @click="clearSelection"
+          <div
+            class="biome-wheel__ring absolute"
+            :class="wheelInteractive ? 'pointer-events-auto' : 'pointer-events-none'"
+            :style="wheelStyle"
           >
-            <UIcon name="i-lucide-x" class="size-3.5" />
-          </button>
-          <button
-            v-for="slot in wheelSlots"
-            :key="slot.biome.id"
-            type="button"
-            class="absolute left-0 top-0 flex size-11 items-center justify-center rounded-full border-2 border-white/70 shadow-md transition hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-            :style="[slot.style, { backgroundColor: biomeSwatch[slot.biome.id] }]"
-            :title="slot.biome.label"
-            :aria-label="slot.biome.label"
-            @click="generate(slot.biome.id)"
-          >
-            <span
-              class="text-[10px] font-semibold uppercase tracking-wide"
-              :class="slot.biome.id === 'mountain' ? 'text-stone-800' : 'text-white'"
+            <button
+              type="button"
+              class="absolute left-0 top-0 flex size-9 items-center justify-center rounded-full border border-default/80 bg-default/90 text-muted shadow-md backdrop-blur-sm"
+              :style="cancelButtonStyle"
+              aria-label="Annuler"
+              @click="clearSelection"
             >
-              {{ slot.biome.label.slice(0, 1) }}
-            </span>
-          </button>
+              <UIcon name="i-lucide-x" class="size-3.5" />
+            </button>
+            <button
+              v-for="slot in wheelSlots"
+              :key="slot.biome.id"
+              type="button"
+              class="absolute left-0 top-0 flex size-11 items-center justify-center rounded-full border-2 border-white/70 shadow-md transition hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              :style="[slot.style, { backgroundColor: biomeSwatch[slot.biome.id] }]"
+              :title="slot.biome.label"
+              :aria-label="slot.biome.label"
+              @click="generate(slot.biome.id)"
+            >
+              <UIcon
+                :name="biomeIcon[slot.biome.id]"
+                class="size-5"
+                :class="slot.biome.id === 'mountain' ? 'text-stone-800' : 'text-white'"
+              />
+            </button>
+          </div>
         </div>
-      </div>
+      </Transition>
       <UCard
         v-if="showTilePanel && selected"
         class="absolute bottom-4 left-4 z-10 w-80 max-w-[calc(100%-2rem)] shadow-lg"

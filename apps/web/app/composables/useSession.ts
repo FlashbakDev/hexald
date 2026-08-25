@@ -43,12 +43,28 @@ export function useSession() {
     return session;
   }
 
+  async function checkPseudoAvailable(nextPseudo: string): Promise<{
+    available: boolean;
+    reason?: string;
+  }> {
+    return await $fetch<{ available: boolean; reason?: string }>(
+      "/v1/session/pseudo/available",
+      {
+        baseURL: config.public.apiBase,
+        method: "GET",
+        credentials: "include",
+        query: { pseudo: nextPseudo }
+      }
+    );
+  }
+
   return {
     playerId,
     pseudo,
     ready,
     error,
     ensureSession,
-    claimPseudo
+    claimPseudo,
+    checkPseudoAvailable
   };
 }
