@@ -1,3 +1,6 @@
+const apiProxyTarget =
+  process.env.NUXT_API_PROXY_TARGET ?? "http://127.0.0.1:3001";
+
 export default defineNuxtConfig({
   compatibilityDate: "2025-07-15",
   modules: ["@nuxt/ui"],
@@ -10,7 +13,7 @@ export default defineNuxtConfig({
   },
   devServer: {
     host: "0.0.0.0",
-    port: 3000
+    port: 9089
   },
   colorMode: {
     preference: "dark",
@@ -23,7 +26,7 @@ export default defineNuxtConfig({
   },
   routeRules: {
     "/backend/**": {
-      proxy: "http://127.0.0.1:3001/**"
+      proxy: `${apiProxyTarget}/**`
     }
   },
   vite: {

@@ -53,7 +53,7 @@ export const env = {
   sessionSecret,
   corsOrigins: (
     process.env.CORS_ORIGINS ??
-    "http://127.0.0.1:3000,http://localhost:3000"
+    "http://127.0.0.1:9089,http://localhost:9089"
   )
     .split(",")
     .map((origin) => origin.trim())
