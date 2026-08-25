@@ -81,10 +81,10 @@ pnpm db:migrate
 pnpm dev:api
 ```
 
-Écoute sur tout le réseau local (`--host` → `0.0.0.0:3001`).
+Écoute sur tout le réseau local (`--host` → `0.0.0.0:9088`).
 
-- Local : `http://127.0.0.1:3001`
-- LAN : `http://<ip-du-pc>:3001`
+- Local : `http://127.0.0.1:9088`
+- LAN : `http://<ip-du-pc>:9088`
 
 Pour rester en localhost uniquement : `pnpm --filter @hexald/api dev -- --host 127.0.0.1`
 
@@ -108,11 +108,11 @@ La session anonyme est un cookie httpOnly signé. Les mondes appartiennent au `p
 pnpm dev:web
 ```
 
-Écoute `http://127.0.0.1:3000` (et l’IP LAN via `--host`).
+Écoute `http://127.0.0.1:9089` (et l’IP LAN via `--host`).
 
 | Route | Rôle |
 | --- | --- |
 | `/` | Landing : pseudo + CTA Jouer |
 | `/play` | Écran de jeu (session + pseudo requis) |
 | `/poc` | Grille hexagonale plein écran (dev) |
-| `/backend/**` | Proxy vers l’API Fastify `:3001` |
+| `/backend/**` | Proxy vers l’API Fastify `:9088` |

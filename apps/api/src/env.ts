@@ -47,7 +47,7 @@ export const env = {
     hostFlag === true
       ? "0.0.0.0"
       : hostFlag || process.env.HOST || "127.0.0.1",
-  port: Number(portFlag || process.env.PORT || 3001),
+  port: Number(portFlag || process.env.PORT || 9088),
   isDev,
   databaseUrl,
   sessionSecret,

@@ -1,5 +1,5 @@
 const apiProxyTarget =
-  process.env.NUXT_API_PROXY_TARGET ?? "http://127.0.0.1:3001";
+  process.env.NUXT_API_PROXY_TARGET ?? "http://127.0.0.1:9088";
 
 export default defineNuxtConfig({
   compatibilityDate: "2025-07-15",

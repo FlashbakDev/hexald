@@ -21,8 +21,8 @@ COPY packages/db ./packages/db
 
 ENV NODE_ENV=production
 ENV HOST=0.0.0.0
-ENV PORT=3001
+ENV PORT=9088
 
-EXPOSE 3001
+EXPOSE 9088
 
 CMD ["sh", "-c", "pnpm --filter @hexald/db migrate && pnpm --filter @hexald/api start"]

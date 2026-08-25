@@ -5,8 +5,8 @@
   "type": "module",
   "description": "Serveur Fastify autoritaire.",
   "scripts": {
-    "dev": "tsx watch src/index.ts --host",
-    "start": "tsx src/index.ts --host",
+    "dev": "tsx watch src/index.ts --host --port 9088",
+    "start": "tsx src/index.ts --host --port 9088",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {

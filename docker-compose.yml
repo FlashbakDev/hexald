@@ -23,13 +23,13 @@ services:
       dockerfile: apps/api/Dockerfile
     container_name: hexald-api
     ports:
-      - "${API_PORT:-3001}:3001"
+      - "9088:9088"
     env_file:
       - apps/api/.env
     environment:
       NODE_ENV: production
       HOST: 0.0.0.0
-      PORT: 3001
+      PORT: 9088
       DATABASE_URL: postgresql://hexald:hexald@postgres:5432/hexald
       CORS_ORIGINS: ${CORS_ORIGINS:-http://127.0.0.1:9089,http://localhost:9089}
     depends_on:
@@ -41,10 +41,10 @@ services:
       context: .
       dockerfile: apps/web/Dockerfile
       args:
-        NUXT_API_PROXY_TARGET: http://api:3001
+        NUXT_API_PROXY_TARGET: http://api:9088
     container_name: hexald-web
     ports:
-      - "${WEB_PORT:-9089}:9089"
+      - "9089:9089"
     environment:
       NODE_ENV: production
       HOST: 0.0.0.0

@@ -18,7 +18,7 @@ COPY packages/content ./packages/content
 COPY packages/game-core ./packages/game-core
 
 # Proxy Nitro → service Compose `api` (réseau Docker interne)
-ARG NUXT_API_PROXY_TARGET=http://api:3001
+ARG NUXT_API_PROXY_TARGET=http://api:9088
 ENV NUXT_API_PROXY_TARGET=$NUXT_API_PROXY_TARGET
 
 RUN pnpm --filter @hexald/web build
