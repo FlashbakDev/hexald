@@ -865,29 +865,33 @@ function formatStock(value: number) {
           {{ pseudo ?? "…" }}
         </p>
         <div class="play-cloud-header__stats">
-          <p class="play-cloud-header__stat" title="Population">
-            <UIcon name="i-lucide-users" class="play-cloud-header__stat-icon" aria-hidden="true" />
-            <span class="sr-only">Pop</span>
-            {{ idlePop }}/{{ population }}
-          </p>
-          <p v-if="economy" class="play-cloud-header__stat" title="Bois">
-            <UIcon name="i-lucide-tree-pine" class="play-cloud-header__stat-icon" aria-hidden="true" />
-            <span class="sr-only">Bois</span>
-            {{ formatStock(displayedWood) }}
-            <span class="opacity-70">· {{ woodRateLabel }}</span>
-          </p>
-          <p v-if="economy" class="play-cloud-header__stat" title="Blé">
-            <UIcon name="i-lucide-wheat" class="play-cloud-header__stat-icon" aria-hidden="true" />
-            <span class="sr-only">Blé</span>
-            {{ formatStock(displayedWheat) }}
-            <span class="opacity-70">· {{ wheatRateLabel }}</span>
-          </p>
-          <p v-if="economy" class="play-cloud-header__stat" title="Pierre">
-            <UIcon name="i-lucide-gem" class="play-cloud-header__stat-icon" aria-hidden="true" />
-            <span class="sr-only">Pierre</span>
-            {{ formatStock(displayedStone) }}
-            <span class="opacity-70">· {{ stoneRateLabel }}</span>
-          </p>
+          <div class="play-cloud-header__stats-row">
+            <p class="play-cloud-header__stat" title="Population">
+              <UIcon name="i-lucide-users" class="play-cloud-header__stat-icon" aria-hidden="true" />
+              <span class="sr-only">Pop</span>
+              {{ idlePop }}/{{ population }}
+            </p>
+            <p v-if="economy" class="play-cloud-header__stat" title="Bois">
+              <UIcon name="i-lucide-tree-pine" class="play-cloud-header__stat-icon" aria-hidden="true" />
+              <span class="sr-only">Bois</span>
+              {{ formatStock(displayedWood) }}
+              <span class="opacity-70">· {{ woodRateLabel }}</span>
+            </p>
+          </div>
+          <div v-if="economy" class="play-cloud-header__stats-row">
+            <p class="play-cloud-header__stat" title="Blé">
+              <UIcon name="i-lucide-wheat" class="play-cloud-header__stat-icon" aria-hidden="true" />
+              <span class="sr-only">Blé</span>
+              {{ formatStock(displayedWheat) }}
+              <span class="opacity-70">· {{ wheatRateLabel }}</span>
+            </p>
+            <p class="play-cloud-header__stat" title="Pierre">
+              <UIcon name="i-lucide-gem" class="play-cloud-header__stat-icon" aria-hidden="true" />
+              <span class="sr-only">Pierre</span>
+              {{ formatStock(displayedStone) }}
+              <span class="opacity-70">· {{ stoneRateLabel }}</span>
+            </p>
+          </div>
         </div>
       </div>
 

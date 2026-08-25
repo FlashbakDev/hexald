@@ -429,12 +429,12 @@ html {
   position: relative;
   z-index: 1;
   display: flex;
-  height: 56%;
-  min-height: 2.5rem;
+  height: 62%;
+  min-height: 3rem;
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  padding: max(0.7rem, env(safe-area-inset-top)) 1.15rem 0;
+  padding: max(0.55rem, env(safe-area-inset-top)) 1.15rem 0;
   color: #1c2b28;
 }
 
@@ -451,24 +451,32 @@ html {
   font-weight: 600;
   letter-spacing: 0.01em;
   line-height: 1.1;
-  max-width: 42%;
+  max-width: 36%;
 }
 
 .play-cloud-header__stats {
   display: flex;
+  flex-direction: column;
   flex-shrink: 0;
+  align-items: flex-end;
+  gap: 0.2rem;
+}
+
+.play-cloud-header__stats-row {
+  display: flex;
   align-items: baseline;
-  gap: 0.85rem;
+  justify-content: flex-end;
+  gap: 0.75rem;
 }
 
 .play-cloud-header__stat {
   display: inline-flex;
   align-items: center;
   gap: 0.32rem;
-  font-size: clamp(0.88rem, 2vw, 1rem);
+  font-size: clamp(0.82rem, 1.9vw, 0.95rem);
   font-weight: 600;
   font-variant-numeric: tabular-nums;
-  line-height: 1.1;
+  line-height: 1.15;
 }
 
 .play-cloud-header__stat-icon {
