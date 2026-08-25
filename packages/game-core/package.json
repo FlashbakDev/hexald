@@ -1,0 +1,14 @@
+{
+  "name": "@hexald/game-core",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Règles du jeu : validation des actions, production hors ligne.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@hexald/content": "workspace:*",
+    "@hexald/shared": "workspace:*"
+  }
+}

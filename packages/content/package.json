@@ -1,0 +1,13 @@
+{
+  "name": "@hexald/content",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Contenu data-driven : biomes, ressources, bâtiments, recettes.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@hexald/shared": "workspace:*"
+  }
+}

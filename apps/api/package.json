@@ -1,0 +1,27 @@
+{
+  "name": "@hexald/api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Serveur Fastify autoritaire.",
+  "scripts": {
+    "dev": "tsx watch src/index.ts --host",
+    "start": "tsx src/index.ts --host",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@fastify/cookie": "^11.1.2",
+    "@fastify/cors": "^11.0.1",
+    "@hexald/content": "workspace:*",
+    "@hexald/db": "workspace:*",
+    "@hexald/game-core": "workspace:*",
+    "@hexald/shared": "workspace:*",
+    "fastify": "^5.6.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.3.0",
+    "pino-pretty": "^13.1.1",
+    "tsx": "^4.20.5",
+    "typescript": "^5.9.2"
+  }
+}

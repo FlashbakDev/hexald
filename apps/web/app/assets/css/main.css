@@ -1,0 +1,65 @@
+@import "tailwindcss";
+@import "@nuxt/ui";
+
+@theme {
+  --font-display: "Syne", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Figtree", ui-sans-serif, system-ui, sans-serif;
+  --color-hx-deep: #041c22;
+  --color-hx-lagoon: #0ea5c6;
+  --color-hx-leaf: #34d399;
+  --color-hx-sun: #fbbf24;
+  --color-hx-cream: #f4fff8;
+}
+
+html {
+  font-family: var(--font-sans);
+}
+
+.font-display {
+  font-family: var(--font-display);
+}
+
+@keyframes landing-rise {
+  from {
+    opacity: 0;
+    transform: translateY(1.25rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes landing-cta-glow {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 0 rgb(251 191 36 / 0.35),
+      0 12px 40px rgb(251 191 36 / 0.25);
+  }
+  50% {
+    box-shadow:
+      0 0 0 10px rgb(251 191 36 / 0),
+      0 16px 48px rgb(251 191 36 / 0.4);
+  }
+}
+
+.landing-rise {
+  animation: landing-rise 0.8s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.landing-rise-delay-1 {
+  animation-delay: 0.12s;
+}
+
+.landing-rise-delay-2 {
+  animation-delay: 0.24s;
+}
+
+.landing-rise-delay-3 {
+  animation-delay: 0.36s;
+}
+
+.landing-cta-glow {
+  animation: landing-cta-glow 2.8s ease-in-out infinite;
+}

@@ -1,0 +1,1785 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Hexald — Project Hub</title>
+  <meta name="description" content="Documentation et tableau de bord de suivi du projet Hexald.">
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <a class="skip-link" href="#content">Aller au contenu</a>
+
+  <div class="layout">
+    <aside class="sidebar" id="sidebar">
+      <button class="sidebar-close" type="button" data-close-nav aria-label="Fermer le menu">✕</button>
+      <div class="brand">
+        <img src="assets/logo.svg" alt="">
+        <div>
+          <div class="brand-name">Hexald</div>
+          <span class="brand-sub">Project Hub</span>
+        </div>
+      </div>
+
+      <nav aria-label="Sections">
+        <div class="nav-group">
+          <div class="nav-label">Projet</div>
+          <a href="#overview"><span class="nav-dot"></span>Overview</a>
+          <a href="#vision"><span class="nav-dot"></span>Concept</a>
+        </div>
+        <div class="nav-group">
+          <div class="nav-label">Game design</div>
+          <a href="#gameplay"><span class="nav-dot"></span>Gameplay</a>
+          <a href="#world"><span class="nav-dot"></span>World</a>
+          <a href="#economy"><span class="nav-dot"></span>Economy</a>
+          <a href="#production"><span class="nav-dot"></span>Production</a>
+          <a href="#buildings"><span class="nav-dot"></span>Buildings</a>
+          <a href="#design"><span class="nav-dot"></span>Design</a>
+        </div>
+        <div class="nav-group">
+          <div class="nav-label">Technique</div>
+          <a href="#technical"><span class="nav-dot"></span>Technical</a>
+          <a href="#decisions"><span class="nav-dot"></span>Decisions</a>
+        </div>
+        <div class="nav-group">
+          <div class="nav-label">Wiki</div>
+          <a href="#wiki"><span class="nav-dot"></span>Index</a>
+          <a href="#wiki-biomes"><span class="nav-dot"></span>Biomes</a>
+          <a href="#wiki-resources"><span class="nav-dot"></span>Ressources</a>
+          <a href="#wiki-buildings"><span class="nav-dot"></span>Bâtiments</a>
+          <a href="#wiki-chains"><span class="nav-dot"></span>Chaînes</a>
+          <a href="#wiki-world"><span class="nav-dot"></span>Monde</a>
+          <a href="#wiki-pois"><span class="nav-dot"></span>POI</a>
+        </div>
+        <div class="nav-group">
+          <div class="nav-label">Suivi</div>
+          <a href="#roadmap"><span class="nav-dot"></span>Roadmap</a>
+          <a href="#priorities"><span class="nav-dot"></span>Priorities</a>
+          <a href="#backlog"><span class="nav-dot"></span>Backlog</a>
+          <a href="#ideas"><span class="nav-dot"></span>Ideas</a>
+          <a href="#risks"><span class="nav-dot"></span>Risks</a>
+          <a href="#mvp"><span class="nav-dot"></span>MVP</a>
+        </div>
+      </nav>
+
+      <div class="sidebar-foot">
+        <div>Phase actuelle : <strong id="sidebar-phase">World POC</strong></div>
+        <div>Statut : <strong>Pre-production</strong></div>
+      </div>
+    </aside>
+
+    <div class="main">
+      <header class="topbar">
+        <button class="menu-toggle" type="button" data-open-nav aria-label="Ouvrir le menu">☰</button>
+        <span class="badge badge-warning">Pre-production</span>
+        <span class="badge badge-accent">Phase 2 — World POC</span>
+        <button class="search-btn" type="button" data-open-search>
+          <span>Rechercher une section</span>
+          <kbd>Ctrl</kbd><kbd>K</kbd>
+        </button>
+      </header>
+
+      <div class="content" id="content">
+
+        <!-- 1. Dashboard -->
+        <section id="overview">
+          <p class="section-kicker">Dashboard</p>
+          <h1>Hexald</h1>
+          <p class="lead">Jeu de gestion / stratégie persistant par navigateur. Chaque joueur crée progressivement son propre monde, hexagone par hexagone.</p>
+          <div class="hero-meta">
+            <span class="status status-progress">In progress</span>
+            <span class="priority priority-p0">P0 — Core gameplay</span>
+            <span class="badge badge-neutral">Browser</span>
+            <span class="badge badge-neutral">Nom temporaire</span>
+          </div>
+
+          <div class="grid grid-4">
+            <article class="card stat-card">
+              <div class="label">Phase</div>
+              <div class="value">POC</div>
+              <div class="hint">Phase 2 — World POC</div>
+            </article>
+            <article class="card stat-card">
+              <div class="label">Priority</div>
+              <div class="value">Persist</div>
+              <div class="hint">Sauver le monde généré</div>
+            </article>
+            <article class="card stat-card">
+              <div class="label">Status</div>
+              <div class="value">Pre-production</div>
+              <div class="hint">Client Nuxt + API Fastify en place</div>
+            </article>
+            <article class="card stat-card">
+              <div class="label">Target</div>
+              <div class="value">Browser</div>
+              <div class="hint">Desktop d’abord</div>
+            </article>
+          </div>
+
+          <div class="grid grid-2" style="margin-top:14px">
+            <article class="card">
+              <h3>Stack en place</h3>
+              <p>Frontend Nuxt 4 / Vue / TypeScript / Three.js / Tailwind / Nuxt UI. Backend Node.js / Fastify. Données PostgreSQL + Drizzle plus tard. Serveur autoritaire, simulation hors ligne.</p>
+              <div class="chip-row">
+                <span class="badge badge-accent">Nuxt 4</span>
+                <span class="badge badge-accent">Three.js</span>
+                <span class="badge badge-accent">Fastify</span>
+                <span class="badge badge-neutral">PostgreSQL</span>
+                <span class="badge badge-neutral">Wiki contenu</span>
+              </div>
+            </article>
+            <article class="card">
+              <h3>Dernière décision importante</h3>
+              <p><span class="badge badge-accent">DEC-009</span> Réseau de centres coin (distance 3) + révélation au « + » / roue de biomes.</p>
+              <p>Validé aussi : DEC-008 (Nuxt UI). Prochaine étape Phase 2 : persistance.</p>
+            </article>
+          </div>
+
+          <div class="grid grid-2" style="margin-top:14px">
+            <article class="card">
+              <h3>Prochaines étapes</h3>
+              <ol class="next-list">
+                <li><span>01</span> Grille infinie + région de départ — fait</li>
+                <li><span>02</span> Sélection, village, décors biomes — fait</li>
+                <li><span>03</span> Génération dirigée (réseau coin, roue biomes) — fait</li>
+                <li><span>04</span> Fusions de bordure 40/40/20 — fait</li>
+                <li><span>05</span> Persistance du monde</li>
+              </ol>
+            </article>
+            <article class="card notes-card">
+              <h3>Quick Notes</h3>
+              <p>Bloc personnel, sauvegardé dans ce navigateur uniquement.</p>
+              <label class="nav-scroll" for="quick-notes">Notes rapides</label>
+              <textarea id="quick-notes" placeholder="Noter une idée, un doute, une décision en cours…"></textarea>
+              <p class="notes-hint" id="notes-status">Les notes restent locales (localStorage).</p>
+            </article>
+          </div>
+        </section>
+
+        <!-- 2. Vision -->
+        <section id="vision">
+          <p class="section-kicker">Vision</p>
+          <h2>Concept</h2>
+          <p class="quote">Chaque joueur crée progressivement son propre monde.</p>
+          <p class="lead">Hexald n’est pas un MMO territorial classique. Ce n’est pas non plus un city-builder posé sur une carte unique partagée. C’est un espace de progression personnel, persistant, que le joueur sculpte en choisissant la direction de génération de son territoire.</p>
+
+          <div class="grid grid-2">
+            <article class="card">
+              <h3>Pitch</h3>
+              <p>Un jeu de gestion / stratégie persistant par navigateur, inspiré de certains aspects de Civilization, Travian ou Grepolis, mais centré sur une mécanique différente : le joueur ne déplace pas un personnage. Il gère un territoire, une population, des villages, des chaînes de production et l’expansion de son monde hexagonal.</p>
+            </article>
+            <article class="card">
+              <h3>Fantasme joueur</h3>
+              <p>Voir son diorama s’agrandir. Choisir la prochaine forêt, la prochaine montagne. Relier une mine à une fonderie, une fonderie à une forge. Revenir le lendemain et constater que le monde a travaillé sans lui. Posséder un lieu qui n’appartient qu’à soi, puis l’ouvrir plus tard aux autres.</p>
+            </article>
+          </div>
+
+          <div class="grid grid-2" style="margin-top:14px">
+            <article class="card">
+              <h3>Ce qui différencie le jeu</h3>
+              <p>La carte n’est pas un énorme territoire partagé. Chaque joueur possède son monde. Il contrôle la direction de la génération (le biome de la prochaine région), pas forcément tous les détails. Les hexagones de frontière se mélangent. L’économie n’est pas un inventaire magique : c’est une chaîne.</p>
+            </article>
+            <article class="card">
+              <h3>Piliers</h3>
+              <p>Création du monde, gestion de civilisation, production, expansion. Lisibilité avant détail. Pas de pay-to-win. Le monde principal reste un espace de progression protégé, même si le multijoueur arrive plus tard.</p>
+            </article>
+          </div>
+
+          <div class="grid grid-4" style="margin-top:14px">
+            <article class="concept-card">
+              <div class="index">01 — Create</div>
+              <h3>Créer</h3>
+              <p>Créer son propre monde, région après région, en choisissant les biomes.</p>
+            </article>
+            <article class="concept-card">
+              <div class="index">02 — Manage</div>
+              <h3>Gérer</h3>
+              <p>Développer sa civilisation : population, villages, besoins, spécialisations.</p>
+            </article>
+            <article class="concept-card">
+              <div class="index">03 — Produce</div>
+              <h3>Produire</h3>
+              <p>Construire des chaînes économiques, de la ressource brute à l’outil fini.</p>
+            </article>
+            <article class="concept-card">
+              <div class="index">04 — Expand</div>
+              <h3>Expand</h3>
+              <p>Générer de nouveaux territoires et faire progresser le monde vers le bas de l’écran.</p>
+            </article>
+          </div>
+        </section>
+
+        <!-- 3. Core gameplay -->
+        <section id="gameplay">
+          <p class="section-kicker">Boucle principale</p>
+          <h2>Core Gameplay</h2>
+          <p class="lead">Le joueur ne contrôle pas individuellement les habitants. Il oriente un système : terrain, travailleurs, bâtiments, logistique.</p>
+
+          <div class="loop">
+            <div class="loop-step">
+              <div class="loop-rail"><div class="loop-num">1</div><div class="loop-line"></div></div>
+              <div class="loop-body"><strong>Choisir un biome</strong><p>Forêt, plaine, montagne, eau — les côtes naissent aux frontières.</p></div>
+            </div>
+            <div class="loop-step">
+              <div class="loop-rail"><div class="loop-num">2</div><div class="loop-line"></div></div>
+              <div class="loop-body"><strong>Générer une région</strong><p>Un hexagone central et ses six voisins, influencés par les frontières.</p></div>
+            </div>
+            <div class="loop-step">
+              <div class="loop-rail"><div class="loop-num">3</div><div class="loop-line"></div></div>
+              <div class="loop-body"><strong>Découvrir les ressources</strong><p>Le terrain dicte ce qui peut être extrait.</p></div>
+            </div>
+            <div class="loop-step">
+              <div class="loop-rail"><div class="loop-num">4</div><div class="loop-line"></div></div>
+              <div class="loop-body"><strong>Affecter des habitants</strong><p>La population est une ressource de gestion, pas des unités micro-contrôlées.</p></div>
+            </div>
+            <div class="loop-step">
+              <div class="loop-rail"><div class="loop-num">5</div><div class="loop-line"></div></div>
+              <div class="loop-body"><strong>Extraire</strong><p>Bois, minerai, blé, pierre — selon le biome et le bâtiment.</p></div>
+            </div>
+            <div class="loop-step">
+              <div class="loop-rail"><div class="loop-num">6</div><div class="loop-line"></div></div>
+              <div class="loop-body"><strong>Transformer</strong><p>Scierie, fonderie, moulin, forge : la valeur se crée dans la chaîne.</p></div>
+            </div>
+            <div class="loop-step">
+              <div class="loop-rail"><div class="loop-num">7</div><div class="loop-line"></div></div>
+              <div class="loop-body"><strong>Construire</strong><p>Bâtiments, routes, villages, éventuellement des structures multi-hexagones.</p></div>
+            </div>
+            <div class="loop-step">
+              <div class="loop-rail"><div class="loop-num">8</div><div class="loop-line"></div></div>
+              <div class="loop-body"><strong>Développer</strong><p>Spécialiser les villages, relier les zones, augmenter la capacité.</p></div>
+            </div>
+            <div class="loop-step">
+              <div class="loop-rail"><div class="loop-num">9</div></div>
+              <div class="loop-body"><strong>Créer une nouvelle région</strong><p>La boucle recommence. Le monde s’étend, les nouvelles tuiles arrivent depuis le bas.</p></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 4. World -->
+        <section id="world">
+          <p class="section-kicker">Génération</p>
+          <h2>World Generation</h2>
+          <p class="lead">L’hexagone est l’unité fondamentale du terrain. Le joueur contrôle la direction de la génération, pas nécessairement chaque détail.</p>
+
+          <div class="grid grid-2">
+            <article class="card">
+              <h3>Monde personnel</h3>
+              <p>Chaque joueur possède son propre monde. La carte n’est pas un territoire unique où tout le monde construit. Le multijoueur pourra exister plus tard via visites, commerce, classements, interactions économiques, événements, éventuellement du PvP instancié. Le monde principal reste l’espace de progression.</p>
+            </article>
+            <article class="card">
+              <h3>Structure d’une région</h3>
+              <p>Une région = rayon 1 (centre + 6 voisins). Les centres candidats sont sur un réseau « coin » : voisins à distance cube 3, offsets du type <code>(−1,3)</code>, <code>(−3,2)</code>, <code>(−2,−1)</code>… Un hex vide sépare l’anneau connu du nouveau centre. Le joueur clique le « + » peint sur la tuile pour ouvrir une roue de biomes (forêt, plaine, montagne, eau). Les hex déjà créés dans l’empreinte ne sont jamais écrasés. Aux bordures : tirage 40&nbsp;% / 40&nbsp;% / 20&nbsp;% fusion.</p>
+            </article>
+          </div>
+
+          <div class="hex-scene" style="margin-top:18px">
+            <div>
+              <h3>Région forêt</h3>
+              <div class="hex-board" aria-hidden="true">
+                <div class="hex-row shift">
+                  <div class="hex forest">🌲</div>
+                  <div class="hex forest">🌲</div>
+                </div>
+                <div class="hex-row">
+                  <div class="hex forest">🌲</div>
+                  <div class="hex forest center">🌲</div>
+                  <div class="hex forest">🌲</div>
+                </div>
+                <div class="hex-row shift">
+                  <div class="hex forest">🌲</div>
+                  <div class="hex forest">🌲</div>
+                </div>
+              </div>
+            </div>
+            <div>
+              <h3>Transition forêt / montagne</h3>
+              <div class="hex-board" aria-hidden="true">
+                <div class="hex-row shift">
+                  <div class="hex forest">🌲</div>
+                  <div class="hex mix-fm">⛰️</div>
+                </div>
+                <div class="hex-row">
+                  <div class="hex forest">🌲</div>
+                  <div class="hex mix-fm">🌲</div>
+                  <div class="hex mountain">⛰️</div>
+                </div>
+                <div class="hex-row shift">
+                  <div class="hex forest">🌲</div>
+                  <div class="hex mountain">⛰️</div>
+                </div>
+              </div>
+            </div>
+            <div class="hex-legend">
+              <span><i class="legend-swatch" style="background:#4e7a56"></i> Forêt</span>
+              <span><i class="legend-swatch" style="background:#8fce6e"></i> Plaine</span>
+              <span><i class="legend-swatch" style="background:#7a746e"></i> Montagne</span>
+              <span><i class="legend-swatch" style="background:#4aa3d9"></i> Eau</span>
+              <span>Le « + » marque un centre de région dévoilable. Terre↔eau : rivage sur l’arête (plage / boisé / falaise). L’eau est plus basse que la terre.</span>
+            </div>
+          </div>
+
+          <div class="grid grid-3" style="margin-top:18px">
+            <article class="card">
+              <h3>Ce qu’un hexagone contient</h3>
+              <p>Un biome, des ressources naturelles, un bâtiment ou une portion de bâtiment, une route, une exploitation, éventuellement des caractéristiques particulières. L’eau pure n’accueille pas de bâtiments terrestres. Les rivages (plage, côte boisée, falaise) ne sont pas des biomes : ce sont les contours des contacts terre↔eau.</p>
+            </article>
+            <article class="card">
+              <h3>Emprise des bâtiments</h3>
+              <p>Maison = 1 hex. Ferme = 1 hex. Fonderie = 1 ou plusieurs. Grande usine = plusieurs. Monument = plusieurs.</p>
+            </article>
+            <article class="card">
+              <h3>Navigation dans le monde</h3>
+              <p>Seule une portion est affichée. En se déplaçant, les anciennes régions restent en haut, les nouvelles arrivent progressivement depuis le bas. Sensation de découverte continue.</p>
+            </article>
+          </div>
+        </section>
+
+        <!-- 5. Economy -->
+        <section id="economy">
+          <p class="section-kicker">Systèmes</p>
+          <h2>Economy</h2>
+          <p class="lead">Les ressources ne doivent pas simplement apparaître dans l’inventaire. Tout passe par extraction, transformation, stockage, et une simulation hors ligne.</p>
+
+          <div class="grid grid-2">
+            <article class="card">
+              <h3>Population</h3>
+              <p>Les habitants sont une ressource de gestion. Ils peuvent être assignés : bûcherons, mineurs, agriculteurs, ouvriers, artisans, constructeurs, puis d’autres métiers.</p>
+              <div class="bar-list">
+                <div class="bar-row"><span>Disponibles</span><div class="bar-track"><div class="bar-fill muted" style="width:15%"></div></div><span>15</span></div>
+                <div class="bar-row"><span>Agriculture</span><div class="bar-track"><div class="bar-fill" style="width:25%"></div></div><span>25</span></div>
+                <div class="bar-row"><span>Mine</span><div class="bar-track"><div class="bar-fill warn" style="width:20%"></div></div><span>20</span></div>
+                <div class="bar-row"><span>Bois</span><div class="bar-track"><div class="bar-fill accent" style="width:20%"></div></div><span>20</span></div>
+                <div class="bar-row"><span>Industrie</span><div class="bar-track"><div class="bar-fill info" style="width:10%"></div></div><span>10</span></div>
+                <div class="bar-row"><span>Construction</span><div class="bar-track"><div class="bar-fill" style="width:10%"></div></div><span>10</span></div>
+              </div>
+              <p class="notes-hint">Exemple : population totale 100.</p>
+            </article>
+            <article class="card">
+              <h3>Villages</h3>
+              <p>Un monde peut contenir une capitale, un village forestier, un village minier, un village agricole, un centre industriel. Chaque village a sa population, ses bâtiments, ses zones exploitées, ses spécialisations et ses besoins.</p>
+              <h3 style="margin-top:18px">Routes et logistique</h3>
+              <p>Les routes relient les zones. Plus tard : accélérer le transport, améliorer la productivité, connecter villages et exploitations, créer un réseau. Niveaux : sentier → route → route pavée → infrastructure avancée.</p>
+            </article>
+          </div>
+
+          <article class="card" style="margin-top:14px">
+            <h3>Production hors ligne</h3>
+            <p>Il ne faut pas simuler chaque mine chaque seconde. On stocke un taux et un timestamp, puis on rattrape le temps à la reconnexion. C’est essentiel pour une simulation persistante avec beaucoup de joueurs.</p>
+            <div class="formula">
+              <div class="formula-box"><b>État stocké</b>stock = 500<br>productionRate = 100/h<br>lastCalculatedAt = 08:00</div>
+              <div class="formula-box"><b>Retour à 14:00</b>elapsed = 6h<br>production = 6 × 100<br>stock = 1100</div>
+              <div class="formula-box"><b>Décision</b>DEC-006<br>Pas de tick permanent<br>Calcul lazy à la requête</div>
+            </div>
+          </article>
+        </section>
+
+        <!-- 6. Production chains -->
+        <section id="production">
+          <p class="section-kicker">Chaînes</p>
+          <h2>Production Chains</h2>
+          <p>Le système devra à terme permettre des chaînes beaucoup plus complexes. Le MVP en valide quatre.</p>
+
+          <div class="grid grid-2">
+            <article class="resource-chain">
+              <h3>Iron <span class="status status-mvp">MVP</span></h3>
+              <div class="chain">
+                <span class="chain-node">Montagne</span><span class="chain-arrow">→</span>
+                <span class="chain-node">Mine</span><span class="chain-arrow">→</span>
+                <span class="chain-node resource">Minerai de fer</span><span class="chain-arrow">→</span>
+                <span class="chain-node">Fonderie</span><span class="chain-arrow">→</span>
+                <span class="chain-node resource">Lingot de fer</span><span class="chain-arrow">→</span>
+                <span class="chain-node">Forge</span><span class="chain-arrow">→</span>
+                <span class="chain-node resource">Outils</span>
+              </div>
+            </article>
+            <article class="resource-chain">
+              <h3>Wood <span class="status status-mvp">MVP</span></h3>
+              <div class="chain">
+                <span class="chain-node">Forêt</span><span class="chain-arrow">→</span>
+                <span class="chain-node">Camp de bûcherons</span><span class="chain-arrow">→</span>
+                <span class="chain-node resource">Bois</span><span class="chain-arrow">→</span>
+                <span class="chain-node">Scierie</span><span class="chain-arrow">→</span>
+                <span class="chain-node resource">Planches</span><span class="chain-arrow">→</span>
+                <span class="chain-node resource">Construction</span>
+              </div>
+            </article>
+            <article class="resource-chain">
+              <h3>Food <span class="status status-mvp">MVP</span></h3>
+              <div class="chain">
+                <span class="chain-node">Plaine</span><span class="chain-arrow">→</span>
+                <span class="chain-node">Ferme</span><span class="chain-arrow">→</span>
+                <span class="chain-node resource">Blé</span><span class="chain-arrow">→</span>
+                <span class="chain-node">Moulin</span><span class="chain-arrow">→</span>
+                <span class="chain-node resource">Farine</span><span class="chain-arrow">→</span>
+                <span class="chain-node">Boulangerie</span><span class="chain-arrow">→</span>
+                <span class="chain-node resource">Nourriture</span>
+              </div>
+            </article>
+            <article class="resource-chain">
+              <h3>Stone <span class="status status-mvp">MVP</span></h3>
+              <div class="chain">
+                <span class="chain-node">Montagne / colline</span><span class="chain-arrow">→</span>
+                <span class="chain-node">Carrière</span><span class="chain-arrow">→</span>
+                <span class="chain-node resource">Pierre</span><span class="chain-arrow">→</span>
+                <span class="chain-node">Taille</span><span class="chain-arrow">→</span>
+                <span class="chain-node resource">Blocs</span><span class="chain-arrow">→</span>
+                <span class="chain-node resource">Construction / routes</span>
+              </div>
+            </article>
+          </div>
+        </section>
+
+        <!-- 7. Buildings -->
+        <section id="buildings">
+          <p class="section-kicker">Contenu</p>
+          <h2>Buildings</h2>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Building</th>
+                  <th>Terrain</th>
+                  <th>Input</th>
+                  <th>Output</th>
+                  <th>Emprise</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Village</td>
+                  <td>Any</td>
+                  <td>—</td>
+                  <td>Population</td>
+                  <td>1+ hex</td>
+                  <td><span class="status status-planned">Planned</span></td>
+                </tr>
+                <tr>
+                  <td>Lumber Camp</td>
+                  <td>Forest</td>
+                  <td>Workers</td>
+                  <td>Wood</td>
+                  <td>1 hex</td>
+                  <td><span class="status status-mvp">MVP</span></td>
+                </tr>
+                <tr>
+                  <td>Sawmill</td>
+                  <td>Any</td>
+                  <td>Wood</td>
+                  <td>Planks</td>
+                  <td>1 hex</td>
+                  <td><span class="status status-mvp">MVP</span></td>
+                </tr>
+                <tr>
+                  <td>Mine</td>
+                  <td>Mountain</td>
+                  <td>Workers</td>
+                  <td>Ore</td>
+                  <td>1 hex</td>
+                  <td><span class="status status-mvp">MVP</span></td>
+                </tr>
+                <tr>
+                  <td>Farm</td>
+                  <td>Plains</td>
+                  <td>Workers</td>
+                  <td>Food / Wheat</td>
+                  <td>1 hex</td>
+                  <td><span class="status status-mvp">MVP</span></td>
+                </tr>
+                <tr>
+                  <td>Mill</td>
+                  <td>Any</td>
+                  <td>Wheat</td>
+                  <td>Flour</td>
+                  <td>1 hex</td>
+                  <td><span class="status status-planned">Planned</span></td>
+                </tr>
+                <tr>
+                  <td>Bakery</td>
+                  <td>Any</td>
+                  <td>Flour</td>
+                  <td>Processed food</td>
+                  <td>1 hex</td>
+                  <td><span class="status status-planned">Planned</span></td>
+                </tr>
+                <tr>
+                  <td>Quarry</td>
+                  <td>Mountain</td>
+                  <td>Workers</td>
+                  <td>Stone</td>
+                  <td>1 hex</td>
+                  <td><span class="status status-mvp">MVP</span></td>
+                </tr>
+                <tr>
+                  <td>Smelter</td>
+                  <td>Any</td>
+                  <td>Ore</td>
+                  <td>Ingots</td>
+                  <td>1+ hex</td>
+                  <td><span class="status status-mvp">MVP</span></td>
+                </tr>
+                <tr>
+                  <td>Forge</td>
+                  <td>Any</td>
+                  <td>Ingots</td>
+                  <td>Tools</td>
+                  <td>1 hex</td>
+                  <td><span class="status status-mvp">MVP</span></td>
+                </tr>
+                <tr>
+                  <td>Monument</td>
+                  <td>Any</td>
+                  <td>Advanced</td>
+                  <td>Prestige</td>
+                  <td>Multi-hex</td>
+                  <td><span class="status status-planned">Later</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- 8. Design -->
+        <section id="design">
+          <p class="section-kicker">Direction artistique</p>
+          <h2>World Design</h2>
+          <p class="lead">Rendu extrêmement low-poly et épuré. La carte doit donner l’impression d’une maquette, d’un diorama, d’un jeu de plateau vivant.</p>
+
+          <div class="grid grid-3">
+            <article class="card">
+              <h3>Look</h3>
+              <p>Low-poly extrême. Assets Synty possibles plus tard. Pas de surcharge : une tuile forestière, c’est quelques arbres, un rocher, éventuellement un chemin.</p>
+            </article>
+            <article class="card">
+              <h3>Caméra</h3>
+              <p>Orthographique, vraie géométrie 3D légère, perspective 2.5D. Caméra relativement fixe. Le joueur ne tourne pas librement autour du monde comme dans un jeu 3D classique.</p>
+            </article>
+            <article class="card">
+              <h3>POC visuel</h3>
+              <p>Three.js dans <code>/poc</code>. Grille infinie (tuiles inconnues), pan / zoom, sélection, village, décors forêt / plaine / montagne, rivages d’arête, mer basse, génération via « + » + roue de biomes.</p>
+            </article>
+          </div>
+
+          <h3 style="margin-top:28px">Design principles</h3>
+          <div class="principles">
+            <article class="card"><h4>Lisibilité d’abord</h4><p>Chaque tuile doit se lire en un coup d’œil. Le détail ne gagne jamais contre la clarté.</p></article>
+            <article class="card"><h4>Peu d’objets par hex</h4><p>Forêt : quelques arbres. Plaine : herbe très légère, pas d’arbres. Montagne : un relief polygonal, quelques rochers, éventuellement une entrée de mine. Ville : quelques bâtiments très lisibles.</p></article>
+            <article class="card"><h4>Maquette vivante</h4><p>Le monde est un diorama, pas un simulateur photoréaliste. L’échelle et la stylisation font partie du plaisir.</p></article>
+            <article class="card"><h4>Portion visible limitée</h4><p>Le monde peut devenir très grand. L’affichage reste local. La découverte arrive par le bas de l’écran.</p></article>
+          </div>
+        </section>
+
+        <!-- 9. Technical -->
+        <section id="technical">
+          <p class="section-kicker">Ingénierie</p>
+          <h2>Technical Architecture</h2>
+
+          <div class="tabs">
+            <input type="radio" name="tech-tab" id="tab-front" checked>
+            <input type="radio" name="tech-tab" id="tab-back">
+            <input type="radio" name="tech-tab" id="tab-data">
+            <input type="radio" name="tech-tab" id="tab-arch">
+            <div class="tab-bar">
+              <label for="tab-front">Frontend</label>
+              <label for="tab-back">Backend</label>
+              <label for="tab-data">Données</label>
+              <label for="tab-arch">Monorepo</label>
+            </div>
+            <div class="tab-panels">
+              <div class="panel-front card">
+                <h3>Nuxt 4 · Vue · TypeScript · Three.js</h3>
+                <p>Nuxt gère l’UI, les pages, les menus, l’inventaire, les panneaux de gestion, la boutique, le compte. Three.js gère uniquement le rendu de la carte : hexagones, bâtiments, terrain, animations visuelles.</p>
+              </div>
+              <div class="panel-back card">
+                <h3>Node.js · TypeScript · Fastify</h3>
+                <p>Le serveur est autoritaire. Le client demande une action (« construire une fonderie »). Le serveur vérifie ressources, terrain, conditions, population, coût, règles. Puis accepte ou refuse.</p>
+              </div>
+              <div class="panel-data card">
+                <h3>PostgreSQL · Drizzle ORM</h3>
+                <p>Redis n’est pas prévu au début. Il pourra être ajouté plus tard pour le cache, les jobs, les files, les événements, les notifications.</p>
+              </div>
+              <div class="panel-arch">
+                <pre class="mono"><span class="tree-key">hexald/</span>
+├── apps/
+│   ├── web/          <span class="tree-key">Nuxt + Three.js</span>
+│   └── api/          <span class="tree-key">Fastify</span>
+├── packages/
+│   ├── shared/
+│   ├── game-core/    <span class="tree-key">règles du jeu</span>
+│   └── content/      <span class="tree-key">biomes, recettes, bâtiments</span>
+├── docs/             <span class="tree-key">Project Hub</span>
+└── ...</pre>
+              </div>
+            </div>
+          </div>
+
+          <div class="grid grid-2" style="margin-top:18px">
+            <div>
+              <h3>Flux d’une action</h3>
+              <div class="arch">
+                <div class="arch-node client"><strong>Nuxt</strong><span>UI, état client, menus</span></div>
+                <div class="arch-arrow">↓</div>
+                <div class="arch-node client"><strong>Three.js</strong><span>Carte, hexagones, feedback visuel</span></div>
+                <div class="arch-arrow">↓ HTTP / WS</div>
+                <div class="arch-node server"><strong>Fastify</strong><span>Serveur autoritaire</span></div>
+                <div class="arch-arrow">↓</div>
+                <div class="arch-node server"><strong>Game Core</strong><span>Règles, validation, simulation lazy</span></div>
+                <div class="arch-arrow">↓</div>
+                <div class="arch-node data"><strong>Drizzle</strong><span>Accès données</span></div>
+                <div class="arch-arrow">↓</div>
+                <div class="arch-node data"><strong>PostgreSQL</strong><span>Persistance</span></div>
+              </div>
+            </div>
+            <div class="grid">
+              <article class="tech-card">
+                <h3>game-core</h3>
+                <p class="role">Règles</p>
+                <ul class="tech-list">
+                  <li>Validation des actions</li>
+                  <li>Calcul de production hors ligne</li>
+                  <li>Coûts, conditions, population</li>
+                  <li>Indépendant de l’UI et du rendu</li>
+                </ul>
+              </article>
+              <article class="tech-card">
+                <h3>content</h3>
+                <p class="role">Data-driven</p>
+                <ul class="tech-list">
+                  <li>Biomes</li>
+                  <li>Ressources</li>
+                  <li>Bâtiments</li>
+                  <li>Recettes, technologies, coûts</li>
+                </ul>
+              </article>
+              <article class="tech-card">
+                <h3>shared</h3>
+                <p class="role">Contrats</p>
+                <ul class="tech-list">
+                  <li>Types TypeScript partagés</li>
+                  <li>Payloads client / serveur</li>
+                  <li>Constantes communes</li>
+                </ul>
+              </article>
+            </div>
+          </div>
+        </section>
+
+        <!-- 10. Decisions -->
+        <section id="decisions">
+          <p class="section-kicker">Decision log</p>
+          <h2>Technical Decisions</h2>
+          <p>Dupliquer le bloc en pointillés en bas de liste pour ajouter une décision. Incrémenter l’ID (DEC-010, etc.).</p>
+
+          <div class="decision-grid">
+            <article class="decision">
+              <header>
+                <span class="id">DEC-001</span>
+                <span class="status status-accepted">Accepted</span>
+                <span class="badge badge-neutral">2026-08-25</span>
+              </header>
+              <h3>Three.js pour le POC visuel</h3>
+              <dl>
+                <dt>Contexte</dt><dd>Le POC doit tester un rendu low-poly 3D lisible, caméra orthographique, vraie géométrie.</dd>
+                <dt>Décision</dt><dd>Utiliser Three.js, isolé de l’UI Nuxt, uniquement pour la carte.</dd>
+                <dt>Raison</dt><dd>Permet d’utiliser directement des assets low-poly 3D, y compris Synty plus tard.</dd>
+                <dt>Conséquences</dt><dd>Pas de rendu 2D sprite-only pour le POC. La caméra reste contrainte, pas un bac à sable 3D libre.</dd>
+              </dl>
+            </article>
+
+            <article class="decision">
+              <header>
+                <span class="id">DEC-002</span>
+                <span class="status status-accepted">Accepted</span>
+                <span class="badge badge-neutral">2026-08-25</span>
+              </header>
+              <h3>Fastify comme serveur séparé</h3>
+              <dl>
+                <dt>Contexte</dt><dd>Le jeu est persistant et compétitif sur les règles. L’UI ne doit pas être source de vérité.</dd>
+                <dt>Décision</dt><dd>API Fastify dédiée, séparée de l’app Nuxt.</dd>
+                <dt>Raison</dt><dd>Contrôle fin des routes, WebSockets possibles plus tard, stack TypeScript homogène.</dd>
+                <dt>Conséquences</dt><dd>Monorepo apps/web + apps/api. Le client ne calcule pas les stocks définitifs.</dd>
+              </dl>
+            </article>
+
+            <article class="decision">
+              <header>
+                <span class="id">DEC-003</span>
+                <span class="status status-accepted">Accepted</span>
+                <span class="badge badge-neutral">2026-08-25</span>
+              </header>
+              <h3>PostgreSQL plutôt que MongoDB</h3>
+              <dl>
+                <dt>Contexte</dt><dd>Économie, inventaires, mondes, relations entre villages et joueurs.</dd>
+                <dt>Décision</dt><dd>PostgreSQL comme base principale.</dd>
+                <dt>Raison</dt><dd>Relations claires, contraintes, transactions, évolutivité pour l’économie.</dd>
+                <dt>Conséquences</dt><dd>Schéma à concevoir tôt. JSONB possible pour le contenu flexible si besoin.</dd>
+              </dl>
+            </article>
+
+            <article class="decision">
+              <header>
+                <span class="id">DEC-004</span>
+                <span class="status status-accepted">Accepted</span>
+                <span class="badge badge-neutral">2026-08-25</span>
+              </header>
+              <h3>Drizzle comme ORM envisagé</h3>
+              <dl>
+                <dt>Contexte</dt><dd>TypeScript partout, envie d’un accès SQL proche du schéma.</dd>
+                <dt>Décision</dt><dd>Drizzle ORM.</dd>
+                <dt>Raison</dt><dd>Léger, typé, migrations claires, bon fit PostgreSQL.</dd>
+                <dt>Conséquences</dt><dd>Les règles restent dans game-core, pas dans l’ORM.</dd>
+              </dl>
+            </article>
+
+            <article class="decision">
+              <header>
+                <span class="id">DEC-005</span>
+                <span class="status status-accepted">Accepted</span>
+                <span class="badge badge-neutral">2026-08-25</span>
+              </header>
+              <h3>Server authoritative</h3>
+              <dl>
+                <dt>Contexte</dt><dd>Actions de construction, économie, génération de monde.</dd>
+                <dt>Décision</dt><dd>Toute action métier est validée côté serveur.</dd>
+                <dt>Raison</dt><dd>Anti-triche, persistance cohérente, même vérité pour tous les clients.</dd>
+                <dt>Conséquences</dt><dd>Le client peut prédire visuellement, jamais décider du résultat.</dd>
+              </dl>
+            </article>
+
+            <article class="decision">
+              <header>
+                <span class="id">DEC-006</span>
+                <span class="status status-accepted">Accepted</span>
+                <span class="badge badge-neutral">2026-08-25</span>
+              </header>
+              <h3>Pas de simulation tick permanente pour la production hors ligne</h3>
+              <dl>
+                <dt>Contexte</dt><dd>Monde persistant, nombreux joueurs, bâtiments qui produisent en absence.</dd>
+                <dt>Décision</dt><dd>Stock + taux + lastCalculatedAt. Recalcul à la requête / reconnexion.</dd>
+                <dt>Raison</dt><dd>Évite de simuler chaque mine chaque seconde. Scale naturel.</dd>
+                <dt>Conséquences</dt><dd>Les plafonds de stockage, cap de temps et files d’attente doivent être prévus dans game-core.</dd>
+              </dl>
+            </article>
+
+            <article class="decision">
+              <header>
+                <span class="id">DEC-007</span>
+                <span class="status status-accepted">Accepted</span>
+                <span class="badge badge-neutral">2026-08-25</span>
+              </header>
+              <h3>Monétisation principalement cosmétique</h3>
+              <dl>
+                <dt>Contexte</dt><dd>Jeu persistant navigateur. Risque classique de pay-to-win.</dd>
+                <dt>Décision</dt><dd>Skins de bâtiments, skins de biomes, thèmes complets. Option Remove Ads si pubs non intrusives. Aucun avantage de stats payant.</dd>
+                <dt>Raison</dt><dd>Le gameplay doit rester équitable. La personnalisation du diorama est le levier naturel.</dd>
+                <dt>Conséquences</dt><dd>Pas de ressources contre argent, pas de biomes payants avantageux, pas d’accélérations P2W, pas d’unités premium plus fortes, pas de bâtiments premium aux meilleures stats.</dd>
+              </dl>
+            </article>
+
+            <article class="decision">
+              <header>
+                <span class="id">DEC-008</span>
+                <span class="status status-accepted">Accepted</span>
+                <span class="badge badge-neutral">2026-08-25</span>
+              </header>
+              <h3>Nuxt UI + Tailwind pour l’UI, Three.js isolé pour la carte</h3>
+              <dl>
+                <dt>Contexte</dt><dd>Le client doit servir menus, landing et jeu. Le rendu 3D ne doit pas mélanger les responsabilités.</dd>
+                <dt>Décision</dt><dd>Nuxt 4 + Nuxt UI + Tailwind pour l’interface. Three.js uniquement dans <code>app/renderer</code>.</dd>
+                <dt>Raison</dt><dd>Permet d’itérer le feeling de la carte sans reconstruire l’UI, et d’utiliser des composants d’interface standards.</dd>
+                <dt>Conséquences</dt><dd>Pas de DOM pour les hexagones. Toute interaction carte passe par le renderer (raycast), puis l’UI Nuxt affiche l’état.</dd>
+              </dl>
+            </article>
+
+            <article class="decision">
+              <header>
+                <span class="id">DEC-009</span>
+                <span class="status status-accepted">Accepted</span>
+                <span class="badge badge-neutral">2026-08-25</span>
+              </header>
+              <h3>Réseau de centres coin (distance 3) + révélation au « + »</h3>
+              <dl>
+                <dt>Contexte</dt><dd>Il faut pouvoir étendre le monde région par région, sans coller les centres à l’anneau connu, tout en gardant un placement déterministe (réseau).</dd>
+                <dt>Décision</dt><dd>Centres voisins via offsets <code>dir + 2×suivante</code> (ex. (−1,3), (−3,2), (−2,−1)…), distance cube 3. Le centre se révèle par un « + » peint sur la tuile ; le clic ouvre une roue de biomes primaires.</dd>
+                <dt>Raison</dt><dd>Un pas axial de 3 laisse un hex vide entre régions ; l’orientation coin évite le packing purement axial. Le « + » sépare clairement « tuile inconnue » et « action de génération ».</dd>
+                <dt>Conséquences</dt><dd>Règles dans <code>game-core</code> (<code>REGION_STEP</code>, <code>REGION_NEIGHBOR_OFFSETS</code>). UI de génération hors panneau détail. Les hex déjà créés dans l’empreinte ne sont jamais écrasés.</dd>
+              </dl>
+            </article>
+
+            <article class="decision">
+              <header>
+                <span class="id">DEC-010</span>
+                <span class="status status-accepted">Accepted</span>
+                <span class="badge badge-neutral">2026-08-25</span>
+              </header>
+              <h3>Mer basse + rivages d’arête (style Civ)</h3>
+              <dl>
+                <dt>Contexte</dt><dd>L’eau et la terre doivent se lire clairement, sans biomes hybrides terre↔eau ni ceinture côtière radius 2.</dd>
+                <dt>Décision</dt><dd><code>water</code> plus bas que la terre. Aucune fusion terre↔eau : au tirage « fusion », on choisit l’un des deux parents. Le rivage est un <strong>décor d’arête</strong> selon le voisin terrestre (plage / rivage boisé / falaise). <code>water</code> non constructible ; toute terre l’est.</dd>
+                <dt>Raison</dt><dd>Aligné sur Civilization : terre et mer restent des types séparés ; le contact se dessine sur le contour.</dd>
+                <dt>Conséquences</dt><dd>Pas de <code>*_water</code>. Fusions limitées aux terre↔terre. Renderer : <code>createShoreEdgeDecor</code>. <code>isCoastBiome</code> reste exposé mais renvoie toujours false.</dd>
+              </dl>
+            </article>
+
+            <article class="decision decision-template">
+              <header>
+                <span class="id">DEC-00X</span>
+                <span class="status status-planned">Proposed</span>
+                <span class="badge badge-neutral">AAAA-MM-JJ</span>
+              </header>
+              <h3>Titre de la décision</h3>
+              <dl>
+                <dt>Contexte</dt><dd>Pourquoi cette question se pose.</dd>
+                <dt>Décision</dt><dd>Ce qui a été choisi.</dd>
+                <dt>Raison</dt><dd>Pourquoi ce choix plutôt qu’un autre.</dd>
+                <dt>Conséquences</dt><dd>Ce que cela impose au design, à la stack ou au scope.</dd>
+              </dl>
+            </article>
+          </div>
+        </section>
+
+        <!-- Wiki — référence contenu -->
+        <section id="wiki">
+          <p class="section-kicker">Référence</p>
+          <h2>Wiki — Contenu du jeu</h2>
+          <p class="lead">Encyclopédie du contenu jouable. Source de vérité code : <code>packages/content</code> (+ règles de génération dans <code>packages/game-core</code>). Ce wiki décrit l’état prévu / implémenté pour le design et le POC.</p>
+
+          <div class="grid grid-3">
+            <a class="card wiki-nav-card" href="#wiki-biomes">
+              <h3>Biomes</h3>
+              <p>Primaires, fusions terre↔terre, rivages (décor d’arête). Ce que le joueur choisit vs ce qui apparaît aux frontières.</p>
+            </a>
+            <a class="card wiki-nav-card" href="#wiki-resources">
+              <h3>Ressources</h3>
+              <p>Bois, blé, minerai, outils… les matières de la chaîne économique.</p>
+            </a>
+            <a class="card wiki-nav-card" href="#wiki-buildings">
+              <h3>Bâtiments</h3>
+              <p>Terrain requis, entrées / sorties, emprise, statut MVP.</p>
+            </a>
+            <a class="card wiki-nav-card" href="#wiki-chains">
+              <h3>Chaînes</h3>
+              <p>Fer, bois, nourriture, pierre — étapes de production.</p>
+            </a>
+            <a class="card wiki-nav-card" href="#wiki-world">
+              <h3>Monde</h3>
+              <p>Région rayon 1, réseau de centres, révélation au « + », fusions.</p>
+            </a>
+            <a class="card wiki-nav-card" href="#wiki-pois">
+              <h3>POI</h3>
+              <p>Points d’intérêt — merveilles naturelles ou landmarks rares, bonus uniques.</p>
+            </a>
+            <article class="card">
+              <h3>Convention</h3>
+              <p>Les IDs entre <code>backticks</code> correspondent aux identifiants TypeScript. Mettre à jour ce wiki quand <code>packages/content</code> change.</p>
+            </article>
+          </div>
+        </section>
+
+        <section id="wiki-biomes">
+          <p class="section-kicker">Wiki · Biomes</p>
+          <h2>Biomes</h2>
+          <p>Quatre biomes <strong>primaires</strong> sont choisis à la génération d’une région. Les fusions <strong>terre↔terre</strong> apparaissent aux frontières (40&nbsp;% / 40&nbsp;% / 20&nbsp;%). Terre↔eau : pas de fusion — rivage en décor d’arête.</p>
+
+          <div class="filters" role="group" aria-label="Filtrer les biomes">
+            <button type="button" class="filter-btn is-on" data-wiki-filter="all" data-wiki-target="biomes">Tous</button>
+            <button type="button" class="filter-btn" data-wiki-filter="primary" data-wiki-target="biomes">Primaires</button>
+            <button type="button" class="filter-btn" data-wiki-filter="fusion" data-wiki-target="biomes">Fusions terre</button>
+            <button type="button" class="filter-btn" data-wiki-filter="coast" data-wiki-target="biomes">Rivages</button>
+          </div>
+
+          <div class="grid grid-2" id="wiki-biomes-grid">
+            <article class="card wiki-entry" data-wiki-kind="primary">
+              <header class="wiki-entry-head">
+                <span class="wiki-swatch" style="background:#62c46f"></span>
+                <div>
+                  <h3>Forêt</h3>
+                  <code class="wiki-id">forest</code>
+                </div>
+                <span class="status status-mvp">Primary</span>
+              </header>
+              <p>Tuile verte avec arbres low-poly. Constructible. Source naturelle pour le camp de bûcherons.</p>
+              <p class="wiki-meta">Kind · <strong>land</strong> · Choix joueur · oui</p>
+            </article>
+            <article class="card wiki-entry" data-wiki-kind="primary">
+              <header class="wiki-entry-head">
+                <span class="wiki-swatch" style="background:#8fce6e"></span>
+                <div>
+                  <h3>Plaine</h3>
+                  <code class="wiki-id">plains</code>
+                </div>
+                <span class="status status-mvp">Primary</span>
+              </header>
+              <p>Vert clair, <strong>sans arbres</strong>, herbe très légère. Terrain de la ferme.</p>
+              <p class="wiki-meta">Kind · <strong>land</strong> · Choix joueur · oui</p>
+            </article>
+            <article class="card wiki-entry" data-wiki-kind="primary">
+              <header class="wiki-entry-head">
+                <span class="wiki-swatch" style="background:#d0d7e2"></span>
+                <div>
+                  <h3>Montagne</h3>
+                  <code class="wiki-id">mountain</code>
+                </div>
+                <span class="status status-mvp">Primary</span>
+              </header>
+              <p>Relief polygonal. Accueille mine et carrière. Peut former des chaînes visuelles avec les voisines.</p>
+              <p class="wiki-meta">Kind · <strong>land</strong> · Choix joueur · oui</p>
+            </article>
+            <article class="card wiki-entry" data-wiki-kind="primary">
+              <header class="wiki-entry-head">
+                <span class="wiki-swatch" style="background:#4aa3d9"></span>
+                <div>
+                  <h3>Eau</h3>
+                  <code class="wiki-id">water</code>
+                </div>
+                <span class="status status-mvp">Primary</span>
+              </header>
+              <p>Hex entièrement aquatique, rendu plus bas que la terre. <strong>Pas de bâtiments terrestres</strong>. Au contact d’une terre, un décor de rivage apparaît sur l’arête (selon le biome voisin). Pas de biome hybride terre↔eau.</p>
+              <p class="wiki-meta">Kind · <strong>water</strong> · Choix joueur · oui · Build · non</p>
+            </article>
+            <article class="card wiki-entry" data-wiki-kind="fusion">
+              <header class="wiki-entry-head">
+                <span class="wiki-swatch" style="background:#a8c45e"></span>
+                <div>
+                  <h3>Lisière</h3>
+                  <code class="wiki-id">forest_plains</code>
+                </div>
+                <span class="status status-planned">Fusion</span>
+              </header>
+              <p>Fusion forêt ↔ plaine. Apparaît aux bordures (poids 20&nbsp;% fusion).</p>
+              <p class="wiki-meta">Kind · <strong>land</strong> · Parents · forest + plains</p>
+            </article>
+            <article class="card wiki-entry" data-wiki-kind="fusion">
+              <header class="wiki-entry-head">
+                <span class="wiki-swatch" style="background:#c4b894"></span>
+                <div>
+                  <h3>Piémont</h3>
+                  <code class="wiki-id">plains_mountain</code>
+                </div>
+                <span class="status status-planned">Fusion</span>
+              </header>
+              <p>Fusion plaine ↔ montagne.</p>
+              <p class="wiki-meta">Kind · <strong>land</strong> · Parents · plains + mountain</p>
+            </article>
+            <article class="card wiki-entry" data-wiki-kind="fusion">
+              <header class="wiki-entry-head">
+                <span class="wiki-swatch" style="background:#7a9a7e"></span>
+                <div>
+                  <h3>Haute forêt</h3>
+                  <code class="wiki-id">forest_mountain</code>
+                </div>
+                <span class="status status-planned">Fusion</span>
+              </header>
+              <p>Fusion forêt ↔ montagne.</p>
+              <p class="wiki-meta">Kind · <strong>land</strong> · Parents · forest + mountain</p>
+            </article>
+            <article class="card wiki-entry" data-wiki-kind="coast">
+              <header class="wiki-entry-head">
+                <span class="wiki-swatch" style="background:#e0d2a8"></span>
+                <div>
+                  <h3>Plage (décor)</h3>
+                  <code class="wiki-id">shore · plains</code>
+                </div>
+                <span class="status status-mvp">Visual</span>
+              </header>
+              <p>Pas un biome. Contour sable / galets / écume sur les arêtes <code>plains</code> ↔ <code>water</code>.</p>
+              <p class="wiki-meta">Kind · <strong>decor</strong> · Parents · plains ↔ water · Build · n/a</p>
+            </article>
+            <article class="card wiki-entry" data-wiki-kind="coast">
+              <header class="wiki-entry-head">
+                <span class="wiki-swatch" style="background:#6aab7a"></span>
+                <div>
+                  <h3>Rivage boisé (décor)</h3>
+                  <code class="wiki-id">shore · forest</code>
+                </div>
+                <span class="status status-mvp">Visual</span>
+              </header>
+              <p>Pas un biome. Roseaux / buissons sur les arêtes où forêt (ou lisière / haute forêt) touche l’eau.</p>
+              <p class="wiki-meta">Kind · <strong>decor</strong> · Parents · forest ↔ water · Build · n/a</p>
+            </article>
+            <article class="card wiki-entry" data-wiki-kind="coast">
+              <header class="wiki-entry-head">
+                <span class="wiki-swatch" style="background:#9aa3ae"></span>
+                <div>
+                  <h3>Falaise (décor)</h3>
+                  <code class="wiki-id">shore · mountain</code>
+                </div>
+                <span class="status status-mvp">Visual</span>
+              </header>
+              <p>Pas un biome. Roches de bordure sur les arêtes où montagne (ou piémont) touche l’eau.</p>
+              <p class="wiki-meta">Kind · <strong>decor</strong> · Parents · mountain ↔ water · Build · n/a</p>
+            </article>
+          </div>
+        </section>
+
+        <section id="wiki-resources">
+          <p class="section-kicker">Wiki · Ressources</p>
+          <h2>Ressources</h2>
+          <p>Inventaire économique. Les IDs suivent <code>packages/content/src/resources.ts</code>.</p>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Label</th>
+                  <th>Rôle</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr><td><code>wood</code></td><td>Bois</td><td>Récolte forêt → entrée scierie</td></tr>
+                <tr><td><code>planks</code></td><td>Planches</td><td>Transformé du bois</td></tr>
+                <tr><td><code>wheat</code></td><td>Blé</td><td>Récolte plaine (ferme)</td></tr>
+                <tr><td><code>flour</code></td><td>Farine</td><td>Transformé du blé (moulin)</td></tr>
+                <tr><td><code>food</code></td><td>Nourriture</td><td>Transformé de la farine (boulangerie)</td></tr>
+                <tr><td><code>stone</code></td><td>Pierre</td><td>Récolte montagne (carrière)</td></tr>
+                <tr><td><code>stone_blocks</code></td><td>Blocs</td><td>Pierre travaillée (prévu)</td></tr>
+                <tr><td><code>iron_ore</code></td><td>Minerai de fer</td><td>Récolte montagne (mine)</td></tr>
+                <tr><td><code>iron_ingot</code></td><td>Lingot de fer</td><td>Fonderie</td></tr>
+                <tr><td><code>tools</code></td><td>Outils</td><td>Forge — bout de chaîne fer</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section id="wiki-buildings">
+          <p class="section-kicker">Wiki · Bâtiments</p>
+          <h2>Bâtiments</h2>
+          <p>Définitions alignées sur <code>packages/content/src/buildings.ts</code>. <code>terrain: any</code> = toute tuile constructible (pas l’eau pure).</p>
+
+          <div class="filters" role="group" aria-label="Filtrer les bâtiments">
+            <button type="button" class="filter-btn is-on" data-wiki-filter="all" data-wiki-target="buildings">Tous</button>
+            <button type="button" class="filter-btn" data-wiki-filter="mvp" data-wiki-target="buildings">MVP</button>
+            <button type="button" class="filter-btn" data-wiki-filter="planned" data-wiki-target="buildings">Planned</button>
+            <button type="button" class="filter-btn" data-wiki-filter="later" data-wiki-target="buildings">Later</button>
+          </div>
+
+          <div class="table-wrap" id="wiki-buildings-table">
+            <table>
+              <thead>
+                <tr>
+                  <th>Bâtiment</th>
+                  <th>ID</th>
+                  <th>Terrain</th>
+                  <th>Input</th>
+                  <th>Output</th>
+                  <th>Emprise</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr data-wiki-kind="planned">
+                  <td>Village</td><td><code>village</code></td><td>any</td><td>—</td><td>population</td><td>multi</td>
+                  <td><span class="status status-planned">Planned</span></td>
+                </tr>
+                <tr data-wiki-kind="mvp">
+                  <td>Camp de bûcherons</td><td><code>lumber_camp</code></td><td>forest</td><td>workers</td><td>wood</td><td>1</td>
+                  <td><span class="status status-mvp">MVP</span></td>
+                </tr>
+                <tr data-wiki-kind="mvp">
+                  <td>Scierie</td><td><code>sawmill</code></td><td>any</td><td>wood</td><td>planks</td><td>1</td>
+                  <td><span class="status status-mvp">MVP</span></td>
+                </tr>
+                <tr data-wiki-kind="mvp">
+                  <td>Mine</td><td><code>mine</code></td><td>mountain</td><td>workers</td><td>iron_ore</td><td>1</td>
+                  <td><span class="status status-mvp">MVP</span></td>
+                </tr>
+                <tr data-wiki-kind="mvp">
+                  <td>Ferme</td><td><code>farm</code></td><td>plains</td><td>workers</td><td>wheat</td><td>1</td>
+                  <td><span class="status status-mvp">MVP</span></td>
+                </tr>
+                <tr data-wiki-kind="planned">
+                  <td>Moulin</td><td><code>mill</code></td><td>any</td><td>wheat</td><td>flour</td><td>1</td>
+                  <td><span class="status status-planned">Planned</span></td>
+                </tr>
+                <tr data-wiki-kind="planned">
+                  <td>Boulangerie</td><td><code>bakery</code></td><td>any</td><td>flour</td><td>food</td><td>1</td>
+                  <td><span class="status status-planned">Planned</span></td>
+                </tr>
+                <tr data-wiki-kind="mvp">
+                  <td>Carrière</td><td><code>quarry</code></td><td>mountain</td><td>workers</td><td>stone</td><td>1</td>
+                  <td><span class="status status-mvp">MVP</span></td>
+                </tr>
+                <tr data-wiki-kind="mvp">
+                  <td>Fonderie</td><td><code>smelter</code></td><td>any</td><td>iron_ore</td><td>iron_ingot</td><td>multi</td>
+                  <td><span class="status status-mvp">MVP</span></td>
+                </tr>
+                <tr data-wiki-kind="mvp">
+                  <td>Forge</td><td><code>forge</code></td><td>any</td><td>iron_ingot</td><td>tools</td><td>1</td>
+                  <td><span class="status status-mvp">MVP</span></td>
+                </tr>
+                <tr data-wiki-kind="later">
+                  <td>Monument</td><td><code>monument</code></td><td>any</td><td>—</td><td>prestige</td><td>multi</td>
+                  <td><span class="status status-planned">Later</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section id="wiki-chains">
+          <p class="section-kicker">Wiki · Production</p>
+          <h2>Chaînes de production</h2>
+          <p>Issues de <code>packages/content/src/recipes.ts</code>. Une chaîne = une suite de bâtiments qui transforme une ressource brute.</p>
+
+          <div class="grid grid-2">
+            <article class="card wiki-entry">
+              <h3>Fer <code class="wiki-id">iron</code></h3>
+              <div class="wiki-chain">
+                <span>Mine → <code>iron_ore</code></span>
+                <span>Fonderie → <code>iron_ingot</code></span>
+                <span>Forge → <code>tools</code></span>
+              </div>
+            </article>
+            <article class="card wiki-entry">
+              <h3>Bois <code class="wiki-id">wood</code></h3>
+              <div class="wiki-chain">
+                <span>Camp de bûcherons → <code>wood</code></span>
+                <span>Scierie → <code>planks</code></span>
+              </div>
+            </article>
+            <article class="card wiki-entry">
+              <h3>Nourriture <code class="wiki-id">food</code></h3>
+              <div class="wiki-chain">
+                <span>Ferme → <code>wheat</code></span>
+                <span>Moulin → <code>flour</code></span>
+                <span>Boulangerie → <code>food</code></span>
+              </div>
+            </article>
+            <article class="card wiki-entry">
+              <h3>Pierre <code class="wiki-id">stone</code></h3>
+              <div class="wiki-chain">
+                <span>Carrière → <code>stone</code></span>
+              </div>
+              <p class="wiki-meta">Chaîne courte MVP ; blocs (<code>stone_blocks</code>) plus tard.</p>
+            </article>
+          </div>
+        </section>
+
+        <section id="wiki-world">
+          <p class="section-kicker">Wiki · Monde</p>
+          <h2>Génération &amp; régions</h2>
+          <p>Règles dans <code>packages/game-core/src/world.ts</code> (DEC-009, DEC-010).</p>
+
+          <div class="grid grid-2">
+            <article class="card wiki-entry">
+              <h3>Région</h3>
+              <ul class="tech-list">
+                <li>Rayon <strong>1</strong> → centre + 6 voisins (7 hex)</li>
+                <li>Biome primaire choisi par le joueur</li>
+                <li>Les hex déjà créés dans l’empreinte ne sont <strong>jamais</strong> écrasés</li>
+              </ul>
+            </article>
+            <article class="card wiki-entry">
+              <h3>Réseau de centres</h3>
+              <ul class="tech-list">
+                <li>Voisins à distance cube <strong>3</strong></li>
+                <li>Offsets coin : <code>(−1,3)</code>, <code>(−3,2)</code>, <code>(−2,−1)</code>, <code>(1,−3)</code>, <code>(3,−2)</code>, <code>(2,1)</code></li>
+                <li>Un hex vide sépare l’anneau connu du nouveau centre</li>
+              </ul>
+            </article>
+            <article class="card wiki-entry">
+              <h3>Révélation</h3>
+              <ul class="tech-list">
+                <li>Centre dévoilable = même teinte que les tuiles inconnues + « + » peint</li>
+                <li>Toute la tuile est cliquable → roue de biomes (F / P / M / E)</li>
+                <li>Les tuiles inconnues banales ne se soulèvent pas au survol</li>
+              </ul>
+            </article>
+            <article class="card wiki-entry">
+              <h3>Bordures</h3>
+              <ul class="tech-list">
+                <li>Sans voisin connu → biome de la région</li>
+                <li>Avec voisins → 40&nbsp;% région / 40&nbsp;% autre influence / 20&nbsp;% fusion (terre↔terre seulement ; terre↔eau → un des deux parents)</li>
+                <li>Rivages = décor d’arête, pas de tuile hybride</li>
+              </ul>
+            </article>
+            <article class="card wiki-entry">
+              <h3>Mer &amp; côtes</h3>
+              <ul class="tech-list">
+                <li><code>water</code> = mer basse, non constructible terrestre</li>
+                <li>Terre↔eau = plage / rivage boisé / falaise sur l’arête</li>
+                <li>Pas de biomes <code>*_water</code>, pas de ceinture radius 2</li>
+              </ul>
+            </article>
+            <article class="card wiki-entry">
+              <h3>POI</h3>
+              <ul class="tech-list">
+                <li>Chance rare à la révélation d’une région (ou claim plus tard)</li>
+                <li>Pas un biome : couche sur une tuile (voir <a href="#wiki-pois">Wiki · POI</a>)</li>
+              </ul>
+            </article>
+          </div>
+        </section>
+
+        <section id="wiki-pois">
+          <p class="section-kicker">Wiki · POI</p>
+          <h2>Points d’intérêt</h2>
+          <p class="lead">Équivalent Hexald des <strong>merveilles</strong> de Civilization : sites rares qui transforment une tuile (ou un petit groupe) et donnent un bonus durable. Ce n’est <em>pas</em> un biome — c’est une couche sur le terrain existant.</p>
+
+          <div class="grid grid-2" style="margin-top:14px">
+            <article class="card">
+              <h3>Mécanique</h3>
+              <ul class="tech-list">
+                <li><strong>Naturels</strong> — apparaissent à la génération / révélation d’une région (comme les natural wonders Civ)</li>
+                <li><strong>Landmarks</strong> — projets rares construits par le joueur (proche des world wonders / monument)</li>
+                <li>Un POI occupe 1 hex (parfois 2–3 pour les plus grands)</li>
+                <li>Le biome sous-jacent reste (forêt, plaine, montagne, eau…)</li>
+                <li>Bonus passif + souvent une action / bâtiment dédié</li>
+                <li>Rareté : au plus <strong>un POI naturel par région</strong>, et pas sur le village de départ au MVP</li>
+              </ul>
+            </article>
+            <article class="card">
+              <h3>Règles de design</h3>
+              <ul class="tech-list">
+                <li>Lisibles au premier coup d’œil (silhouette / déco forte)</li>
+                <li>Bonus thématique lié au biome (pas de « +tout » générique)</li>
+                <li>Ne remplacent pas les chaînes économiques de base</li>
+                <li>Pas pay-to-win : skins de POI OK, stats exclusives payantes non</li>
+                <li>IDs prévus dans <code>packages/content</code> (ex. <code>pois.ts</code>) — pas encore implémentés en POC</li>
+              </ul>
+            </article>
+          </div>
+
+          <div class="filters" role="group" aria-label="Filtrer les POI" style="margin-top:18px">
+            <button type="button" class="filter-btn is-on" data-wiki-filter="all" data-wiki-target="pois">Tous</button>
+            <button type="button" class="filter-btn" data-wiki-filter="natural" data-wiki-target="pois">Naturels</button>
+            <button type="button" class="filter-btn" data-wiki-filter="landmark" data-wiki-target="pois">Landmarks</button>
+          </div>
+
+          <div class="grid grid-2" id="wiki-pois-grid">
+            <article class="card wiki-entry" data-wiki-kind="natural">
+              <header class="wiki-entry-head">
+                <span class="wiki-swatch" style="background:#2f7a45"></span>
+                <div>
+                  <h3>Chêne ancestral</h3>
+                  <code class="wiki-id">ancient_oak</code>
+                </div>
+                <span class="status status-planned">Natural</span>
+              </header>
+              <p>Immense arbre sur une tuile forêt. Silhouette unique, au-dessus de la canopée.</p>
+              <p class="wiki-meta">Biome · <strong>forest</strong> · Bonus · +rendement bois / camp de bûcherons adjacent · Emprise · 1 hex</p>
+            </article>
+            <article class="card wiki-entry" data-wiki-kind="natural">
+              <header class="wiki-entry-head">
+                <span class="wiki-swatch" style="background:#c9b87a"></span>
+                <div>
+                  <h3>Champs dorés</h3>
+                  <code class="wiki-id">golden_fields</code>
+                </div>
+                <span class="status status-planned">Natural</span>
+              </header>
+              <p>Plaine particulièrement fertile, herbe plus claire et « blé sauvage » visible.</p>
+              <p class="wiki-meta">Biome · <strong>plains</strong> · Bonus · +blé / ferme · Emprise · 1 hex</p>
+            </article>
+            <article class="card wiki-entry" data-wiki-kind="natural">
+              <header class="wiki-entry-head">
+                <span class="wiki-swatch" style="background:#8a949f"></span>
+                <div>
+                  <h3>Pic de fer</h3>
+                  <code class="wiki-id">iron_peak</code>
+                </div>
+                <span class="status status-planned">Natural</span>
+              </header>
+              <p>Sommet veiné de minerai. Plus sombre / métallique que les montagnes voisines.</p>
+              <p class="wiki-meta">Biome · <strong>mountain</strong> · Bonus · +minerai / mine · Emprise · 1 hex</p>
+            </article>
+            <article class="card wiki-entry" data-wiki-kind="natural">
+              <header class="wiki-entry-head">
+                <span class="wiki-swatch" style="background:#3a88b8"></span>
+                <div>
+                  <h3>Lagune de corail</h3>
+                  <code class="wiki-id">coral_lagoon</code>
+                </div>
+                <span class="status status-planned">Natural</span>
+              </header>
+              <p>Eau peu profonde aux teintes turquoise, récif visible. Touche souvent un rivage.</p>
+              <p class="wiki-meta">Biome · <strong>water</strong> · Bonus · nourriture marine / port futur · Emprise · 1 hex</p>
+            </article>
+            <article class="card wiki-entry" data-wiki-kind="natural">
+              <header class="wiki-entry-head">
+                <span class="wiki-swatch" style="background:#6a9eaa"></span>
+                <div>
+                  <h3>Cascade murmurante</h3>
+                  <code class="wiki-id">whispering_falls</code>
+                </div>
+                <span class="status status-planned">Natural</span>
+              </header>
+              <p>Chute d’eau sur une arête montagne ↔ autre terre (ou vers l’eau). Décor de falaise + écume.</p>
+              <p class="wiki-meta">Biome · <strong>mountain</strong> (bordure) · Bonus · +pierre ou bonheur · Emprise · 1–2 hex</p>
+            </article>
+            <article class="card wiki-entry" data-wiki-kind="natural">
+              <header class="wiki-entry-head">
+                <span class="wiki-swatch" style="background:#5c6b58"></span>
+                <div>
+                  <h3>Ruines englouties</h3>
+                  <code class="wiki-id">sunken_ruins</code>
+                </div>
+                <span class="status status-planned">Natural</span>
+              </header>
+              <p>Vestiges dans l’eau ou à la limite rivage. Hint de lore / exploration.</p>
+              <p class="wiki-meta">Biome · <strong>water</strong> ou rivage · Bonus · prestige / déblocage cosmétique · Emprise · 1 hex</p>
+            </article>
+            <article class="card wiki-entry" data-wiki-kind="landmark">
+              <header class="wiki-entry-head">
+                <span class="wiki-swatch" style="background:#b08d57"></span>
+                <div>
+                  <h3>Monument</h3>
+                  <code class="wiki-id">monument</code>
+                </div>
+                <span class="status status-planned">Landmark</span>
+              </header>
+              <p>Landmark construit (déjà listé côté bâtiments). Équivalent « wonder » joueur : coût élevé, emprise multi-hex, prestige.</p>
+              <p class="wiki-meta">Terrain · <strong>any</strong> land · Bonus · prestige · Emprise · multi · Voir wiki bâtiments</p>
+            </article>
+            <article class="card wiki-entry" data-wiki-kind="landmark">
+              <header class="wiki-entry-head">
+                <span class="wiki-swatch" style="background:#7a6a9a"></span>
+                <div>
+                  <h3>Observatoire des vents</h3>
+                  <code class="wiki-id">wind_observatory</code>
+                </div>
+                <span class="status status-planned">Landmark</span>
+              </header>
+              <p>Tour rare en hauteur. Un seul par monde. Améliore la prévisibilité / vitesse de révélation des régions proches (design à figer).</p>
+              <p class="wiki-meta">Terrain · <strong>mountain</strong> · Bonus · vision / génération · Emprise · 1 hex · Unique monde</p>
+            </article>
+            <article class="card wiki-entry" data-wiki-kind="landmark">
+              <header class="wiki-entry-head">
+                <span class="wiki-swatch" style="background:#4a7a6a"></span>
+                <div>
+                  <h3>Sanctuaire de la lisière</h3>
+                  <code class="wiki-id">edge_sanctuary</code>
+                </div>
+                <span class="status status-planned">Landmark</span>
+              </header>
+              <p>Petit temple en forêt ou lisière. Renforce le moral / population max du village lié.</p>
+              <p class="wiki-meta">Terrain · <strong>forest</strong> / <code>forest_plains</code> · Bonus · population · Emprise · 1 hex</p>
+            </article>
+          </div>
+        </section>
+
+        <!-- Monetization (nested in tracking but linked from decisions) -->
+        <section id="monetization">
+          <p class="section-kicker">Business</p>
+          <h2>Monétisation</h2>
+          <p class="lead">Le gameplay ne doit pas être pay-to-win. La monétisation envisagée est essentiellement cosmétique.</p>
+          <div class="grid grid-4">
+            <article class="card">
+              <h3>Skins de bâtiments</h3>
+              <p>Médiéval, nordique, asiatique, fantasy, steampunk, industriel. Même stats, autre silhouette.</p>
+            </article>
+            <article class="card">
+              <h3>Skins de biomes</h3>
+              <p>Modifications purement visuelles du terrain, de la végétation, des teintes.</p>
+            </article>
+            <article class="card">
+              <h3>Thèmes complets</h3>
+              <p>Peuvent changer bâtiments, routes, végétation, interface, décorations, effets visuels.</p>
+            </article>
+            <article class="card">
+              <h3>No Ads</h3>
+              <p>Formule Remove Ads si des publicités non intrusives sont ajoutées. Jamais d’avantage de jeu.</p>
+            </article>
+          </div>
+        </section>
+
+        <!-- 11. Roadmap -->
+        <section id="roadmap">
+          <p class="section-kicker">Planning</p>
+          <h2>Roadmap</h2>
+          <div class="timeline">
+            <article class="roadmap-item is-done">
+              <div class="roadmap-head">
+                <h3>Phase 0 — Concept</h3>
+                <span class="status status-done">Done</span>
+              </div>
+              <p>Cadrer la boucle principale, la génération, l’économie, la direction artistique et la stack.</p>
+              <ul>
+                <li>Boucle principale</li>
+                <li>Génération de monde</li>
+                <li>Économie et chaînes</li>
+                <li>Direction artistique</li>
+                <li>Stack technique</li>
+                <li>Monorepo, hub, API Fastify, client Nuxt</li>
+              </ul>
+            </article>
+            <article class="roadmap-item is-done">
+              <div class="roadmap-head">
+                <h3>Phase 1 — Visual POC</h3>
+                <span class="status status-done">Done</span>
+              </div>
+              <p>Rendu Three.js jouable à regarder. Le feeling de la carte avant toute économie.</p>
+              <ul>
+                <li>Three.js + caméra orthographique — fait</li>
+                <li>4 biomes primaires (+ côtes), tuiles emboîtées, survol — fait</li>
+                <li>37 hexagones, tuiles sans biome non interactives — fait</li>
+                <li>Sélection d’une tuile au clic — fait</li>
+                <li>Village sur une tuile — fait</li>
+              </ul>
+            </article>
+            <article class="roadmap-item is-current">
+              <div class="roadmap-head"><h3>Phase 2 — World POC</h3><span class="status status-progress">In progress</span></div>
+              <ul>
+                <li>Génération dirigée (réseau coin, distance 3) — fait</li>
+                <li>Roue de biomes au « + » — fait</li>
+                <li>Bordures 40/40/20 + fusions terre + rivages d’arête — fait</li>
+                <li>Décors : forêt (arbres), plaine (herbe légère), montagne — fait</li>
+                <li>Persistance du monde</li>
+              </ul>
+            </article>
+            <article class="roadmap-item">
+              <div class="roadmap-head"><h3>Phase 3 — Economy POC</h3><span class="status status-planned">Planned</span></div>
+              <ul>
+                <li>Population et travailleurs</li>
+                <li>Wood, food, stone, iron ore</li>
+              </ul>
+            </article>
+            <article class="roadmap-item">
+              <div class="roadmap-head"><h3>Phase 4 — Industry</h3><span class="status status-planned">Planned</span></div>
+              <ul>
+                <li>Mine, fonderie, forge, outils</li>
+                <li>Chaînes de production</li>
+              </ul>
+            </article>
+            <article class="roadmap-item">
+              <div class="roadmap-head"><h3>Phase 5 — Civilization</h3><span class="status status-planned">Planned</span></div>
+              <ul>
+                <li>Villages</li>
+                <li>Routes</li>
+                <li>Bâtiments multi-hexagones</li>
+                <li>Logistique</li>
+              </ul>
+            </article>
+            <article class="roadmap-item">
+              <div class="roadmap-head"><h3>Phase 6 — Online</h3><span class="status status-planned">Planned</span></div>
+              <ul>
+                <li>Comptes</li>
+                <li>Persistance complète</li>
+                <li>Interaction entre joueurs</li>
+                <li>Commerce</li>
+              </ul>
+            </article>
+            <article class="roadmap-item">
+              <div class="roadmap-head"><h3>Phase 7 — Monetization</h3><span class="status status-planned">Planned</span></div>
+              <ul>
+                <li>Skins et thèmes</li>
+                <li>Publicité éventuelle</li>
+                <li>No-ads</li>
+              </ul>
+            </article>
+            <article class="roadmap-item">
+              <div class="roadmap-head"><h3>Phase 8 — PvP Experiment</h3><span class="status status-planned">Later</span></div>
+              <ul>
+                <li>PvP instancié</li>
+                <li>Classement</li>
+                <li>Équilibrage</li>
+              </ul>
+            </article>
+          </div>
+        </section>
+
+        <!-- Priorities -->
+        <section id="priorities">
+          <p class="section-kicker">Focus</p>
+          <h2>Priority Board</h2>
+          <div class="grid grid-4 priority-board">
+            <article class="card priority-col">
+              <h3><span class="priority priority-p0">P0</span> Critical</h3>
+              <ul>
+                <li>Three.js + région de départ (7 tuiles) — validés</li>
+                <li>Sélection au clic — validé</li>
+                <li>Village sur une tuile — validé</li>
+                <li>Génération dirigée + fusions — validé</li>
+                <li>Persistance du monde</li>
+              </ul>
+            </article>
+            <article class="card priority-col">
+              <h3><span class="priority priority-p1">P1</span> Important</h3>
+              <ul>
+                <li>Chaînes industrielles</li>
+                <li>Routes</li>
+                <li>Villages additionnels</li>
+              </ul>
+            </article>
+            <article class="card priority-col">
+              <h3><span class="priority priority-p2">P2</span> Later</h3>
+              <ul>
+                <li>Commerce</li>
+                <li>Monde public</li>
+                <li>Skins</li>
+                <li>Publicité</li>
+              </ul>
+            </article>
+            <article class="card priority-col">
+              <h3><span class="priority priority-p3">P3</span> Ideas</h3>
+              <ul>
+                <li>PvP</li>
+                <li>Événements</li>
+                <li>Armées</li>
+                <li>Fonctionnalités sociales avancées</li>
+              </ul>
+            </article>
+          </div>
+        </section>
+
+        <!-- Backlog -->
+        <section id="backlog">
+          <p class="section-kicker">Kanban</p>
+          <h2>Backlog</h2>
+          <p>Glisser une carte vers une colonne pour changer son statut. L’état est sauvegardé dans ce navigateur. Sans JavaScript, le tableau reste lisible.</p>
+          <div class="kanban" id="kanban">
+            <div class="kanban-col" data-column="ideas">
+              <h3>Ideas</h3>
+              <article class="task" draggable="true" data-id="task-ages">
+                <strong>Âges technologiques</strong>
+                <p>Débloquer de nouvelles chaînes sans casser le MVP.</p>
+              </article>
+              <article class="task" draggable="true" data-id="task-visits">
+                <strong>Visites de mondes</strong>
+                <p>Parcourir le diorama d’un autre joueur, sans le modifier.</p>
+              </article>
+            </div>
+            <div class="kanban-col" data-column="todo">
+              <h3>Todo</h3>
+              <article class="task" draggable="true" data-id="task-persist">
+                <strong>Persistance du monde</strong>
+                <p>Sauver les régions générées. Phase 2.</p>
+              </article>
+            </div>
+            <div class="kanban-col" data-column="doing">
+              <h3>In progress</h3>
+            </div>
+            <div class="kanban-col" data-column="done">
+              <h3>Done</h3>
+              <article class="task" draggable="true" data-id="task-wiki">
+                <strong>Wiki contenu</strong>
+                <p>Référence biomes, ressources, bâtiments, chaînes, monde dans le hub.</p>
+              </article>
+              <article class="task" draggable="true" data-id="task-biome-look">
+                <strong>Look biomes</strong>
+                <p>Forêt = arbres. Plaine = herbe. Montagne = relief. Eau = basse. Rivages = arêtes terre↔eau.</p>
+              </article>
+              <article class="task" draggable="true" data-id="task-plus-wheel">
+                <strong>« + » + roue de biomes</strong>
+                <p>Centre dévoilable = même teinte que le vide, « + » sur la surface, roue F/P/M/E.</p>
+              </article>
+              <article class="task" draggable="true" data-id="task-lattice">
+                <strong>Réseau de centres coin</strong>
+                <p>Offsets (−1,3), (−3,2)… Distance cube 3 entre centres voisins.</p>
+              </article>
+              <article class="task" draggable="true" data-id="task-transition">
+                <strong>Transitions de biomes</strong>
+                <p>Bordures 40/40/20 fusion terre↔terre ; terre↔eau = rivage d’arête.</p>
+              </article>
+              <article class="task" draggable="true" data-id="task-region">
+                <strong>Générateur de région</strong>
+                <p>Rayon 1, biome choisi, n’écrase jamais l’existant.</p>
+              </article>
+              <article class="task" draggable="true" data-id="task-village">
+                <strong>Village sur une tuile</strong>
+                <p>Un mesh low-poly lisible, pas un hexagon décoré.</p>
+              </article>
+              <article class="task" draggable="true" data-id="task-visual-poc">
+                <strong>Visual POC</strong>
+                <p>Feeling de la carte : couleurs, hover, fond, caméra fixe.</p>
+              </article>
+              <article class="task" draggable="true" data-id="task-pitch">
+                <strong>Pitch et piliers</strong>
+                <p>Monde personnel, génération dirigée, chaînes, low-poly.</p>
+              </article>
+              <article class="task" draggable="true" data-id="task-hub">
+                <strong>Project Hub</strong>
+                <p>Cadrage, décisions, roadmap, définition du MVP.</p>
+              </article>
+              <article class="task" draggable="true" data-id="task-stack">
+                <strong>Monorepo + stack</strong>
+                <p>Nuxt, Nuxt UI, Three.js, Fastify, packages shared / game-core / content.</p>
+              </article>
+              <article class="task" draggable="true" data-id="task-hex-grid">
+                <strong>Grille hexagonale 7 tuiles</strong>
+                <p>Emboîtement, biomes (dont eau), caméra orthographique, survol.</p>
+              </article>
+              <article class="task" draggable="true" data-id="task-hex-expand">
+                <strong>Grille 37 hexagones</strong>
+                <p>Rayon 3. Tuiles sans biome visibles, non interactives.</p>
+              </article>
+              <article class="task" draggable="true" data-id="task-hex-select">
+                <strong>Sélection au clic</strong>
+                <p>Tuile active, panneau Nuxt avec biome / coordonnées.</p>
+              </article>
+              <article class="task" draggable="true" data-id="task-camera">
+                <strong>Caméra orthographique contrainte</strong>
+                <p>Pas d’orbite libre.</p>
+              </article>
+            </div>
+          </div>
+        </section>
+
+        <!-- Ideas -->
+        <section id="ideas">
+          <p class="section-kicker">Parking lot</p>
+          <h2>Ideas</h2>
+          <p>Idées non validées. Filtrer par statut. Le contenu reste visible même sans filtre.</p>
+          <div class="filters" role="group" aria-label="Filtrer les idées">
+            <button type="button" class="filter-btn is-on" data-filter="all">Toutes</button>
+            <button type="button" class="filter-btn" data-filter="confirmed">Confirmed</button>
+            <button type="button" class="filter-btn" data-filter="experiment">Experiment</button>
+            <button type="button" class="filter-btn" data-filter="idea">Idea</button>
+            <button type="button" class="filter-btn" data-filter="rejected">Rejected</button>
+          </div>
+          <div class="grid grid-3" id="ideas-grid">
+            <article class="card idea" data-status="experiment">
+              <span class="status status-experiment">Experiment</span>
+              <h3>PvP instancié</h3>
+              <p>Le joueur envoie ressources, unités, armées. Son monde principal reste protégé. V2, pas MVP.</p>
+            </article>
+            <article class="card idea" data-status="idea">
+              <span class="status status-idea">Idea</span>
+              <h3>Commerce entre joueurs</h3>
+              <p>Échanges économiques sans fusionner les cartes. Phase 6.</p>
+            </article>
+            <article class="card idea" data-status="confirmed">
+              <span class="status status-confirmed">Confirmed</span>
+              <h3>Spécialisations des villages</h3>
+              <p>Forestier, minier, agricole, industriel. Direction validée, détails plus tard.</p>
+            </article>
+            <article class="card idea" data-status="idea">
+              <span class="status status-idea">Idea</span>
+              <h3>Nouveaux âges technologiques</h3>
+              <p>Étendre les chaînes sans payer la puissance. Hors MVP.</p>
+            </article>
+            <article class="card idea" data-status="confirmed">
+              <span class="status status-confirmed">Confirmed</span>
+              <h3>Bâtiments multi-hexagones</h3>
+              <p>Usines, monuments. Prévu en Phase 5.</p>
+            </article>
+            <article class="card idea" data-status="idea">
+              <span class="status status-idea">Idea</span>
+              <h3>Ressources rares</h3>
+              <p>Risque d’ajouter de la complexité. À tester seulement si la boucle de base est plaisante.</p>
+            </article>
+            <article class="card idea" data-status="idea">
+              <span class="status status-idea">Idea</span>
+              <h3>Événements mondiaux</h3>
+              <p>P3. Ne pas les concevoir avant l’online.</p>
+            </article>
+            <article class="card idea" data-status="confirmed">
+              <span class="status status-confirmed">Confirmed</span>
+              <h3>Thèmes premium</h3>
+              <p>Cosmétique uniquement. Phase 7.</p>
+            </article>
+            <article class="card idea" data-status="experiment">
+              <span class="status status-experiment">Experiment</span>
+              <h3>Visites de mondes</h3>
+              <p>Interaction douce, cohérente avec le monde personnel.</p>
+            </article>
+          </div>
+        </section>
+
+        <!-- PvP -->
+        <section id="pvp">
+          <p class="section-kicker">Évolution</p>
+          <h2>PvP</h2>
+          <p>Le PvP n’est pas une priorité du MVP. Il est prévu comme une évolution, uniquement s’il s’intègre au fantasme de monde personnel.</p>
+          <div class="grid grid-3">
+            <article class="card">
+              <h3>V1 — Indirect</h3>
+              <p>Compétition sans invasion : classements, économie, commerce, performances.</p>
+            </article>
+            <article class="card">
+              <h3>V2 — Instancié</h3>
+              <p>Zones ou expéditions PvP. Le joueur envoie des ressources, des unités, des armées. Son monde principal reste protégé.</p>
+            </article>
+            <article class="card">
+              <h3>Plus tard</h3>
+              <p>Conflits plus avancés seulement si cela s’intègre correctement au jeu, sans détruire le diorama personnel.</p>
+            </article>
+          </div>
+        </section>
+
+        <!-- Risks -->
+        <section id="risks">
+          <p class="section-kicker">Vigilance</p>
+          <h2>Risks</h2>
+          <div class="grid grid-2">
+            <article class="risk-card">
+              <h3>Complexity <span class="badge badge-danger">High</span></h3>
+              <p>Risque de transformer le jeu en simulateur trop complexe. Mitigation : une boucle courte, peu de ressources au MVP, data-driven plus tard.</p>
+            </article>
+            <article class="risk-card">
+              <h3>Visual readability <span class="badge badge-warning">Medium</span></h3>
+              <p>Risque de surcharger les hexagones. Mitigation : budget d’objets par tuile, lisibilité avant détail, tests à 20–40 hex.</p>
+            </article>
+            <article class="risk-card">
+              <h3>Economy balance <span class="badge badge-warning">Medium</span></h3>
+              <p>Risque de chaînes trop compliquées ou trop lentes. Mitigation : valider fer → outils avant d’ajouter des branches.</p>
+            </article>
+            <article class="risk-card">
+              <h3>World generation <span class="badge badge-warning">Medium</span></h3>
+              <p>Risque que choisir simplement le biome devienne répétitif. Mitigation : transitions, ressources, relief, villages, logistique comme profondeur.</p>
+            </article>
+            <article class="risk-card">
+              <h3>Scope <span class="badge badge-danger">High</span></h3>
+              <p>Risque d’ajouter PvP, social ou commerce trop tôt. Mitigation : hors scope MVP explicite, P3 jusqu’à la boucle fun.</p>
+            </article>
+          </div>
+        </section>
+
+        <!-- MVP -->
+        <section id="mvp">
+          <p class="section-kicker">Cible prototype</p>
+          <h2>MVP Definition</h2>
+          <p class="quote">What must exist before this is considered a valid prototype?</p>
+          <p class="lead">Une carte hexagonale agréable à regarder, quatre biomes primaires (forêt, plaine, montagne, eau) avec rivages en décor d’arête, la génération d’une nouvelle région, un village, de la population, l’affectation de travailleurs, la récolte, une mine, du minerai, une fonderie, un lingot, une forge, des outils, de la persistance, et une boucle suffisamment agréable pour donner envie de continuer à développer son monde.</p>
+
+          <div class="check-grid">
+            <div class="check-item"><span class="check-box"></span>Carte hexagonale agréable</div>
+            <div class="check-item"><span class="check-box"></span>Biomes : forêt, plaine, montagne, eau (+ rivages d’arête)</div>
+            <div class="check-item"><span class="check-box"></span>Génération d’une nouvelle région</div>
+            <div class="check-item"><span class="check-box"></span>Village</div>
+            <div class="check-item"><span class="check-box"></span>Population</div>
+            <div class="check-item"><span class="check-box"></span>Affectation de travailleurs</div>
+            <div class="check-item"><span class="check-box"></span>Récolte</div>
+            <div class="check-item"><span class="check-box"></span>Mine + minerai</div>
+            <div class="check-item"><span class="check-box"></span>Fonderie + lingot</div>
+            <div class="check-item"><span class="check-box"></span>Forge + outils</div>
+            <div class="check-item"><span class="check-box"></span>Persistance</div>
+            <div class="check-item"><span class="check-box"></span>Boucle assez plaisante pour continuer</div>
+          </div>
+
+          <h3 style="margin-top:32px">Out of Scope MVP</h3>
+          <div class="out-scope">
+            <span>PvP</span>
+            <span>Combat</span>
+            <span>Marché global</span>
+            <span>Alliances</span>
+            <span>Armées</span>
+            <span>Application mobile</span>
+            <span>Système premium</span>
+            <span>Publicité</span>
+            <span>Dizaines de biomes</span>
+            <span>Technologies avancées</span>
+          </div>
+        </section>
+
+        <footer class="page-foot">
+          Hexald — Project Hub. Site statique de documentation, pas le jeu. Ouvrir <code>docs/index.html</code> dans le navigateur. Dernière mise à jour du contenu : 25 août 2026 (Phase 2 — World POC + Wiki).
+        </footer>
+      </div>
+    </div>
+  </div>
+
+  <div class="overlay" id="search-overlay" hidden>
+    <div class="palette" role="dialog" aria-modal="true" aria-label="Recherche de sections">
+      <input type="search" id="search-input" placeholder="Aller à une section…" autocomplete="off">
+      <ul class="palette-list" id="search-results"></ul>
+    </div>
+  </div>
+
+  <script src="js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,27 @@
+{
+  "name": "@hexald/web",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Client navigateur : UI Nuxt 4, rendu de carte Three.js.",
+  "scripts": {
+    "dev": "nuxt dev --host -- --port 9089",
+    "build": "nuxt build",
+    "preview": "nuxt preview --host",
+    "prepare": "nuxt prepare"
+  },
+  "dependencies": {
+    "@nuxt/ui": "^4.11.0",
+    "@hexald/content": "workspace:*",
+    "@hexald/game-core": "workspace:*",
+    "@hexald/shared": "workspace:*",
+    "nuxt": "^4.5.2",
+    "tailwindcss": "^4.3.3",
+    "three": "^0.185.1",
+    "vue": "^3.5.41"
+  },
+  "devDependencies": {
+    "@types/three": "^0.185.4",
+    "typescript": "^5.9.2"
+  }
+}

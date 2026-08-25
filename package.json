@@ -1,0 +1,19 @@
+{
+  "name": "hexald",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Hexald — jeu de gestion / stratégie persistant par navigateur.",
+  "packageManager": "pnpm@9.15.0",
+  "scripts": {
+    "dev:web": "pnpm --filter @hexald/web dev",
+    "dev:api": "pnpm --filter @hexald/api dev",
+    "db:up": "docker compose up -d postgres",
+    "db:down": "docker compose down",
+    "db:generate": "pnpm --filter @hexald/db generate",
+    "db:migrate": "pnpm --filter @hexald/db migrate",
+    "db:studio": "pnpm --filter @hexald/db studio"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

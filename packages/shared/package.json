@@ -1,0 +1,10 @@
+{
+  "name": "@hexald/shared",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Types et contrats partagés entre le client et le serveur.",
+  "exports": {
+    ".": "./src/index.ts"
+  }
+}
