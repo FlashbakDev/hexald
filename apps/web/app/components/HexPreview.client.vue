@@ -76,6 +76,9 @@ if (import.meta.hot) {
   import.meta.hot.accept("../renderer/createForestDecor", () => {
     mountScene();
   });
+  import.meta.hot.accept("../renderer/createFogCloudKit", () => {
+    mountScene();
+  });
   import.meta.hot.accept("../renderer/createWaterDecor", () => {
     mountScene();
   });
@@ -93,7 +96,8 @@ defineExpose({
     tiles: readonly WorldTileSnapshot[]
   ) => api?.applyRegion(center, biome, tiles) ?? false,
   applyBuilding: (q: number, r: number, buildingId: BuildingId) =>
-    api?.applyBuilding(q, r, buildingId) ?? false
+    api?.applyBuilding(q, r, buildingId) ?? false,
+  projectTile: (q: number, r: number) => api?.projectTile(q, r) ?? null
 });
 </script>
 

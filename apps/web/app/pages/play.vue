@@ -8,14 +8,16 @@ import type {
 } from "@hexald/shared";
 import {
   buildings,
+  BUILD_DURATION_MS,
+  DEV_BUILD_DURATION_MS,
   primaryBiomes,
   STONE_RATE_PER_WORKER_PER_HOUR,
   WHEAT_RATE_PER_WORKER_PER_HOUR,
   WOOD_RATE_PER_WORKER_PER_HOUR,
   type PlaceableExtractorId
 } from "@hexald/content";
-import { listBuildOptionsForTile } from "@hexald/game-core";
-import type { SelectedTile } from "~/renderer/createHexScene";
+import { computeRegionExpansionCost, listBuildOptionsForTile, isBuildingUnderConstruction } from "@hexald/game-core";
+import type { HexScreenPoint, SelectedTile } from "~/renderer/createHexScene";
 
 definePageMeta({
   layout: "blank"
@@ -27,6 +29,8 @@ const {
   expandRegion,
   assignWorkers,
   buildBuilding,
+  resetWorld,
+  grantDevResources,
   refreshWorld,
   world,
   error: worldError
@@ -46,6 +50,7 @@ useHead({
 });
 
 const preview = useTemplateRef<{
+  recenter: () => void;
   clearSelection: () => void;
   applyRegion: (
     center: HexCoord,
@@ -53,6 +58,7 @@ const preview = useTemplateRef<{
     tiles: readonly WorldTileSnapshot[]
   ) => boolean;
   applyBuilding: (q: number, r: number, buildingId: BuildingId) => boolean;
+  projectTile: (q: number, r: number) => HexScreenPoint | null;
 }>("preview");
 
 const stage = useTemplateRef<HTMLElement>("stage");
@@ -61,12 +67,16 @@ const expanding = ref(false);
 const building = ref(false);
 const expandError = ref<string | null>(null);
 const assigning = ref(false);
+const resetting = ref(false);
+const granting = ref(false);
 const nowTick = ref(Date.now());
+const isDevClient = import.meta.dev;
 
 const wheelInteractive = ref(false);
 let wheelReadyTimer: ReturnType<typeof setTimeout> | null = null;
 let tickTimer: ReturnType<typeof setInterval> | null = null;
 let refreshTimer: ReturnType<typeof setInterval> | null = null;
+let overlayRaf: number | null = null;
 
 onMounted(() => {
   tickTimer = setInterval(() => {
@@ -75,12 +85,17 @@ onMounted(() => {
   refreshTimer = setInterval(() => {
     void refreshWorld();
   }, 30_000);
+  startOverlayLoop();
 });
 
 onBeforeUnmount(() => {
   if (tickTimer) clearInterval(tickTimer);
   if (refreshTimer) clearInterval(refreshTimer);
   if (wheelReadyTimer) clearTimeout(wheelReadyTimer);
+  if (overlayRaf != null) {
+    cancelAnimationFrame(overlayRaf);
+    overlayRaf = null;
+  }
 });
 
 const economy = computed(() => world.value?.economy ?? null);
@@ -161,18 +176,243 @@ const stoneRateLabel = computed(() => {
   return rateLabel(eco.quarriers, STONE_RATE_PER_WORKER_PER_HOUR, eco.hasQuarry);
 });
 
+const selectedWorldTile = computed(() => {
+  const tile = selected.value;
+  const tiles = world.value?.tiles;
+  if (!tile || !tiles) return null;
+  return tiles.find((entry) => entry.q === tile.q && entry.r === tile.r) ?? null;
+});
+
+const selectedConstruction = computed(() => {
+  const snap = selectedWorldTile.value;
+  const completesAt = snap?.constructionCompletesAt;
+  const buildingId = snap?.buildingId;
+  if (!buildingId || !completesAt) return null;
+  if (
+    buildingId !== "lumber_camp" &&
+    buildingId !== "farm" &&
+    buildingId !== "quarry"
+  ) {
+    return null;
+  }
+  const endsAt = Date.parse(completesAt);
+  if (Number.isNaN(endsAt)) return null;
+  const remainingMs = Math.max(0, endsAt - nowTick.value);
+  if (remainingMs <= 0) return null;
+  const durationMs = import.meta.dev
+    ? DEV_BUILD_DURATION_MS
+    : BUILD_DURATION_MS[buildingId];
+  const progress = Math.min(
+    1,
+    Math.max(0, 1 - remainingMs / Math.max(1, durationMs))
+  );
+  return {
+    endsAt,
+    remainingMs,
+    progress,
+    label: formatRemaining(remainingMs)
+  };
+});
+
+function formatRemaining(ms: number) {
+  const totalSec = Math.ceil(ms / 1000);
+  const min = Math.floor(totalSec / 60);
+  const sec = totalSec % 60;
+  if (min <= 0) return `${sec}s`;
+  return `${min}:${sec.toString().padStart(2, "0")}`;
+}
+
+type MapBadgeKind = "pop" | "workers" | "timer";
+
+type MapBadge = {
+  key: string;
+  q: number;
+  r: number;
+  kind: MapBadgeKind;
+  label: string;
+  icon: string;
+  x: number;
+  y: number;
+  visible: boolean;
+  /** Extracteur sans pop assignée. */
+  needsWorkers?: boolean;
+};
+
+const overlayPositions = ref(
+  new Map<string, { x: number; y: number; visible: boolean }>()
+);
+
+const START_VILLAGE = { q: 0, r: 0 } as const;
+
+function workersForBuilding(
+  buildingId: string
+): { count: number; max: number } | null {
+  const eco = economy.value;
+  if (!eco) return null;
+  if (buildingId === "lumber_camp" && eco.hasLumberCamp) {
+    return { count: eco.woodcutters, max: eco.lumberCampMaxWorkers };
+  }
+  if (buildingId === "farm" && eco.hasFarm) {
+    return { count: eco.farmers, max: eco.farmMaxWorkers };
+  }
+  if (buildingId === "quarry" && eco.hasQuarry) {
+    return { count: eco.quarriers, max: eco.quarryMaxWorkers };
+  }
+  return null;
+}
+
+const mapBadges = computed((): MapBadge[] => {
+  const tiles = world.value?.tiles;
+  const eco = economy.value;
+  if (!tiles?.length || !eco) return [];
+  const now = nowTick.value;
+  const out: MapBadge[] = [];
+
+  const villageKey = `${START_VILLAGE.q},${START_VILLAGE.r}`;
+  const villagePos = overlayPositions.value.get(villageKey);
+  out.push({
+    key: `pop:${villageKey}`,
+    q: START_VILLAGE.q,
+    r: START_VILLAGE.r,
+    kind: "pop",
+    label: `${eco.population}/${eco.populationCap}`,
+    icon: "i-lucide-users",
+    x: villagePos?.x ?? -9999,
+    y: villagePos?.y ?? -9999,
+    visible: villagePos?.visible ?? false
+  });
+
+  for (const tile of tiles) {
+    if (!tile.buildingId) continue;
+    const key = `${tile.q},${tile.r}`;
+    const pos = overlayPositions.value.get(key);
+    const underConstruction = isBuildingUnderConstruction(
+      tile.constructionCompletesAt,
+      now
+    );
+
+    if (underConstruction && tile.constructionCompletesAt) {
+      const ends = Date.parse(tile.constructionCompletesAt);
+      if (!Number.isNaN(ends) && ends > now) {
+        out.push({
+          key: `timer:${key}`,
+          q: tile.q,
+          r: tile.r,
+          kind: "timer",
+          label: formatRemaining(ends - now),
+          icon: "i-lucide-hammer",
+          x: pos?.x ?? -9999,
+          y: pos?.y ?? -9999,
+          visible: pos?.visible ?? false
+        });
+      }
+      continue;
+    }
+
+    const workers = workersForBuilding(tile.buildingId);
+    if (workers == null) continue;
+    out.push({
+      key: `workers:${key}`,
+      q: tile.q,
+      r: tile.r,
+      kind: "workers",
+      label: `${workers.count}/${workers.max}`,
+      icon: "i-lucide-users",
+      x: pos?.x ?? -9999,
+      y: pos?.y ?? -9999,
+      visible: pos?.visible ?? false,
+      needsWorkers: workers.count === 0
+    });
+  }
+
+  return out;
+});
+
+function collectOverlayTargets(): { q: number; r: number }[] {
+  const tiles = world.value?.tiles;
+  if (!tiles?.length) return [{ ...START_VILLAGE }];
+  const targets: { q: number; r: number }[] = [{ ...START_VILLAGE }];
+  const seen = new Set([`${START_VILLAGE.q},${START_VILLAGE.r}`]);
+  for (const tile of tiles) {
+    if (!tile.buildingId) continue;
+    const key = `${tile.q},${tile.r}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    targets.push({ q: tile.q, r: tile.r });
+  }
+  return targets;
+}
+
+function syncOverlayPositions() {
+  const project = preview.value?.projectTile;
+  if (!project || !world.value) {
+    if (overlayPositions.value.size) overlayPositions.value = new Map();
+    return;
+  }
+  const next = new Map<string, { x: number; y: number; visible: boolean }>();
+  for (const target of collectOverlayTargets()) {
+    const point = project(target.q, target.r);
+    if (!point) continue;
+    next.set(`${target.q},${target.r}`, {
+      x: point.x,
+      y: point.y,
+      visible: point.visible
+    });
+  }
+  overlayPositions.value = next;
+}
+
+function startOverlayLoop() {
+  if (overlayRaf != null) return;
+  const loop = () => {
+    syncOverlayPositions();
+    overlayRaf = requestAnimationFrame(loop);
+  };
+  overlayRaf = requestAnimationFrame(loop);
+}
+
+const hasActiveConstruction = computed(
+  () =>
+    world.value?.tiles.some((tile) => {
+      const at = tile.constructionCompletesAt;
+      if (!at) return false;
+      const ends = Date.parse(at);
+      return !Number.isNaN(ends) && ends > nowTick.value;
+    }) ?? false
+);
+
+watch(hasActiveConstruction, (active, wasActive) => {
+  if (wasActive && !active) void refreshWorld();
+});
+
+watch(nowTick, (now) => {
+  const tiles = world.value?.tiles;
+  if (!tiles?.length) return;
+  const due = tiles.some((tile) => {
+    const at = tile.constructionCompletesAt;
+    if (!at || !tile.buildingId) return false;
+    const ends = Date.parse(at);
+    if (Number.isNaN(ends) || ends > now) return false;
+    if (tile.buildingId === "lumber_camp" && !economy.value?.hasLumberCamp) return true;
+    if (tile.buildingId === "farm" && !economy.value?.hasFarm) return true;
+    if (tile.buildingId === "quarry" && !economy.value?.hasQuarry) return true;
+    return false;
+  });
+  if (due) void refreshWorld();
+});
+
 const buildOptions = computed(() => {
   const tile = selected.value;
-  const eco = economy.value;
-  if (!tile?.biome || !eco) return [] as PlaceableExtractorId[];
+  const tiles = world.value?.tiles;
+  if (!tile?.biome || !tiles) return [] as PlaceableExtractorId[];
   return listBuildOptionsForTile({
     biome: tile.biome,
     hasVillage: tile.hasVillage,
     existingBuildingId: tile.buildingId ?? null,
     counts: {
-      lumber_camp: eco.hasLumberCamp ? 1 : 0,
-      farm: eco.hasFarm ? 1 : 0,
-      quarry: eco.hasQuarry ? 1 : 0
+      lumber_camp: tiles.filter((entry) => entry.buildingId === "lumber_camp").length,
+      farm: tiles.filter((entry) => entry.buildingId === "farm").length,
+      quarry: tiles.filter((entry) => entry.buildingId === "quarry").length
     }
   });
 });
@@ -210,6 +450,7 @@ const selectedWorkerPanel = computed((): WorkerPanel | null => {
   const tile = selected.value;
   const eco = economy.value;
   if (!tile?.buildingId || !eco) return null;
+  if (selectedConstruction.value) return null;
 
   if (tile.buildingId === "lumber_camp" && eco.hasLumberCamp) {
     return {
@@ -287,6 +528,32 @@ const showBiomeWheel = computed(
     !building.value
 );
 
+const regionExpansionCost = computed(() => {
+  const tile = selected.value;
+  const tiles = world.value?.tiles;
+  if (!tile?.canGenerate || tile.biome != null || !tiles) return null;
+  return computeRegionExpansionCost({
+    center: { q: tile.q, r: tile.r },
+    tiles,
+    now: nowTick.value
+  });
+});
+
+const canAffordRegion = computed(() => {
+  const cost = regionExpansionCost.value;
+  if (!cost) return false;
+  return displayedWood.value + 1e-9 >= cost.wood;
+});
+
+const regionCostLabel = computed(() => {
+  const cost = regionExpansionCost.value;
+  if (!cost) return "";
+  const wood = `${cost.wood} bois`;
+  if (cost.discount <= 0) return wood;
+  const pct = Math.round(cost.discount * 100);
+  return `${wood} (−${pct}%)`;
+});
+
 const showBuildWheel = computed(
   () =>
     selected.value != null &&
@@ -339,11 +606,15 @@ const wheelStyle = computed(() => {
   return { left: `${x}px`, top: `${y}px` };
 });
 
+const BIOME_WHEEL_RADIUS = 56;
+
 const wheelSlots = computed(() => {
   const n = primaryBiomes.length;
+  const radius = BIOME_WHEEL_RADIUS;
+  // Arc inférieur (droite → bas → gauche), coût réservé à la moitié haute.
   return primaryBiomes.map((biome, index) => {
-    const angle = -Math.PI / 2 + (index * 2 * Math.PI) / n;
-    const radius = 56;
+    const angle =
+      n <= 1 ? Math.PI / 2 : (index * Math.PI) / (n - 1);
     return {
       biome,
       style: {
@@ -352,6 +623,10 @@ const wheelSlots = computed(() => {
     };
   });
 });
+
+const regionCostStyle = {
+  transform: `translate(-50%, -50%) translate(0px, ${-BIOME_WHEEL_RADIUS}px)`
+};
 
 const cancelButtonStyle = {
   transform: "translate(-50%, -50%)"
@@ -385,6 +660,10 @@ async function generate(biome: PrimaryBiomeId) {
   const tile = selected.value;
   const id = world.value?.id;
   if (!tile || tile.biome || !tile.canGenerate || !id || expanding.value) return;
+  if (!canAffordRegion.value) {
+    expandError.value = "Pas assez de bois pour étendre.";
+    return;
+  }
 
   expanding.value = true;
   expandError.value = null;
@@ -408,6 +687,10 @@ async function placeBuilding(buildingId: PlaceableExtractorId) {
   const id = world.value?.id;
   if (!tile?.biome || !id || building.value) return;
   if (!buildOptions.value.includes(buildingId)) return;
+  if (idlePop.value < 1) {
+    expandError.value = "Il faut au moins 1 habitant libre pour construire.";
+    return;
+  }
 
   building.value = true;
   expandError.value = null;
@@ -446,6 +729,38 @@ async function setWorkers(job: ExtractorJob, count: number) {
   }
 }
 
+async function onResetWorld() {
+  const id = world.value?.id;
+  if (!isDevClient || !id || resetting.value) return;
+  resetting.value = true;
+  expandError.value = null;
+  clearSelection();
+  try {
+    const snapshot = await resetWorld(id);
+    if (!snapshot) {
+      expandError.value = worldError.value ?? "Impossible de reset le monde.";
+    }
+  } finally {
+    resetting.value = false;
+  }
+}
+
+async function onGrantResources() {
+  const id = world.value?.id;
+  if (!isDevClient || !id || granting.value) return;
+  granting.value = true;
+  expandError.value = null;
+  try {
+    const snapshot = await grantDevResources(id);
+    if (!snapshot) {
+      expandError.value =
+        worldError.value ?? "Impossible d’ajouter des ressources.";
+    }
+  } finally {
+    granting.value = false;
+  }
+}
+
 function formatStock(value: number) {
   return Math.floor(value).toLocaleString("fr-FR");
 }
@@ -479,11 +794,31 @@ function formatStock(value: number) {
 
     <div v-else class="absolute inset-0 z-0">
       <HexPreview
+        :key="world.id"
         ref="preview"
         class="size-full"
         :initial-world="world"
         @select="onSelect"
       />
+    </div>
+
+    <div
+      v-for="badge in mapBadges"
+      v-show="badge.visible"
+      :key="badge.key"
+      class="map-badge pointer-events-none absolute z-20"
+      :class="[
+        `map-badge--${badge.kind}`,
+        badge.needsWorkers ? 'map-badge--needs-workers' : null
+      ]"
+      :style="{ left: `${badge.x}px`, top: `${badge.y}px` }"
+      aria-hidden="true"
+    >
+      <span class="map-badge__chip">
+        <UIcon :name="badge.icon" class="map-badge__icon" />
+        {{ badge.label }}
+        <span v-if="badge.needsWorkers" class="map-badge__alert">!</span>
+      </span>
     </div>
 
     <header
@@ -575,6 +910,51 @@ function formatStock(value: number) {
       </p>
     </div>
 
+    <div
+      v-if="world && isDevClient"
+      class="pointer-events-auto absolute left-3 z-30 flex items-center gap-2"
+      :class="
+        showBuildingSheet
+          ? 'bottom-[calc(13.5rem+env(safe-area-inset-bottom))]'
+          : 'bottom-[max(0.85rem,env(safe-area-inset-bottom))]'
+      "
+    >
+      <button
+        type="button"
+        class="flex h-11 items-center gap-1.5 rounded-full border border-amber-500/40 bg-[#2a1a0e]/90 px-3 text-xs font-semibold tracking-wide text-[#f0d2a0] shadow-lg backdrop-blur-md transition hover:border-amber-400/70 hover:text-[#ffe4b8] active:scale-95 disabled:opacity-50"
+        :disabled="resetting || granting || expanding || building"
+        @click="onResetWorld"
+      >
+        <UIcon name="i-lucide-rotate-ccw" class="size-4" />
+        {{ resetting ? "Reset…" : "Reset monde" }}
+      </button>
+      <button
+        type="button"
+        class="flex h-11 items-center gap-1.5 rounded-full border border-emerald-500/40 bg-[#0e2a1a]/90 px-3 text-xs font-semibold tracking-wide text-[#b8f0d0] shadow-lg backdrop-blur-md transition hover:border-emerald-400/70 hover:text-[#d8ffe8] active:scale-95 disabled:opacity-50"
+        :disabled="resetting || granting || expanding || building"
+        title="+100 bois / blé / pierre"
+        @click="onGrantResources"
+      >
+        <UIcon name="i-lucide-package-plus" class="size-4" />
+        {{ granting ? "…" : "+ Ressources" }}
+      </button>
+    </div>
+
+    <button
+      v-if="world"
+      type="button"
+      class="pointer-events-auto absolute right-3 z-30 flex size-11 items-center justify-center rounded-full border border-white/15 bg-[#0e1f1a]/88 text-[#c8d5c0] shadow-lg backdrop-blur-md transition hover:border-[#e8a54b]/50 hover:text-[#e8a54b] active:scale-95"
+      :class="
+        showBuildingSheet
+          ? 'bottom-[calc(13.5rem+env(safe-area-inset-bottom))]'
+          : 'bottom-[max(0.85rem,env(safe-area-inset-bottom))]'
+      "
+      aria-label="Recentrer la caméra"
+      @click="preview?.recenter()"
+    >
+      <UIcon name="i-lucide-locate-fixed" class="size-5" />
+    </button>
+
     <Transition name="biome-wheel">
       <div
         v-if="showBiomeWheel"
@@ -586,6 +966,18 @@ function formatStock(value: number) {
           :class="wheelInteractive ? 'pointer-events-auto' : 'pointer-events-none'"
           :style="wheelStyle"
         >
+          <p
+            v-if="regionExpansionCost"
+            class="absolute left-0 top-0 z-10 whitespace-nowrap rounded-full border px-2.5 py-1 text-[11px] font-semibold shadow-md backdrop-blur-sm"
+            :class="
+              canAffordRegion
+                ? 'border-white/20 bg-[#0e1f1a]/92 text-[#e8a54b]'
+                : 'border-red-400/40 bg-[#1a0e0e]/92 text-red-300'
+            "
+            :style="regionCostStyle"
+          >
+            {{ regionCostLabel }}
+          </p>
           <button
             type="button"
             class="absolute left-0 top-0 flex size-9 items-center justify-center rounded-full border border-white/20 bg-[#0e1f1a]/95 text-[#c8d5c0] shadow-md backdrop-blur-sm"
@@ -599,10 +991,20 @@ function formatStock(value: number) {
             v-for="slot in wheelSlots"
             :key="slot.biome.id"
             type="button"
-            class="absolute left-0 top-0 flex size-11 items-center justify-center rounded-full border-2 border-white/70 shadow-md transition hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e8a54b]"
+            class="absolute left-0 top-0 flex size-11 items-center justify-center rounded-full border-2 shadow-md transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e8a54b]"
+            :class="
+              canAffordRegion
+                ? 'border-white/70 hover:scale-110'
+                : 'border-white/30 opacity-45'
+            "
             :style="[slot.style, { backgroundColor: biomeSwatch[slot.biome.id] }]"
-            :title="slot.biome.label"
+            :title="
+              canAffordRegion
+                ? `${slot.biome.label} · ${regionCostLabel}`
+                : `${slot.biome.label} · pas assez de bois`
+            "
             :aria-label="slot.biome.label"
+            :disabled="!canAffordRegion"
             @click="generate(slot.biome.id)"
           >
             <UIcon
@@ -639,10 +1041,20 @@ function formatStock(value: number) {
             v-for="slot in buildWheelSlots"
             :key="slot.id"
             type="button"
-            class="absolute left-0 top-0 flex size-12 flex-col items-center justify-center rounded-full border-2 border-[#e8a54b]/80 bg-[#2d5248] text-[#f2f6ee] shadow-md transition hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e8a54b]"
+            class="absolute left-0 top-0 flex size-12 flex-col items-center justify-center rounded-full border-2 bg-[#2d5248] text-[#f2f6ee] shadow-md transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e8a54b]"
+            :class="
+              idlePop >= 1
+                ? 'border-[#e8a54b]/80 hover:scale-110'
+                : 'border-white/30 opacity-45'
+            "
             :style="slot.style"
-            :title="slot.label"
+            :title="
+              idlePop >= 1
+                ? `${slot.label} · 1 habitant requis`
+                : `${slot.label} · aucun habitant libre`
+            "
             :aria-label="slot.label"
+            :disabled="idlePop < 1"
             @click="placeBuilding(slot.id)"
           >
             <UIcon :name="slot.icon" class="size-4" />
@@ -700,7 +1112,10 @@ function formatStock(value: number) {
               <p class="building-sheet__title truncate">
                 {{ selectedBuildingTitle }}
               </p>
-              <p v-if="selectedWorkerPanel" class="building-sheet__hint">
+              <p v-if="selectedConstruction" class="building-sheet__hint">
+                En construction · {{ selectedConstruction.label }} · 1 habitant réservé
+              </p>
+              <p v-else-if="selectedWorkerPanel" class="building-sheet__hint">
                 {{ selectedWorkerPanel.hint }}
               </p>
               <p v-else-if="selected.hasVillage" class="building-sheet__hint">
@@ -715,6 +1130,18 @@ function formatStock(value: number) {
             >
               <UIcon name="i-lucide-x" class="size-4" />
             </button>
+          </div>
+
+          <div
+            v-if="selectedConstruction"
+            class="mt-3"
+          >
+            <div class="h-1.5 overflow-hidden rounded-full bg-black/10">
+              <div
+                class="h-full rounded-full bg-[#e8a54b] transition-[width] duration-1000 linear"
+                :style="{ width: `${Math.round(selectedConstruction.progress * 100)}%` }"
+              />
+            </div>
           </div>
 
           <div

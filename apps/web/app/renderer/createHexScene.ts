@@ -36,6 +36,7 @@ import {
   generateRegionTiles
 } from "@hexald/game-core";
 import { createForestDecorKit } from "./createForestDecor";
+import { createFogCloudKit, FOG_CLOUD_LIFT } from "./createFogCloudKit";
 import { createFarmMesh } from "./createFarmMesh";
 import { createLumberCampMesh } from "./createLumberCampMesh";
 import { createQuarryMesh } from "./createQuarryMesh";
@@ -198,6 +199,14 @@ export type SelectedTile = {
   clientY?: number;
 };
 
+export type HexScreenPoint = {
+  /** Position CSS relative au canvas (px). */
+  x: number;
+  y: number;
+  /** Dans le frustum ortho approximatif. */
+  visible: boolean;
+};
+
 export type HexSceneApi = {
   dispose: () => void;
   recenter: () => void;
@@ -211,6 +220,8 @@ export type HexSceneApi = {
     tiles: readonly WorldTileSnapshot[]
   ) => boolean;
   applyBuilding: (q: number, r: number, buildingId: BuildingId) => boolean;
+  /** Projette le centre d’une tuile (au-dessus du bâtiment) en coords canvas. */
+  projectTile: (q: number, r: number) => HexScreenPoint | null;
 };
 
 export type HexSceneFraming = {
@@ -375,6 +386,9 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
   const applyCamera = () => {
     camera.position.copy(lookTarget).add(CAMERA_OFFSET);
     camera.lookAt(lookTarget);
+    // Requis pour unproject pendant le pan/pinch : sinon matrixWorld reste
+    // stale entre deux frames et le grab-pan accélère (surtout Safari iOS).
+    camera.updateMatrixWorld();
   };
 
   applyCamera();
@@ -411,8 +425,13 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
   const emptyPool: Mesh[] = [];
   const revealableCenters = new Set<string>();
   const revealableFootprint = new Set<string>();
+  /** Positions monde des centres constructibles (frein de pan). */
+  const revealableCenterWorld: { x: number; z: number }[] = [];
   const plusByKey = new Map<string, Mesh>();
   const plusPool: Mesh[] = [];
+  const fogByKey = new Map<string, Group>();
+  const fogPool: Group[] = [];
+  const fogKit = createFogCloudKit();
   const plusTexture = (() => {
     const size = 128;
     const canvasEl = document.createElement("canvas");
@@ -486,6 +505,52 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
     plus.userData.isPlus = true;
     plus.userData.q = q;
     plus.userData.r = r;
+  };
+
+  const detachFog = (key: string) => {
+    const fog = fogByKey.get(key);
+    if (!fog) return;
+    fog.removeFromParent();
+    fog.visible = false;
+    fogByKey.delete(key);
+    fogPool.push(fog);
+  };
+
+  const attachFog = (
+    empty: Mesh,
+    q: number,
+    r: number,
+    fogKeys: ReadonlySet<string>
+  ) => {
+    const key = hexKey(q, r);
+    const neighbors = HEX_DIRECTIONS.filter((dir) =>
+      fogKeys.has(hexKey(q + dir.q, r + dir.r))
+    );
+    const neighborSig = neighbors.map((d) => `${d.q},${d.r}`).join("|");
+    let fog = fogByKey.get(key);
+    if (!fog) {
+      fog = fogPool.pop();
+      if (fog) fogKit.configureInstance(fog, q, r, neighbors);
+      else fog = fogKit.createInstance(q, r, neighbors);
+      fog.userData.neighborSig = neighborSig;
+      fogByKey.set(key, fog);
+    } else if (
+      fog.userData.q !== q ||
+      fog.userData.r !== r ||
+      fog.userData.neighborSig !== neighborSig
+    ) {
+      fogKit.configureInstance(fog, q, r, neighbors);
+      fog.userData.neighborSig = neighborSig;
+    }
+    if (fog.parent !== empty) {
+      fog.removeFromParent();
+      empty.add(fog);
+    }
+    // Flotte clairement au-dessus de la tuile vierge.
+    const liftJitter = (fog.userData.liftJitter as number) ?? 1;
+    fog.userData.baseY = (EMPTY_HEIGHT / 2 + FOG_CLOUD_LIFT) * liftJitter;
+    fog.position.set(0, fog.userData.baseY as number, 0);
+    fog.visible = true;
   };
 
   const village = createVillageMesh();
@@ -645,6 +710,7 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
 
   const recycleEmptyMesh = (key: string, mesh: Mesh) => {
     detachPlus(key);
+    detachFog(key);
     if (emptyByKey.get(key) === mesh) emptyByKey.delete(key);
     mesh.visible = false;
     mesh.position.y = EMPTY_HEIGHT / 2;
@@ -693,6 +759,7 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
 
     if (existingEmpty) {
       detachPlus(key);
+      detachFog(key);
       if (spawn) {
         // Garde la tuile vierge visible jusqu’à la fin de la montée.
         pendingEmpty = existingEmpty;
@@ -809,11 +876,14 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
   const refreshRevealable = () => {
     revealableCenters.clear();
     revealableFootprint.clear();
+    revealableCenterWorld.length = 0;
 
     for (const candidate of adjacentRegionCenters(regionCenters)) {
       if (!canPlaceRegion(biomesByKey, candidate, regionCenters)) continue;
       const key = hexKey(candidate.q, candidate.r);
       revealableCenters.add(key);
+      const world = axialToWorld(candidate.q, candidate.r);
+      revealableCenterWorld.push(world);
       for (const cell of regionCells(candidate)) {
         revealableFootprint.add(hexKey(cell.q, cell.r));
       }
@@ -832,6 +902,44 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
       const q = mesh.userData.q as number;
       const r = mesh.userData.r as number;
       attachPlus(mesh, q, r);
+    }
+
+    // Brouillard de guerre : nuages sur les vierges hors zone découvrable.
+    const fogKeys = new Set<string>();
+    for (const [key, mesh] of emptyByKey) {
+      if (!mesh.visible) continue;
+      if (revealableFootprint.has(key)) continue;
+      const spawning = tilesByKey.get(key);
+      if (spawning?.pendingEmpty === mesh) continue;
+      fogKeys.add(key);
+    }
+
+    for (const [key, mesh] of emptyByKey) {
+      if (!mesh.visible) {
+        detachFog(key);
+        continue;
+      }
+
+      const q = mesh.userData.q as number;
+      const r = mesh.userData.r as number;
+      const inFootprint = revealableFootprint.has(key);
+      paintEmptyMaterials(
+        meshMaterials(mesh),
+        q,
+        r,
+        inFootprint ? "reveal-footprint" : "empty"
+      );
+      mesh.userData.revealKind = inFootprint ? "reveal-footprint" : "empty";
+
+      if (!fogKeys.has(key)) {
+        detachFog(key);
+        continue;
+      }
+      attachFog(mesh, q, r, fogKeys);
+    }
+
+    for (const key of [...fogByKey.keys()]) {
+      if (!fogKeys.has(key)) detachFog(key);
     }
   };
 
@@ -855,6 +963,7 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
   let dragMoved = false;
   let activePointer: number | null = null;
   let recenterActive = false;
+  let recenterView = false;
   let dragStartClientX = 0;
   let dragStartClientY = 0;
   let pinching = false;
@@ -864,6 +973,11 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
   const TAP_SLOP_PX = 14;
   /** Ignore les pointer mouse synthétiques après un geste tactile. */
   let ignoreMouseUntil = 0;
+
+  const cancelRecenter = () => {
+    recenterActive = false;
+    recenterView = false;
+  };
 
   const pointerDistance = () => {
     if (activePointers.size < 2) return 0;
@@ -883,6 +997,9 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
   };
 
   const applyZoomAt = (clientX: number, clientY: number, nextViewSize: number) => {
+    cancelRecenter();
+    const fromX = lookTarget.x;
+    const fromZ = lookTarget.z;
     clientToGround(clientX, clientY, grabWorld);
     viewSize = Math.min(VIEW_MAX, Math.max(VIEW_MIN, nextViewSize));
     const { width, height } = canvasSize();
@@ -890,7 +1007,7 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
     applyCamera();
     clientToGround(clientX, clientY, groundPoint);
     lookTarget.add(grabWorld).sub(groundPoint);
-    applyCamera();
+    clampLookTargetToConstructible(fromX, fromZ);
     viewDirty = true;
     hoverDirty = true;
   };
@@ -921,11 +1038,21 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
     const ndcY = -((clientY - rect.top) / rect.height) * 2 + 1;
     rayOrigin.set(ndcX, ndcY, -1).unproject(camera);
     rayDir.set(ndcX, ndcY, 1).unproject(camera).sub(rayOrigin);
+    if (Math.abs(rayDir.y) < 1e-8) {
+      target.set(lookTarget.x, 0, lookTarget.z);
+      return;
+    }
     const t = -rayOrigin.y / rayDir.y;
-    target.set(rayOrigin.x + rayDir.x * t, 0, rayOrigin.z + rayDir.z * t);
+    const x = rayOrigin.x + rayDir.x * t;
+    const z = rayOrigin.z + rayDir.z * t;
+    if (!Number.isFinite(x) || !Number.isFinite(z)) {
+      target.set(lookTarget.x, 0, lookTarget.z);
+      return;
+    }
+    target.set(x, 0, z);
   };
 
-  const visibleGroundAabb = (): Aabb => {
+  const visibleGroundAabb = (pad = HEX_SIZE * 3, ndcExtent = 1): Aabb => {
     camera.updateProjectionMatrix();
     camera.updateMatrixWorld();
     let minX = Infinity;
@@ -933,11 +1060,12 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
     let minZ = Infinity;
     let maxZ = -Infinity;
 
+    const e = Math.max(0.05, Math.min(1, ndcExtent));
     for (const [nx, ny] of [
-      [-1, -1],
-      [1, -1],
-      [-1, 1],
-      [1, 1]
+      [-e, -e],
+      [e, -e],
+      [-e, e],
+      [e, e]
     ] as const) {
       rayOrigin.set(nx, ny, -1).unproject(camera);
       rayDir.set(nx, ny, 1).unproject(camera).sub(rayOrigin);
@@ -950,7 +1078,6 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
       maxZ = Math.max(maxZ, z);
     }
 
-    const pad = HEX_SIZE * 3;
     return {
       minX: minX - pad,
       maxX: maxX + pad,
@@ -958,6 +1085,51 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
       maxZ: maxZ + pad
     };
   };
+
+  /**
+   * True si du territoire constructible (ou connu) reste dans la moitié
+   * centrale de l’écran — évite un viewport full nuages en panant trop loin.
+   */
+  const viewportHasConstructible = () => {
+    const bounds = visibleGroundAabb(HEX_SIZE * 0.35, 0.5);
+    if (revealableCenterWorld.length > 0) {
+      for (const p of revealableCenterWorld) {
+        if (pointInAabb(p.x, p.z, bounds)) return true;
+      }
+      return false;
+    }
+    // Plus rien à explorer : reste sur le territoire connu.
+    for (const tile of biomeTiles) {
+      if (pointInAabb(tile.mesh.position.x, tile.mesh.position.z, bounds)) return true;
+    }
+    return biomeTiles.length === 0;
+  };
+
+  /**
+   * Si le lookTarget sort trop loin (plus de constructible au centre),
+   * ramène le long du segment depuis (fromX, fromZ).
+   */
+  const clampLookTargetToConstructible = (fromX: number, fromZ: number) => {
+    applyCamera();
+    if (viewportHasConstructible()) return;
+
+    const toX = lookTarget.x;
+    const toZ = lookTarget.z;
+    let lo = 0;
+    let hi = 1;
+    for (let i = 0; i < 10; i++) {
+      const mid = (lo + hi) * 0.5;
+      lookTarget.set(fromX + (toX - fromX) * mid, 0, fromZ + (toZ - fromZ) * mid);
+      applyCamera();
+      if (viewportHasConstructible()) lo = mid;
+      else hi = mid;
+    }
+    lookTarget.set(fromX + (toX - fromX) * lo, 0, fromZ + (toZ - fromZ) * lo);
+    applyCamera();
+  };
+
+  const pointInAabb = (x: number, z: number, bounds: Aabb) =>
+    x >= bounds.minX && x <= bounds.maxX && z >= bounds.minZ && z <= bounds.maxZ;
 
   const syncEmptyTiles = () => {
     const bounds = visibleGroundAabb();
@@ -1176,6 +1348,7 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
       dragging = false;
       dragMoved = true;
       activePointer = null;
+      cancelRecenter();
       pinchStartDist = pointerDistance();
       pinchStartView = viewSize;
       hoveredMesh = null;
@@ -1236,8 +1409,13 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
     clientToGround(event.clientX, event.clientY, groundPoint);
     dragMoved = true;
     hoveredMesh = null;
+    cancelRecenter();
+    const fromX = lookTarget.x;
+    const fromZ = lookTarget.z;
     lookTarget.add(grabWorld).sub(groundPoint);
-    applyCamera();
+    clampLookTargetToConstructible(fromX, fromZ);
+    // Recalcule le grab sous le doigt après clamp (évite l’accélération au bord).
+    clientToGround(event.clientX, event.clientY, grabWorld);
     viewDirty = true;
     canvas.style.cursor = "grabbing";
     // Mobile : dès qu’on pan la carte, on ferme la modal de biomes.
@@ -1316,6 +1494,7 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
 
   const recenter = () => {
     recenterActive = true;
+    recenterView = true;
   };
 
   const setFraming = (framing: HexSceneFraming) => {
@@ -1384,6 +1563,27 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
     return true;
   };
 
+  const projectScratch = new Vector3();
+  const projectTile = (q: number, r: number): HexScreenPoint | null => {
+    const { x, z } = axialToWorld(q, r);
+    const tile = tilesByKey.get(hexKey(q, r));
+    if (!tile) return null;
+    const lift = 0.52;
+    projectScratch.set(x, tile.restY + lift, z);
+    projectScratch.project(camera);
+    const { width, height } = canvasSize();
+    const sx = (projectScratch.x * 0.5 + 0.5) * width;
+    const sy = (-projectScratch.y * 0.5 + 0.5) * height;
+    const visible =
+      projectScratch.x >= -1.15 &&
+      projectScratch.x <= 1.15 &&
+      projectScratch.y >= -1.15 &&
+      projectScratch.y <= 1.15 &&
+      projectScratch.z >= -1 &&
+      projectScratch.z <= 1;
+    return { x: sx, y: sy, visible };
+  };
+
   const generateRegion = (q: number, r: number, biome: PrimaryBiomeId) => {
     const center = { q, r };
     const created = generateRegionTiles(biomesByKey, center, biome, regionCenters);
@@ -1396,7 +1596,16 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
 
     if (recenterActive) {
       lookTarget.lerp(ORIGIN, 0.18);
-      if (lookTarget.lengthSq() < 0.0004) {
+      if (recenterView) {
+        viewSize += (VIEW_DEFAULT - viewSize) * 0.18;
+        if (Math.abs(viewSize - VIEW_DEFAULT) < 0.02) {
+          viewSize = VIEW_DEFAULT;
+          recenterView = false;
+        }
+        const { width, height } = canvasSize();
+        applyProjection(width, height);
+      }
+      if (lookTarget.lengthSq() < 0.0004 && !recenterView) {
         lookTarget.set(0, 0, 0);
         recenterActive = false;
       }
@@ -1507,6 +1716,10 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
       }
     }
 
+    for (const fog of fogByKey.values()) {
+      if (fog.visible) fogKit.animate(fog, now);
+    }
+
     renderer.render(scene, camera);
   };
 
@@ -1533,6 +1746,7 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
     generateRegion,
     applyRegion,
     applyBuilding,
+    projectTile,
     dispose: () => {
       cancelAnimationFrame(frame);
       window.removeEventListener("resize", resize);
@@ -1560,6 +1774,7 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
       plusGeometry.dispose();
       plusMaterial.dispose();
       plusTexture.dispose();
+      fogKit.dispose();
       for (const tile of biomeTiles) {
         for (const material of tile.materials) material.dispose();
       }

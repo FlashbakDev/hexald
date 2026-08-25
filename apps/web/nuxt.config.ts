@@ -21,7 +21,9 @@ export default defineNuxtConfig({
   },
   runtimeConfig: {
     public: {
-      apiBase: "/backend"
+      apiBase: "/backend",
+      /** Override with NUXT_PUBLIC_ADMIN_CODE */
+      adminCode: "nimda"
     }
   },
   routeRules: {

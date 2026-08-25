@@ -23,6 +23,18 @@ function unitToward(dirIndex: number) {
   return { x: x / len, z: z / len, yaw: Math.atan2(x, z) };
 }
 
+/** Sommet hex entre deux arêtes consécutives (dir et dir+1). */
+function vertexBetween(dirA: number, dirB: number) {
+  const a = unitToward(dirA);
+  const b = unitToward(dirB);
+  let x = a.x + b.x;
+  let z = a.z + b.z;
+  const len = Math.hypot(x, z) || 1;
+  x /= len;
+  z /= len;
+  return { x, z, yaw: Math.atan2(x, z) };
+}
+
 function edgeHash(dirIndex: number, salt = 0) {
   let n = Math.imul(dirIndex + 1, 9973) ^ Math.imul(salt | 0, 1597334677);
   n = Math.imul(n ^ (n >>> 16), 2246822519);
@@ -41,8 +53,16 @@ export function shoreKindForBiome(biome: BiomeId): ShoreKind | null {
   return null;
 }
 
+type EdgeContinuity = {
+  /** Arête précédente (dir−1) aussi rivage. */
+  hasPrev: boolean;
+  /** Arête suivante (dir+1) aussi rivage. */
+  hasNext: boolean;
+};
+
 /**
  * Rivage terre↔eau (style Civ) : décor d’arête selon le biome terrestre.
+ * Les plages se connectent aux coins (bandes prolongées + pastilles de sommet).
  */
 export function createShoreEdgeDecorKit() {
   const geometries: BufferGeometry[] = [];
@@ -127,11 +147,14 @@ export function createShoreEdgeDecorKit() {
     foliage
   );
 
-  const duneWide = new BoxGeometry(0.92, 0.028, 0.2);
-  const sandBand = new BoxGeometry(0.88, 0.018, 0.14);
-  const wetBand = new BoxGeometry(0.82, 0.012, 0.09);
-  const foamBand = new BoxGeometry(0.72, 0.01, 0.055);
+  // Largeur ≈ longueur d’arête hex (1.0) + léger débord pour chevaucher les sommets.
+  const duneWide = new BoxGeometry(1.08, 0.028, 0.22);
+  const sandBand = new BoxGeometry(1.06, 0.018, 0.16);
+  const wetBand = new BoxGeometry(1.04, 0.012, 0.1);
+  const foamBand = new BoxGeometry(1.05, 0.01, 0.06);
   const foamCurl = new CylinderGeometry(0.05, 0.06, 0.014, 6);
+  const cornerPad = new CylinderGeometry(0.16, 0.18, 0.016, 6);
+  const cornerPadSm = new CylinderGeometry(0.11, 0.13, 0.012, 6);
   const pebble = new CylinderGeometry(0.028, 0.038, 0.022, 5);
   const rockChunk = new CylinderGeometry(0.08, 0.11, 0.1, 5);
   const cliffBlock = new BoxGeometry(0.55, 0.16, 0.22);
@@ -146,6 +169,8 @@ export function createShoreEdgeDecorKit() {
     wetBand,
     foamBand,
     foamCurl,
+    cornerPad,
+    cornerPadSm,
     pebble,
     rockChunk,
     cliffBlock,
@@ -176,40 +201,124 @@ export function createShoreEdgeDecorKit() {
     group.add(mesh);
   }
 
-  function addBeachEdge(group: Group, dirIndex: number) {
+  function addBeachEdge(
+    group: Group,
+    dirIndex: number,
+    continuity: EdgeContinuity
+  ) {
     const { x: ux, z: uz, yaw } = unitToward(dirIndex);
     const tx = -uz;
     const tz = ux;
     const h = edgeHash(dirIndex, 11);
-    const wobble = ((h % 7) - 3) * 0.012;
+    // Moins de wobble si l’arête est liée — jointures plus propres.
+    const wobble = continuity.hasPrev || continuity.hasNext
+      ? ((h % 5) - 2) * 0.006
+      : ((h % 7) - 3) * 0.012;
 
-    addMesh(group, duneWide, sandDry, ux * (0.58 + wobble), 0.016, uz * (0.58 + wobble), 0.95, 1, 1.05, yaw);
-    addMesh(group, sandBand, sandMid, ux * (0.72 + wobble * 0.5), 0.012, uz * (0.72 + wobble * 0.5), 1, 1, 1.1, yaw);
-    addMesh(group, wetBand, sandWet, ux * 0.84, 0.008, uz * 0.84, 0.95, 1, 0.95, yaw);
+    // Prolonge vers les coins connectés pour absorber le joint.
+    const along =
+      1 +
+      (continuity.hasPrev ? 0.1 : 0.04) +
+      (continuity.hasNext ? 0.1 : 0.04);
 
-    for (let i = 0; i < 3; i++) {
-      const along = (i - 1) * 0.22 + (((h >>> (i * 3)) % 5) - 2) * 0.02;
-      addMesh(
-        group,
-        pebble,
-        i === 1 ? sandWet : sandMid,
-        ux * (0.7 + (i % 2) * 0.08) + tx * along,
-        0.018,
-        uz * (0.7 + (i % 2) * 0.08) + tz * along,
-        1.1 + (i % 2) * 0.3,
-        0.8,
-        1.2,
-        yaw + i * 0.4
-      );
-    }
+    addMesh(
+      group,
+      duneWide,
+      sandDry,
+      ux * (0.56 + wobble),
+      0.016,
+      uz * (0.56 + wobble),
+      along,
+      1,
+      1.05,
+      yaw
+    );
+    addMesh(
+      group,
+      sandBand,
+      sandMid,
+      ux * (0.7 + wobble * 0.5),
+      0.012,
+      uz * (0.7 + wobble * 0.5),
+      along * 0.98,
+      1,
+      1.08,
+      yaw
+    );
+    addMesh(
+      group,
+      wetBand,
+      sandWet,
+      ux * 0.82,
+      0.008,
+      uz * 0.82,
+      along * 0.96,
+      1,
+      0.98,
+      yaw
+    );
 
-    if ((h & 3) !== 0) {
-      const along = (((h >>> 4) % 9) - 4) * 0.06;
-      addMesh(group, shellGeom, shell, ux * 0.68 + tx * along, 0.02, uz * 0.68 + tz * along, 1.2, 1, 1.2, yaw + 0.8);
+    // Décor léger seulement au milieu d’une arête « libre » (évite le bruit aux joints).
+    if (!continuity.hasPrev || !continuity.hasNext) {
+      for (let i = 0; i < 3; i++) {
+        const alongPos = (i - 1) * 0.2 + (((h >>> (i * 3)) % 5) - 2) * 0.015;
+        if (continuity.hasPrev && alongPos < -0.12) continue;
+        if (continuity.hasNext && alongPos > 0.12) continue;
+        addMesh(
+          group,
+          pebble,
+          i === 1 ? sandWet : sandMid,
+          ux * (0.68 + (i % 2) * 0.08) + tx * alongPos,
+          0.018,
+          uz * (0.68 + (i % 2) * 0.08) + tz * alongPos,
+          1.1 + (i % 2) * 0.3,
+          0.8,
+          1.2,
+          yaw + i * 0.4
+        );
+      }
+
+      if ((h & 3) !== 0) {
+        const alongPos = (((h >>> 4) % 9) - 4) * 0.05;
+        addMesh(
+          group,
+          shellGeom,
+          shell,
+          ux * 0.66 + tx * alongPos,
+          0.02,
+          uz * 0.66 + tz * alongPos,
+          1.2,
+          1,
+          1.2,
+          yaw + 0.8
+        );
+      }
+      if ((h & 5) === 1 && !continuity.hasPrev && !continuity.hasNext) {
+        addMesh(
+          group,
+          stick,
+          driftwood,
+          ux * 0.6 + tx * 0.18,
+          0.016,
+          uz * 0.6 + tz * 0.18,
+          1,
+          1,
+          1,
+          yaw + 0.4
+        );
+      }
     }
-    if ((h & 5) === 1) {
-      addMesh(group, stick, driftwood, ux * 0.62 + tx * 0.2, 0.016, uz * 0.62 + tz * 0.2, 1, 1, 1, yaw + 0.4);
-    }
+  }
+
+  /** Pastille de sable au sommet entre deux arêtes plage consécutives. */
+  function addBeachCorner(group: Group, dirA: number, dirB: number) {
+    const { x: vx, z: vz, yaw } = vertexBetween(dirA, dirB);
+
+    addMesh(group, cornerPad, sandWet, vx * 0.9, 0.007, vz * 0.9, 1.05, 1, 1.05, yaw);
+    addMesh(group, cornerPad, sandMid, vx * 0.78, 0.011, vz * 0.78, 1.15, 1, 1.15, yaw);
+    addMesh(group, cornerPadSm, sandDry, vx * 0.66, 0.015, vz * 0.66, 1.2, 1, 1.2, yaw);
+    // Petite langue vers l’intérieur pour fondre avec la dune.
+    addMesh(group, cornerPadSm, sandDry, vx * 0.54, 0.014, vz * 0.54, 0.85, 1, 0.85, yaw + 0.2);
   }
 
   function addForestEdge(group: Group, dirIndex: number) {
@@ -218,8 +327,8 @@ export function createShoreEdgeDecorKit() {
     const tz = ux;
     const h = edgeHash(dirIndex, 29);
 
-    addMesh(group, sandBand, sandMid, ux * 0.78, 0.01, uz * 0.78, 0.9, 1, 0.85, yaw);
-    addMesh(group, wetBand, sandWet, ux * 0.86, 0.007, uz * 0.86, 0.8, 1, 0.7, yaw);
+    addMesh(group, sandBand, sandMid, ux * 0.78, 0.01, uz * 0.78, 0.95, 1, 0.85, yaw);
+    addMesh(group, wetBand, sandWet, ux * 0.86, 0.007, uz * 0.86, 0.9, 1, 0.7, yaw);
 
     for (let i = 0; i < 4; i++) {
       const along = (i - 1.5) * 0.16;
@@ -237,8 +346,19 @@ export function createShoreEdgeDecorKit() {
       );
     }
 
-    const treeAlong = (((h % 7) - 3) * 0.08);
-    addMesh(group, trunkGeom, trunk, ux * 0.48 + tx * treeAlong, 0.09, uz * 0.48 + tz * treeAlong, 0.85, 1, 0.85, yaw);
+    const treeAlong = ((h % 7) - 3) * 0.08;
+    addMesh(
+      group,
+      trunkGeom,
+      trunk,
+      ux * 0.48 + tx * treeAlong,
+      0.09,
+      uz * 0.48 + tz * treeAlong,
+      0.85,
+      1,
+      0.85,
+      yaw
+    );
     addMesh(
       group,
       crownGeom,
@@ -260,8 +380,30 @@ export function createShoreEdgeDecorKit() {
     const h = edgeHash(dirIndex, 47);
 
     addMesh(group, cliffBlock, rock, ux * 0.72, 0.09, uz * 0.72, 1, 1, 1, yaw);
-    addMesh(group, cliffBlock, rockDark, ux * 0.62 + tx * 0.12, 0.12, uz * 0.62 + tz * 0.12, 0.7, 1.2, 0.75, yaw + 0.15);
-    addMesh(group, rockChunk, rockDark, ux * 0.8 + tx * -0.15, 0.06, uz * 0.8 + tz * -0.15, 1.1, 1, 1.1, yaw);
+    addMesh(
+      group,
+      cliffBlock,
+      rockDark,
+      ux * 0.62 + tx * 0.12,
+      0.12,
+      uz * 0.62 + tz * 0.12,
+      0.7,
+      1.2,
+      0.75,
+      yaw + 0.15
+    );
+    addMesh(
+      group,
+      rockChunk,
+      rockDark,
+      ux * 0.8 + tx * -0.15,
+      0.06,
+      uz * 0.8 + tz * -0.15,
+      1.1,
+      1,
+      1.1,
+      yaw
+    );
 
     for (let i = 0; i < 2; i++) {
       const along = (i === 0 ? -0.2 : 0.22) + ((h % 3) - 1) * 0.03;
@@ -280,46 +422,103 @@ export function createShoreEdgeDecorKit() {
     }
   }
 
+  function continuityFor(dirIndex: number, set: Set<number>): EdgeContinuity {
+    return {
+      hasPrev: set.has((dirIndex + 5) % 6),
+      hasNext: set.has((dirIndex + 1) % 6)
+    };
+  }
+
   /** Rivage côté terre, stylé selon le biome. */
   function createLandEdges(dirIndices: readonly number[], kind: ShoreKind) {
     const group = new Group();
+    const set = new Set(dirIndices);
+
     for (const dirIndex of dirIndices) {
-      if (kind === "beach") addBeachEdge(group, dirIndex);
+      const continuity = continuityFor(dirIndex, set);
+      if (kind === "beach") addBeachEdge(group, dirIndex, continuity);
       else if (kind === "forest") addForestEdge(group, dirIndex);
       else addCliffEdge(group, dirIndex);
     }
+
+    if (kind === "beach") {
+      for (const dirIndex of dirIndices) {
+        const next = (dirIndex + 1) % 6;
+        if (set.has(next)) addBeachCorner(group, dirIndex, next);
+      }
+    }
+
     return group;
+  }
+
+  function addFoamEdge(
+    group: Group,
+    dirIndex: number,
+    continuity: EdgeContinuity
+  ) {
+    const { x: ux, z: uz, yaw } = unitToward(dirIndex);
+    const tx = -uz;
+    const tz = ux;
+    const h = edgeHash(dirIndex, 71);
+    const along =
+      1 +
+      (continuity.hasPrev ? 0.1 : 0.04) +
+      (continuity.hasNext ? 0.1 : 0.04);
+
+    addMesh(group, foamBand, foam, ux * 0.7, 0.006, uz * 0.7, along, 1, 1, yaw);
+    addMesh(
+      group,
+      foamBand,
+      foamSoft,
+      ux * 0.62,
+      0.004,
+      uz * 0.62,
+      along * 0.9,
+      1,
+      1.25,
+      yaw
+    );
+
+    for (let i = 0; i < 4; i++) {
+      const alongPos = (i - 1.5) * 0.14 + (((h >>> (i * 2)) % 5) - 2) * 0.012;
+      if (continuity.hasPrev && alongPos < -0.18) continue;
+      if (continuity.hasNext && alongPos > 0.18) continue;
+      const out = 0.66 + (i % 2) * 0.05;
+      addMesh(
+        group,
+        foamCurl,
+        i % 2 === 0 ? foam : foamSoft,
+        ux * out + tx * alongPos,
+        0.007,
+        uz * out + tz * alongPos,
+        0.9 + (i % 3) * 0.15,
+        1,
+        0.9 + (i % 2) * 0.2,
+        yaw + i * 0.5
+      );
+    }
+  }
+
+  function addFoamCorner(group: Group, dirA: number, dirB: number) {
+    const { x: vx, z: vz, yaw } = vertexBetween(dirA, dirB);
+    addMesh(group, cornerPadSm, foam, vx * 0.72, 0.006, vz * 0.72, 1.1, 1, 1.1, yaw);
+    addMesh(group, foamCurl, foamSoft, vx * 0.64, 0.007, vz * 0.64, 1.2, 1, 1.2, yaw + 0.4);
   }
 
   /** Écume côté mer (toute terre adjacente). */
   function createWaterEdges(dirIndices: readonly number[]) {
     const group = new Group();
+    const set = new Set(dirIndices);
+
     for (const dirIndex of dirIndices) {
-      const { x: ux, z: uz, yaw } = unitToward(dirIndex);
-      const tx = -uz;
-      const tz = ux;
-      const h = edgeHash(dirIndex, 71);
-
-      addMesh(group, foamBand, foam, ux * 0.7, 0.006, uz * 0.7, 1, 1, 1, yaw);
-      addMesh(group, foamBand, foamSoft, ux * 0.62, 0.004, uz * 0.62, 0.85, 1, 1.3, yaw);
-
-      for (let i = 0; i < 4; i++) {
-        const along = (i - 1.5) * 0.14 + (((h >>> (i * 2)) % 5) - 2) * 0.015;
-        const out = 0.66 + (i % 2) * 0.05;
-        addMesh(
-          group,
-          foamCurl,
-          i % 2 === 0 ? foam : foamSoft,
-          ux * out + tx * along,
-          0.007,
-          uz * out + tz * along,
-          0.9 + (i % 3) * 0.15,
-          1,
-          0.9 + (i % 2) * 0.2,
-          yaw + i * 0.5
-        );
-      }
+      addFoamEdge(group, dirIndex, continuityFor(dirIndex, set));
     }
+
+    for (const dirIndex of dirIndices) {
+      const next = (dirIndex + 1) % 6;
+      if (set.has(next)) addFoamCorner(group, dirIndex, next);
+    }
+
     return group;
   }
 

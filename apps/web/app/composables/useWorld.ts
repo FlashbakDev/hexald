@@ -11,6 +11,31 @@ import type {
   WorldSummary
 } from "@hexald/shared";
 
+function expandErrorMessage(err: unknown): string {
+  const data =
+    err && typeof err === "object" && "data" in err
+      ? (err as { data?: { error?: string } }).data
+      : undefined;
+  if (data?.error === "insufficient_resources") {
+    return "Pas assez de bois pour étendre.";
+  }
+  if (data?.error === "cannot_place_region") {
+    return "Impossible de placer cette région.";
+  }
+  return err instanceof Error ? err.message : "expand_failed";
+}
+
+function buildErrorMessage(err: unknown): string {
+  const data =
+    err && typeof err === "object" && "data" in err
+      ? (err as { data?: { error?: string } }).data
+      : undefined;
+  if (data?.error === "no_idle_workers") {
+    return "Il faut au moins 1 habitant libre pour construire.";
+  }
+  return err instanceof Error ? err.message : "build_failed";
+}
+
 export function useWorld() {
   const config = useRuntimeConfig();
   const worldId = useState<string | null>("world-id", () => null);
@@ -84,9 +109,10 @@ export function useWorld() {
         credentials: "include",
         body
       });
+      world.value = result.world;
       return result;
     } catch (err) {
-      error.value = err instanceof Error ? err.message : "expand_failed";
+      error.value = expandErrorMessage(err);
       return null;
     }
   }
@@ -130,7 +156,43 @@ export function useWorld() {
       world.value = result.world;
       return result;
     } catch (err) {
-      error.value = err instanceof Error ? err.message : "build_failed";
+      error.value = buildErrorMessage(err);
+      return null;
+    }
+  }
+
+  async function resetWorld(id: string): Promise<WorldSnapshot | null> {
+    error.value = null;
+    try {
+      const snapshot = await $fetch<WorldSnapshot>(`/v1/worlds/${id}/reset`, {
+        baseURL: config.public.apiBase,
+        method: "POST",
+        credentials: "include"
+      });
+      worldId.value = snapshot.id;
+      world.value = snapshot;
+      return snapshot;
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : "reset_failed";
+      return null;
+    }
+  }
+
+  async function grantDevResources(id: string): Promise<WorldSnapshot | null> {
+    error.value = null;
+    try {
+      const snapshot = await $fetch<WorldSnapshot>(
+        `/v1/worlds/${id}/dev/grant-resources`,
+        {
+          baseURL: config.public.apiBase,
+          method: "POST",
+          credentials: "include"
+        }
+      );
+      world.value = snapshot;
+      return snapshot;
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : "grant_failed";
       return null;
     }
   }
@@ -146,6 +208,8 @@ export function useWorld() {
     refreshWorld,
     expandRegion,
     assignWorkers,
-    buildBuilding
+    buildBuilding,
+    resetWorld,
+    grantDevResources
   };
 }

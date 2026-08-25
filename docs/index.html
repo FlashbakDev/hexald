@@ -138,8 +138,8 @@
             </article>
             <article class="card">
               <h3>Dernière décision importante</h3>
-              <p><span class="badge badge-accent">DEC-014</span> Camp de bûcherons posé sur la carte (roue build comme biomes). Plus de camp implicite. Prod bois liée au camp posé.</p>
-              <p>Phase 3 : farm / mine / autres extracteurs sur le même modèle.</p>
+              <p><span class="badge badge-accent">DEC-015</span> Coût d’expansion région v1 : base bois × hop depuis le village, remise bâtiments proches (d1 −20&nbsp;% / d2 −5&nbsp;%, cap 50&nbsp;%).</p>
+              <p>Phase 3 : sécuriser <code>/admin</code>, bonus d’adjacence prod.</p>
             </article>
           </div>
 
@@ -148,10 +148,10 @@
               <h3>Prochaines étapes</h3>
               <ol class="next-list">
                 <li><span>01</span> Pop + workers + bois lazy — fait</li>
-                <li><span>02</span> Poser <code>lumber_camp</code> (roue build) — fait</li>
-                <li><span>03</span> <code>ads.txt</code> AdSense — fait</li>
-                <li><span>04</span> Farm / carrière (même pattern) — fait</li>
-                <li><span>05</span> Sécuriser <code>/admin</code></li>
+                <li><span>02</span> Extracteurs posés (bois / farm / carrière) — fait</li>
+                <li><span>03</span> Coût d’expansion région (DEC-015) — fait</li>
+                <li><span>04</span> Sécuriser <code>/admin</code></li>
+                <li><span>05</span> Bonus d’adjacence Civ</li>
               </ol>
             </article>
             <article class="card notes-card">
@@ -570,6 +570,31 @@
               </tbody>
             </table>
           </div>
+
+          <article class="card" style="margin-top:14px">
+            <h3>Niveaux de bâtiments <span class="status status-planned">Planned</span></h3>
+            <p>Chaque bâtiment devrait pouvoir être <strong>amélioré en niveau</strong>. Un niveau plus élevé augmente ses stats (production, capacité de workers, stockage, etc.) sans changer son rôle dans la chaîne.</p>
+            <div class="grid grid-2" style="margin-top:12px">
+              <div>
+                <h4 style="margin:0 0 8px">Effets cibles</h4>
+                <ul class="tech-list">
+                  <li><strong>Rate</strong> — production / transformation plus élevée</li>
+                  <li><strong>Workers</strong> — plus de postes assignables sur le bâtiment</li>
+                  <li><strong>Capacité</strong> — buffer / stockage local si pertinent</li>
+                  <li><strong>Emprise</strong> — reste la même (pas d’expansion hex au level-up)</li>
+                </ul>
+              </div>
+              <div>
+                <h4 style="margin:0 0 8px">Règles de design</h4>
+                <ul class="tech-list">
+                  <li>Niveaux discrets (ex. 1 → 5), coût croissant en ressources</li>
+                  <li>Formule : rate final = f(workers, niveau) × (1 + bonus adjacence)</li>
+                  <li>UI : afficher le niveau sur le panneau bâtiment + coût du prochain</li>
+                  <li>Hors scope slice bois actuel ; après extracteurs + adjacence</li>
+                </ul>
+              </div>
+            </div>
+          </article>
         </section>
 
         <!-- 8. Design -->
@@ -895,7 +920,7 @@
               <h3>Population v0 — pop fixe + camp bois implicite</h3>
               <dl>
                 <dt>Contexte</dt><dd>Phase 3 doit valider assignation → production hors ligne sans poser encore tout le système de bâtiments.</dd>
-                <dt>Décision</dt><dd>Pop fixe <strong>8</strong> (cap 12 affiché). Camp de bûcherons implicite (max 4). Rate 12 bois/worker/h, cap stock 200, départ 30. <code>POST /v1/worlds/:id/workers</code>. Settle lazy au load / assign (DEC-006).</dd>
+                <dt>Décision</dt><dd>Pop fixe <strong>4</strong> (cap 12 affiché). Extracteurs niveau 1 : <strong>1 worker max</strong> chacun. Rate 12 bois/worker/h, cap stock 200, départ 30. <code>POST /v1/worlds/:id/workers</code>. Settle lazy au load / assign (DEC-006).</dd>
                 <dt>Raison</dt><dd>Prouve la boucle navigateur (Travian-like + idle) avec un scope minimal. Pas de croissance / food / pathfinding au v0.</dd>
                 <dt>Conséquences</dt><dd>Colonnes économie sur <code>worlds</code>. UI <code>/play</code> : panneau workers ± et stocks. Remplacé en partie par DEC-014 (camp posé sur carte).</dd>
               </dl>
@@ -913,6 +938,21 @@
                 <dt>Décision</dt><dd>Sélection tuile sans village / sans bâtiment → roue build (comme biomes). <code>lumber_camp</code> uniquement, terrain forêt (ou influence forêt), max 1 par monde. <code>POST /v1/worlds/:id/buildings</code>. Colonne <code>world_tiles.building_id</code>. Mesh low-poly + workers seulement si camp posé.</dd>
                 <dt>Raison</dt><dd>Lisibilité carte + même pattern d’interaction. Prod bois conditionnée à un bâtiment réel.</dd>
                 <dt>Conséquences</dt><dd>Plus de camp implicite. Suite : farm / mine / carrière sur le même modèle. <code>ads.txt</code> AdSense ajouté en <code>apps/web/public/ads.txt</code>.</dd>
+              </dl>
+            </article>
+
+            <article class="decision">
+              <header>
+                <span class="id">DEC-015</span>
+                <span class="status status-accepted">Accepted</span>
+                <span class="badge badge-neutral">2026-08-25</span>
+              </header>
+              <h3>Coût d’expansion de région v1</h3>
+              <dl>
+                <dt>Contexte</dt><dd>L’extension était gratuite : pas de tension économique ni d’incitation à densifier le front.</dd>
+                <dt>Décision</dt><dd>Coût en <strong>bois</strong> : <code>base = 30 × hop</code> (hop = distance cube au village / 3). Remise civilisation : −20&nbsp;% par site à d=1, −5&nbsp;% à d=2 (village + bâtiments achevés), cap 50&nbsp;%. Settle lazy puis débit. <code>409 insufficient_resources</code>. UI : badge coût sur la roue biomes.</dd>
+                <dt>Raison</dt><dd>Taxe le sprawl distant ; récompense un front développé. Boucle produire → dépenser → s’étendre.</dd>
+                <dt>Conséquences</dt><dd>Constantes dans <code>packages/content</code>, calcul <code>game-core/regionCost</code>, débit dans <code>expandRegionService</code>. Suite possible : multi-ressources, routes comme sites de développement.</dd>
               </dl>
             </article>
 
@@ -1141,6 +1181,7 @@
           <h2>Bâtiments</h2>
           <p>Définitions alignées sur <code>packages/content/src/buildings.ts</code>. <code>terrain: any</code> = toute tuile constructible (pas l’eau pure).</p>
           <p><span class="badge badge-neutral">Planned</span> <strong>Bonus d’adjacence (Civ-like)</strong> — le rate d’un bâtiment dépend aussi des biomes des 6 voisins (voir <a href="#economy">Economy</a>). Pas encore dans le code.</p>
+          <p><span class="badge badge-neutral">Planned</span> <strong>Niveaux de bâtiments</strong> — chaque bâtiment peut monter de niveau pour augmenter ses stats (rate, workers, capacité). Voir <a href="#buildings">Buildings</a>. Pas encore dans le code.</p>
 
           <div class="filters" role="group" aria-label="Filtrer les bâtiments">
             <button type="button" class="filter-btn is-on" data-wiki-filter="all" data-wiki-target="buildings">Tous</button>
@@ -1534,6 +1575,7 @@
                 <li>Pose <code>lumber_camp</code> (roue build, 1 max) — fait</li>
                 <li><code>ads.txt</code> AdSense — fait</li>
                 <li>Farm / carrière (même pattern) — fait</li>
+                <li>Coût d’expansion (bois × hop, remise front) — fait</li>
                 <li>Bonus d’adjacence Civ (voisins → rate)</li>
                 <li>Croissance pop + food (plus tard)</li>
               </ul>
@@ -1648,6 +1690,10 @@
                 <strong>Bonus d’adjacence Civ</strong>
                 <p>Rate bâtiment = f(workers) × (1 + bonus voisins). Cap, UI panneau.</p>
               </article>
+              <article class="task" draggable="true" data-id="task-building-levels">
+                <strong>Niveaux de bâtiments</strong>
+                <p>Upgrade level → stats (rate, workers, cap). Coût croissant, UI panneau.</p>
+              </article>
               <article class="task" draggable="true" data-id="task-visits">
                 <strong>Visites de mondes</strong>
                 <p>Parcourir le diorama d’un autre joueur, sans le modifier.</p>
@@ -1683,7 +1729,7 @@
               </article>
               <article class="task" draggable="true" data-id="task-economy-pop">
                 <strong>Population + travailleurs + bois</strong>
-                <p>Pop 8, max 4 workers, rate 12/h, cap 200, <code>POST …/workers</code>.</p>
+                <p>Pop 4, max 1 worker/bâtiment (niv. 1), rate 12/h, cap 200, <code>POST …/workers</code>.</p>
               </article>
               <article class="task" draggable="true" data-id="task-admin-ops">
                 <strong>Admin ops</strong>
@@ -1786,6 +1832,11 @@
                 <span class="status status-confirmed">Confirmed</span>
                 <h3>Bonus d’adjacence (Civ)</h3>
                 <p>Production du bâtiment bonusée par les tuiles voisines (forêt autour du camp, plaine autour de la ferme…). Cap de bonus, UI lisible. Voir Economy.</p>
+              </article>
+              <article class="card idea" data-status="confirmed">
+                <span class="status status-confirmed">Confirmed</span>
+                <h3>Niveaux de bâtiments</h3>
+                <p>Chaque bâtiment peut être amélioré : le niveau augmente ses stats (production, postes workers, capacité). Voir Buildings.</p>
               </article>
             <article class="card idea" data-status="experiment">
               <span class="status status-experiment">Experiment</span>

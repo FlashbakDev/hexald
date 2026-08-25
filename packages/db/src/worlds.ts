@@ -8,6 +8,7 @@ export type WorldTileRow = {
   r: number;
   biome: BiomeId;
   buildingId: BuildingId | null;
+  constructionCompletesAt: Date | null;
 };
 
 export type WorldRegionRow = {
@@ -121,7 +122,8 @@ export async function insertWorldWithTerrain(
           q: tile.q,
           r: tile.r,
           biome: tile.biome,
-          buildingId: tile.buildingId
+          buildingId: tile.buildingId,
+          constructionCompletesAt: tile.constructionCompletesAt
         }))
       );
     }
@@ -161,7 +163,8 @@ export async function fetchWorld(
       q: worldTiles.q,
       r: worldTiles.r,
       biome: worldTiles.biome,
-      buildingId: worldTiles.buildingId
+      buildingId: worldTiles.buildingId,
+      constructionCompletesAt: worldTiles.constructionCompletesAt
     })
     .from(worldTiles)
     .where(eq(worldTiles.worldId, worldId));
@@ -185,7 +188,8 @@ export async function fetchWorld(
       q: tile.q,
       r: tile.r,
       biome: tile.biome as BiomeId,
-      buildingId: (tile.buildingId as BuildingId | null) ?? null
+      buildingId: (tile.buildingId as BuildingId | null) ?? null,
+      constructionCompletesAt: tile.constructionCompletesAt ?? null
     })),
     regions: regions.map((region) => ({
       centerQ: region.centerQ,
@@ -227,6 +231,18 @@ export async function fetchWorldForOwner(
   return fetchWorld(db, worldId);
 }
 
+export async function deleteWorldForOwner(
+  db: Database["db"],
+  worldId: string,
+  ownerId: string
+): Promise<boolean> {
+  const deleted = await db
+    .delete(worlds)
+    .where(and(eq(worlds.id, worldId), eq(worlds.ownerId, ownerId)))
+    .returning({ id: worlds.id });
+  return deleted.length > 0;
+}
+
 export async function updateWorldEconomy(
   db: Database["db"],
   worldId: string,
@@ -254,12 +270,20 @@ export async function updateWorldEconomy(
 export async function setTileBuilding(
   db: Database["db"],
   worldId: string,
-  tile: { q: number; r: number; buildingId: BuildingId }
+  tile: {
+    q: number;
+    r: number;
+    buildingId: BuildingId;
+    constructionCompletesAt: Date | null;
+  }
 ): Promise<void> {
   await db.transaction(async (tx) => {
     await tx
       .update(worldTiles)
-      .set({ buildingId: tile.buildingId })
+      .set({
+        buildingId: tile.buildingId,
+        constructionCompletesAt: tile.constructionCompletesAt
+      })
       .where(
         and(
           eq(worldTiles.worldId, worldId),
@@ -299,7 +323,8 @@ export async function appendRegion(
           q: tile.q,
           r: tile.r,
           biome: tile.biome,
-          buildingId: tile.buildingId
+          buildingId: tile.buildingId,
+          constructionCompletesAt: tile.constructionCompletesAt
         }))
       );
     }

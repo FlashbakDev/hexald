@@ -1,0 +1,1 @@
+ALTER TABLE "worlds" ALTER COLUMN "population_total" SET DEFAULT 4;

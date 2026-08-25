@@ -13,8 +13,11 @@ import {
   createWorldService,
   expandRegionService,
   getWorldService,
-  listWorldsService
+  grantDevResourcesService,
+  listWorldsService,
+  resetWorldService
 } from "../worlds/service.ts";
+import { env } from "../env.ts";
 
 const uuidRe =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -64,6 +67,56 @@ export async function worldRoutes(app: FastifyInstance) {
     return reply.code(201).send(world);
   });
 
+  app.post<{ Params: { id: string } }>(
+    "/worlds/:id/reset",
+    async (request, reply) => {
+      if (!env.isDev) {
+        return reply.code(404).send({ error: "not_found" });
+      }
+
+      const player = await requirePlayer(app, request, reply);
+      if (!player) return;
+
+      const { id } = request.params;
+      if (!uuidRe.test(id)) {
+        return reply.code(400).send({ error: "invalid_world_id" });
+      }
+
+      const outcome = await resetWorldService(app.db, id, player.id);
+      if (!outcome.ok) {
+        const status = outcome.error === "world_not_found" ? 404 : 403;
+        return reply.code(status).send({ error: outcome.error });
+      }
+
+      return outcome.world;
+    }
+  );
+
+  app.post<{ Params: { id: string } }>(
+    "/worlds/:id/dev/grant-resources",
+    async (request, reply) => {
+      if (!env.isDev) {
+        return reply.code(404).send({ error: "not_found" });
+      }
+
+      const player = await requirePlayer(app, request, reply);
+      if (!player) return;
+
+      const { id } = request.params;
+      if (!uuidRe.test(id)) {
+        return reply.code(400).send({ error: "invalid_world_id" });
+      }
+
+      const outcome = await grantDevResourcesService(app.db, id, player.id);
+      if (!outcome.ok) {
+        const status = outcome.error === "world_not_found" ? 404 : 403;
+        return reply.code(status).send({ error: outcome.error });
+      }
+
+      return outcome.world;
+    }
+  );
+
   app.get<{ Params: { id: string } }>("/worlds/:id", async (request, reply) => {
     const player = await requirePlayer(app, request, reply);
     if (!player) return;
@@ -106,7 +159,8 @@ export async function worldRoutes(app: FastifyInstance) {
         const status =
           outcome.error === "world_not_found"
             ? 404
-            : outcome.error === "cannot_place_region"
+            : outcome.error === "cannot_place_region" ||
+                outcome.error === "insufficient_resources"
               ? 409
               : 400;
         return reply.code(status).send({ error: outcome.error });

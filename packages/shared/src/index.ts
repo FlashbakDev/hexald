@@ -27,6 +27,7 @@ export type {
   WorldTileSnapshot,
   WorldRegionSnapshot,
   WorldEconomySnapshot,
+  RegionExpansionCostSnapshot,
   ExpandRegionRequest,
   ExpandRegionResult,
   AssignWorkersRequest,

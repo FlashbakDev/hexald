@@ -7,6 +7,9 @@ useHead({
   title: "Admin · Hexald"
 });
 
+/** Gate client simple (prompt). Override: NUXT_PUBLIC_ADMIN_CODE */
+const ADMIN_UNLOCK_KEY = "hexald-admin-ok";
+
 type AdminOverview = {
   generatedAt: string;
   presenceTtlMs: number;
@@ -44,6 +47,9 @@ type AdminOverview = {
 };
 
 const config = useRuntimeConfig();
+const expectedCode = String(config.public.adminCode ?? "nimda");
+
+const unlocked = ref(false);
 
 const {
   data,
@@ -56,15 +62,38 @@ const {
     $fetch<AdminOverview>("/v1/admin/overview", {
       baseURL: config.public.apiBase
     }),
-  { server: false }
+  { server: false, immediate: false }
 );
 
 let timer: ReturnType<typeof setInterval> | null = null;
 
-onMounted(() => {
+function startPolling() {
+  void refresh();
   timer = setInterval(() => {
     void refresh();
   }, 10_000);
+}
+
+function unlockAdmin() {
+  unlocked.value = true;
+  sessionStorage.setItem(ADMIN_UNLOCK_KEY, "1");
+  startPolling();
+}
+
+onMounted(() => {
+  if (sessionStorage.getItem(ADMIN_UNLOCK_KEY) === "1") {
+    unlockAdmin();
+    return;
+  }
+
+  const entered = window.prompt("Code admin");
+  if (entered === expectedCode) {
+    unlockAdmin();
+    return;
+  }
+
+  window.alert("Accès refusé");
+  void navigateTo("/");
 });
 
 onBeforeUnmount(() => {
@@ -89,7 +118,7 @@ const ttlMinutes = computed(() =>
 </script>
 
 <template>
-  <div class="admin min-h-dvh bg-[#e8f0ec] text-[#1c2b28]">
+  <div v-if="unlocked" class="admin min-h-dvh bg-[#e8f0ec] text-[#1c2b28]">
     <div class="admin-glow" aria-hidden="true" />
 
     <div class="relative mx-auto max-w-6xl px-5 py-10 sm:px-8 sm:py-14">
@@ -102,7 +131,7 @@ const ttlMinutes = computed(() =>
             Admin
           </h1>
           <p class="mt-2 max-w-xl text-[#6b7c76]">
-            Stats live, présence approximative ({{ ttlMinutes }}&nbsp;min), sans auth pour l’instant.
+            Stats live, présence approximative ({{ ttlMinutes }}&nbsp;min).
           </p>
         </div>
 

@@ -1,0 +1,1 @@
+ALTER TABLE "world_tiles" ADD COLUMN "construction_completes_at" timestamp with time zone;

@@ -7,6 +7,11 @@ export type WorldTileSnapshot = {
   biome: BiomeId;
   /** Bâtiment sur la tuile ; le village de départ est géré côté client (0,0). */
   buildingId?: BuildingId | null;
+  /**
+   * Fin de chantier (ISO). Absent / null = achevé (legacy ou déjà opérationnel).
+   * Si dans le futur → en construction.
+   */
+  constructionCompletesAt?: string | null;
 };
 
 export type WorldRegionSnapshot = {
@@ -68,10 +73,22 @@ export type ExpandRegionRequest = {
   biome: PrimaryBiomeId;
 };
 
+/** Détail du coût d’expansion (DEC-015). */
+export type RegionExpansionCostSnapshot = {
+  hop: number;
+  baseWood: number;
+  buildingsAtDistance1: number;
+  buildingsAtDistance2: number;
+  discount: number;
+  wood: number;
+};
+
 export type ExpandRegionResult = {
   center: HexCoord;
   biome: PrimaryBiomeId;
   tiles: WorldTileSnapshot[];
+  cost: RegionExpansionCostSnapshot;
+  world: WorldSnapshot;
 };
 
 export type AssignWorkersRequest = {

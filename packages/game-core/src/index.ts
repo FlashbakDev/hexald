@@ -5,8 +5,11 @@ export {
   assignWoodcutters,
   assignedWorkers,
   createInitialEconomy,
+  extractorJobForBuilding,
   idleWorkers,
+  reserveWorkerForConstruction,
   settleEconomy,
+  spendWood,
   woodProductionRatePerHour,
   wheatProductionRatePerHour,
   stoneProductionRatePerHour,
@@ -20,7 +23,8 @@ export {
   WHEAT_RATE_PER_WORKER_PER_HOUR,
   STONE_RATE_PER_WORKER_PER_HOUR,
   type EconomyState,
-  type AssignWorkersResult
+  type AssignWorkersResult,
+  type SpendWoodResult
 } from "./economy.ts";
 export {
   countBuildings,
@@ -32,6 +36,15 @@ export {
   type BuildPlacementInput,
   type BuildPlacementResult
 } from "./build.ts";
+export {
+  countBuildingSites,
+  hasCompletedBuilding,
+  isBuildingComplete,
+  isBuildingUnderConstruction,
+  resolveBuildDurationMs,
+  startConstruction,
+  type ConstructionTimeInput
+} from "./construction.ts";
 export {
   REGION_NEIGHBOR_OFFSETS,
   REGION_RADIUS,
@@ -53,3 +66,10 @@ export {
   resolveCellBiome,
   type GeneratedTile
 } from "./world.ts";
+export {
+  computeRegionExpansionCost,
+  listDevelopmentSites,
+  regionHopFromOrigin,
+  type DevelopmentSite,
+  type RegionExpansionCost
+} from "./regionCost.ts";

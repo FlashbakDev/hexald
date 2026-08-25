@@ -12,7 +12,8 @@ import {
   WHEAT_RATE_PER_WORKER_PER_HOUR,
   WHEAT_STOCK_CAP,
   WOOD_RATE_PER_WORKER_PER_HOUR,
-  WOOD_STOCK_CAP
+  WOOD_STOCK_CAP,
+  type PlaceableExtractorId
 } from "@hexald/content";
 import type { ExtractorJob } from "@hexald/shared";
 import { applyOfflineProduction } from "./production.ts";
@@ -172,6 +173,59 @@ export function idleWorkers(state: EconomyState): number {
   return Math.max(0, state.population - assignedWorkers(state));
 }
 
+export function extractorJobForBuilding(
+  buildingId: PlaceableExtractorId
+): ExtractorJob {
+  if (buildingId === "lumber_camp") return "woodcutter";
+  if (buildingId === "farm") return "farmer";
+  return "quarrier";
+}
+
+function workerKeyForJob(
+  job: ExtractorJob
+): "woodcutters" | "farmers" | "quarriers" {
+  if (job === "woodcutter") return "woodcutters";
+  if (job === "farmer") return "farmers";
+  return "quarriers";
+}
+
+function maxWorkersForJob(job: ExtractorJob): number {
+  if (job === "woodcutter") return LUMBER_CAMP_MAX_WORKERS;
+  if (job === "farmer") return FARM_MAX_WORKERS;
+  return QUARRY_MAX_WORKERS;
+}
+
+/**
+ * Réserve 1 pop pour un chantier extracteur.
+ * Compteur workers +1 immédiatement (pas de prod tant que le bâtiment n’est pas achevé).
+ * À la fin du chantier, ce worker est déjà assigné.
+ */
+export function reserveWorkerForConstruction(
+  state: EconomyState,
+  buildingId: PlaceableExtractorId,
+  now = Date.now()
+): AssignWorkersResult {
+  const settled = settleEconomy(state, now);
+  if (idleWorkers(settled) < 1) {
+    return { ok: false, reason: "over_population" };
+  }
+
+  const job = extractorJobForBuilding(buildingId);
+  const key = workerKeyForJob(job);
+  const current = settled[key];
+  if (current + 1 > maxWorkersForJob(job)) {
+    return { ok: false, reason: "over_building_cap" };
+  }
+
+  return {
+    ok: true,
+    state: {
+      ...settled,
+      [key]: current + 1
+    }
+  };
+}
+
 /**
  * Assignation absolue pour un métier extracteur.
  * Settle d’abord pour ne pas perdre la prod avant le changement de rate.
@@ -216,6 +270,33 @@ export function assignWoodcutters(
 ): AssignWorkersResult {
   return assignExtractorWorkers(state, "woodcutter", count, now);
 }
+
+export type SpendWoodResult =
+  | { ok: true; state: EconomyState }
+  | { ok: false; reason: "insufficient_resources" };
+
+/** Settle puis débit bois (expansion, constructions, …). */
+export function spendWood(
+  state: EconomyState,
+  amount: number,
+  now = Date.now()
+): SpendWoodResult {
+  const settled = settleEconomy(state, now);
+  if (amount < 0 || !Number.isFinite(amount)) {
+    return { ok: false, reason: "insufficient_resources" };
+  }
+  if (settled.wood + 1e-9 < amount) {
+    return { ok: false, reason: "insufficient_resources" };
+  }
+  return {
+    ok: true,
+    state: {
+      ...settled,
+      wood: Math.max(0, settled.wood - amount)
+    }
+  };
+}
+
 
 export {
   LUMBER_CAMP_MAX_WORKERS,

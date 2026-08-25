@@ -17,7 +17,7 @@ export const worlds = pgTable("worlds", {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   /** Économie v0 — pop + extracteurs */
-  populationTotal: integer("population_total").notNull().default(8),
+  populationTotal: integer("population_total").notNull().default(4),
   populationCap: integer("population_cap").notNull().default(12),
   woodcutters: integer("woodcutters").notNull().default(0),
   farmers: integer("farmers").notNull().default(0),
@@ -51,7 +51,11 @@ export const worldTiles = pgTable(
     q: integer("q").notNull(),
     r: integer("r").notNull(),
     biome: text("biome").notNull(),
-    buildingId: text("building_id")
+    buildingId: text("building_id"),
+    /** Fin de chantier ; null = bâtiment opérationnel (ou tuile vide). */
+    constructionCompletesAt: timestamp("construction_completes_at", {
+      withTimezone: true
+    })
   },
   (table) => [primaryKey({ columns: [table.worldId, table.q, table.r] })]
 );

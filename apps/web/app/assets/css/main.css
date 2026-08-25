@@ -627,6 +627,67 @@ html {
   transform: translateY(110%);
 }
 
+/* Badges carte (pop village, travailleurs, timer chantier) */
+.map-badge {
+  transform: translate(-50%, -50%);
+  transition: opacity 0.15s ease;
+}
+
+.map-badge__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28rem;
+  padding: 0.22rem 0.55rem 0.22rem 0.4rem;
+  border-radius: 999px;
+  border: 1px solid rgb(255 255 255 / 0.18);
+  background: rgb(14 31 26 / 0.88);
+  color: #f2f6ee;
+  font-size: 0.72rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+  line-height: 1;
+  box-shadow: 0 0.35rem 0.9rem rgb(0 0 0 / 0.28);
+  backdrop-filter: blur(6px);
+}
+
+.map-badge__icon {
+  width: 0.78rem;
+  height: 0.78rem;
+  flex-shrink: 0;
+  color: #9ec9b8;
+}
+
+.map-badge--timer .map-badge__icon {
+  color: #e8a54b;
+}
+
+.map-badge--pop .map-badge__icon {
+  color: #e8a54b;
+}
+
+.map-badge--workers .map-badge__icon {
+  color: #7ec8ff;
+}
+
+.map-badge--needs-workers .map-badge__chip {
+  border-color: #e8a54b;
+  box-shadow:
+    0 0 0 1.5px rgb(232 165 75 / 0.55),
+    0 0.35rem 0.9rem rgb(0 0 0 / 0.28);
+}
+
+.map-badge--needs-workers .map-badge__icon {
+  color: #e8a54b;
+}
+
+.map-badge__alert {
+  margin-left: 0.05rem;
+  color: #e8a54b;
+  font-weight: 800;
+  letter-spacing: 0;
+}
+
 /* Pages légales */
 .legal-prose h1 {
   font-family: var(--font-display);
