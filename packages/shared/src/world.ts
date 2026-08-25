@@ -12,6 +12,8 @@ export type WorldTileSnapshot = {
    * Si dans le futur → en construction.
    */
   constructionCompletesAt?: string | null;
+  /** Workers assignés (0–1 par extracteur niveau 1). */
+  assignedWorkers?: number;
 };
 
 export type WorldRegionSnapshot = {
@@ -92,8 +94,8 @@ export type ExpandRegionResult = {
 };
 
 export type AssignWorkersRequest = {
-  job: ExtractorJob;
-  /** Effectif cible pour ce métier (absolu). */
+  origin: HexCoord;
+  /** 0 ou 1 pour un extracteur niveau 1. */
   count: number;
 };
 

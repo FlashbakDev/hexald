@@ -9,6 +9,8 @@ export type WorldTileRow = {
   biome: BiomeId;
   buildingId: BuildingId | null;
   constructionCompletesAt: Date | null;
+  assignedWorkers: number;
+  defaultWorkerSeeded: boolean;
 };
 
 export type WorldRegionRow = {
@@ -123,7 +125,9 @@ export async function insertWorldWithTerrain(
           r: tile.r,
           biome: tile.biome,
           buildingId: tile.buildingId,
-          constructionCompletesAt: tile.constructionCompletesAt
+          constructionCompletesAt: tile.constructionCompletesAt,
+          assignedWorkers: tile.assignedWorkers ?? 0,
+          defaultWorkerSeeded: tile.defaultWorkerSeeded ?? false
         }))
       );
     }
@@ -164,7 +168,9 @@ export async function fetchWorld(
       r: worldTiles.r,
       biome: worldTiles.biome,
       buildingId: worldTiles.buildingId,
-      constructionCompletesAt: worldTiles.constructionCompletesAt
+      constructionCompletesAt: worldTiles.constructionCompletesAt,
+      assignedWorkers: worldTiles.assignedWorkers,
+      defaultWorkerSeeded: worldTiles.defaultWorkerSeeded
     })
     .from(worldTiles)
     .where(eq(worldTiles.worldId, worldId));
@@ -189,7 +195,9 @@ export async function fetchWorld(
       r: tile.r,
       biome: tile.biome as BiomeId,
       buildingId: (tile.buildingId as BuildingId | null) ?? null,
-      constructionCompletesAt: tile.constructionCompletesAt ?? null
+      constructionCompletesAt: tile.constructionCompletesAt ?? null,
+      assignedWorkers: tile.assignedWorkers ?? 0,
+      defaultWorkerSeeded: tile.defaultWorkerSeeded ?? false
     })),
     regions: regions.map((region) => ({
       centerQ: region.centerQ,
@@ -267,6 +275,47 @@ export async function updateWorldEconomy(
     .where(eq(worlds.id, worldId));
 }
 
+export async function setTileWorkerState(
+  db: Database["db"],
+  worldId: string,
+  origin: { q: number; r: number },
+  state: { assignedWorkers: number; defaultWorkerSeeded: boolean }
+): Promise<void> {
+  await db.transaction(async (tx) => {
+    await tx
+      .update(worldTiles)
+      .set({
+        assignedWorkers: state.assignedWorkers,
+        defaultWorkerSeeded: state.defaultWorkerSeeded
+      })
+      .where(
+        and(
+          eq(worldTiles.worldId, worldId),
+          eq(worldTiles.q, origin.q),
+          eq(worldTiles.r, origin.r)
+        )
+      );
+
+    await tx
+      .update(worlds)
+      .set({ updatedAt: new Date() })
+      .where(eq(worlds.id, worldId));
+  });
+}
+
+/** @deprecated Prefer setTileWorkerState */
+export async function setTileAssignedWorkers(
+  db: Database["db"],
+  worldId: string,
+  origin: { q: number; r: number },
+  assignedWorkers: number
+): Promise<void> {
+  await setTileWorkerState(db, worldId, origin, {
+    assignedWorkers,
+    defaultWorkerSeeded: true
+  });
+}
+
 export async function setTileBuilding(
   db: Database["db"],
   worldId: string,
@@ -275,6 +324,8 @@ export async function setTileBuilding(
     r: number;
     buildingId: BuildingId;
     constructionCompletesAt: Date | null;
+    assignedWorkers?: number;
+    defaultWorkerSeeded?: boolean;
   }
 ): Promise<void> {
   await db.transaction(async (tx) => {
@@ -282,7 +333,9 @@ export async function setTileBuilding(
       .update(worldTiles)
       .set({
         buildingId: tile.buildingId,
-        constructionCompletesAt: tile.constructionCompletesAt
+        constructionCompletesAt: tile.constructionCompletesAt,
+        assignedWorkers: tile.assignedWorkers ?? 0,
+        defaultWorkerSeeded: tile.defaultWorkerSeeded ?? false
       })
       .where(
         and(
@@ -324,7 +377,9 @@ export async function appendRegion(
           r: tile.r,
           biome: tile.biome,
           buildingId: tile.buildingId,
-          constructionCompletesAt: tile.constructionCompletesAt
+          constructionCompletesAt: tile.constructionCompletesAt,
+          assignedWorkers: tile.assignedWorkers ?? 0,
+          defaultWorkerSeeded: tile.defaultWorkerSeeded ?? false
         }))
       );
     }

@@ -10,8 +10,7 @@ export type BuildAction = {
 
 export type AssignWorkersAction = {
   type: "assign_workers";
-  job: ExtractorJob;
-  /** Effectif cible (absolu) pour ce métier. */
+  origin: HexCoord;
   count: number;
 };
 

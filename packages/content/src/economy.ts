@@ -1,28 +1,39 @@
 /** Population + extracteurs v0 (DEC-013 / DEC-014). */
 
 export const STARTING_POPULATION = 4;
-export const POPULATION_CAP = 12;
+export const POPULATION_CAP = 4;
 
-/** Stats niveau 1 : 1 worker max par bâtiment. */
+/** Prod par worker assigné (niveau 1). */
 export const LUMBER_CAMP_MAX_WORKERS = 1;
 export const FARM_MAX_WORKERS = 1;
 export const QUARRY_MAX_WORKERS = 1;
 
-export const WOOD_RATE_PER_WORKER_PER_HOUR = 12;
-export const WHEAT_RATE_PER_WORKER_PER_HOUR = 10;
-export const STONE_RATE_PER_WORKER_PER_HOUR = 8;
+export const WOOD_RATE_PER_WORKER_PER_MINUTE = 5;
+export const WHEAT_RATE_PER_WORKER_PER_MINUTE = 5;
+export const STONE_RATE_PER_WORKER_PER_MINUTE = 5;
 
 export const WOOD_STOCK_CAP = 200;
 export const WHEAT_STOCK_CAP = 200;
 export const STONE_STOCK_CAP = 150;
 
-export const STARTING_WOOD = 30;
+/** Assez pour 1 camp de bûcherons + 1 expansion adjacente (15 + 30). */
+export const STARTING_WOOD = 45;
 export const STARTING_WHEAT = 0;
 export const STARTING_STONE = 0;
 
-/** Bâtiments extracteurs posables (1 max chacun). */
+/** Bâtiments extracteurs posables (extracteurs niveau 1). */
 export const PLACEABLE_EXTRACTORS = ["lumber_camp", "farm", "quarry"] as const;
 export type PlaceableExtractorId = (typeof PLACEABLE_EXTRACTORS)[number];
+
+/** Pop libre requise pour lancer un chantier (réservée sur le site). */
+export const BUILD_IDLE_POP_REQUIREMENT = 1;
+
+/** Coût de construction niveau 1 — bois uniquement, fixe par type. */
+export const BUILD_COST_WOOD: Record<PlaceableExtractorId, number> = {
+  lumber_camp: 15,
+  farm: 20,
+  quarry: 25
+};
 
 /** Durées de construction de base (ms) — hors override dev. */
 export const BUILD_DURATION_MS: Record<PlaceableExtractorId, number> = {

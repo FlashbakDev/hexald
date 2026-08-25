@@ -7,11 +7,11 @@ import {
   STARTING_STONE,
   STARTING_WHEAT,
   STARTING_WOOD,
-  STONE_RATE_PER_WORKER_PER_HOUR,
+  STONE_RATE_PER_WORKER_PER_MINUTE,
   STONE_STOCK_CAP,
-  WHEAT_RATE_PER_WORKER_PER_HOUR,
+  WHEAT_RATE_PER_WORKER_PER_MINUTE,
   WHEAT_STOCK_CAP,
-  WOOD_RATE_PER_WORKER_PER_HOUR,
+  WOOD_RATE_PER_WORKER_PER_MINUTE,
   WOOD_STOCK_CAP,
   type PlaceableExtractorId
 } from "@hexald/content";
@@ -30,6 +30,11 @@ export type EconomyState = {
   wheatLastCalculatedAt: number;
   stone: number;
   stoneLastCalculatedAt: number;
+  /** Sites posés (y compris en chantier). */
+  lumberCampSites: number;
+  farmSites: number;
+  quarrySites: number;
+  /** Au moins un site achevé — requis pour produire. */
   hasLumberCamp: boolean;
   hasFarm: boolean;
   hasQuarry: boolean;
@@ -48,34 +53,37 @@ export function createInitialEconomy(now = Date.now()): EconomyState {
     wheatLastCalculatedAt: now,
     stone: STARTING_STONE,
     stoneLastCalculatedAt: now,
+    lumberCampSites: 0,
+    farmSites: 0,
+    quarrySites: 0,
     hasLumberCamp: false,
     hasFarm: false,
     hasQuarry: false
   };
 }
 
-export function woodProductionRatePerHour(
+export function woodProductionRatePerMinute(
   woodcutters: number,
   hasLumberCamp: boolean
 ): number {
   if (!hasLumberCamp) return 0;
-  return Math.max(0, woodcutters) * WOOD_RATE_PER_WORKER_PER_HOUR;
+  return Math.max(0, woodcutters) * WOOD_RATE_PER_WORKER_PER_MINUTE;
 }
 
-export function wheatProductionRatePerHour(
+export function wheatProductionRatePerMinute(
   farmers: number,
   hasFarm: boolean
 ): number {
   if (!hasFarm) return 0;
-  return Math.max(0, farmers) * WHEAT_RATE_PER_WORKER_PER_HOUR;
+  return Math.max(0, farmers) * WHEAT_RATE_PER_WORKER_PER_MINUTE;
 }
 
-export function stoneProductionRatePerHour(
+export function stoneProductionRatePerMinute(
   quarriers: number,
   hasQuarry: boolean
 ): number {
   if (!hasQuarry) return 0;
-  return Math.max(0, quarriers) * STONE_RATE_PER_WORKER_PER_HOUR;
+  return Math.max(0, quarriers) * STONE_RATE_PER_WORKER_PER_MINUTE;
 }
 
 /** DEC-006 — recalcul lazy de tous les stocks extracteurs. */
@@ -83,7 +91,7 @@ export function settleEconomy(state: EconomyState, now: number): EconomyState {
   const wood = applyOfflineProduction(
     {
       stock: state.wood,
-      productionRatePerHour: woodProductionRatePerHour(
+      productionRatePerMinute: woodProductionRatePerMinute(
         state.woodcutters,
         state.hasLumberCamp
       ),
@@ -95,7 +103,7 @@ export function settleEconomy(state: EconomyState, now: number): EconomyState {
   const wheat = applyOfflineProduction(
     {
       stock: state.wheat,
-      productionRatePerHour: wheatProductionRatePerHour(
+      productionRatePerMinute: wheatProductionRatePerMinute(
         state.farmers,
         state.hasFarm
       ),
@@ -107,7 +115,7 @@ export function settleEconomy(state: EconomyState, now: number): EconomyState {
   const stone = applyOfflineProduction(
     {
       stock: state.stone,
-      productionRatePerHour: stoneProductionRatePerHour(
+      productionRatePerMinute: stoneProductionRatePerMinute(
         state.quarriers,
         state.hasQuarry
       ),
@@ -135,33 +143,42 @@ export type AssignWorkersResult =
       reason:
         | "invalid_count"
         | "over_population"
-        | "over_building_cap"
         | "unsupported_job"
         | "no_building";
     };
 
+function siteCountForJob(job: ExtractorJob, state: EconomyState): number {
+  if (job === "woodcutter") return state.lumberCampSites;
+  if (job === "farmer") return state.farmSites;
+  return state.quarrySites;
+}
+
+function currentWorkersForJob(state: EconomyState, job: ExtractorJob): number {
+  if (job === "woodcutter") return state.woodcutters;
+  if (job === "farmer") return state.farmers;
+  return state.quarriers;
+}
+
+/** Plafond d’assignation : population du village, partagée entre métiers. */
+export function maxAssignableWorkersForJob(
+  job: ExtractorJob,
+  state: EconomyState
+): number {
+  if (siteCountForJob(job, state) === 0) return 0;
+  const current = currentWorkersForJob(state, job);
+  const others = assignedWorkers(state) - current;
+  return Math.max(0, state.population - others);
+}
+
 function jobConfig(job: ExtractorJob, state: EconomyState) {
-  if (job === "woodcutter") {
-    return {
-      hasBuilding: state.hasLumberCamp,
-      maxWorkers: LUMBER_CAMP_MAX_WORKERS,
-      current: state.woodcutters,
-      key: "woodcutters" as const
-    };
-  }
-  if (job === "farmer") {
-    return {
-      hasBuilding: state.hasFarm,
-      maxWorkers: FARM_MAX_WORKERS,
-      current: state.farmers,
-      key: "farmers" as const
-    };
-  }
+  const sites = siteCountForJob(job, state);
+  const key =
+    job === "woodcutter" ? "woodcutters" : job === "farmer" ? "farmers" : "quarriers";
   return {
-    hasBuilding: state.hasQuarry,
-    maxWorkers: QUARRY_MAX_WORKERS,
-    current: state.quarriers,
-    key: "quarriers" as const
+    hasBuilding: sites > 0,
+    maxWorkers: maxAssignableWorkersForJob(job, state),
+    current: currentWorkersForJob(state, job),
+    key: key as "woodcutters" | "farmers" | "quarriers"
   };
 }
 
@@ -179,51 +196,6 @@ export function extractorJobForBuilding(
   if (buildingId === "lumber_camp") return "woodcutter";
   if (buildingId === "farm") return "farmer";
   return "quarrier";
-}
-
-function workerKeyForJob(
-  job: ExtractorJob
-): "woodcutters" | "farmers" | "quarriers" {
-  if (job === "woodcutter") return "woodcutters";
-  if (job === "farmer") return "farmers";
-  return "quarriers";
-}
-
-function maxWorkersForJob(job: ExtractorJob): number {
-  if (job === "woodcutter") return LUMBER_CAMP_MAX_WORKERS;
-  if (job === "farmer") return FARM_MAX_WORKERS;
-  return QUARRY_MAX_WORKERS;
-}
-
-/**
- * Réserve 1 pop pour un chantier extracteur.
- * Compteur workers +1 immédiatement (pas de prod tant que le bâtiment n’est pas achevé).
- * À la fin du chantier, ce worker est déjà assigné.
- */
-export function reserveWorkerForConstruction(
-  state: EconomyState,
-  buildingId: PlaceableExtractorId,
-  now = Date.now()
-): AssignWorkersResult {
-  const settled = settleEconomy(state, now);
-  if (idleWorkers(settled) < 1) {
-    return { ok: false, reason: "over_population" };
-  }
-
-  const job = extractorJobForBuilding(buildingId);
-  const key = workerKeyForJob(job);
-  const current = settled[key];
-  if (current + 1 > maxWorkersForJob(job)) {
-    return { ok: false, reason: "over_building_cap" };
-  }
-
-  return {
-    ok: true,
-    state: {
-      ...settled,
-      [key]: current + 1
-    }
-  };
 }
 
 /**
@@ -244,7 +216,7 @@ export function assignExtractorWorkers(
     return { ok: false, reason: "invalid_count" };
   }
   if (count > config.maxWorkers) {
-    return { ok: false, reason: "over_building_cap" };
+    return { ok: false, reason: "over_population" };
   }
 
   const others = assignedWorkers(state) - config.current;
@@ -305,7 +277,7 @@ export {
   WOOD_STOCK_CAP,
   WHEAT_STOCK_CAP,
   STONE_STOCK_CAP,
-  WOOD_RATE_PER_WORKER_PER_HOUR,
-  WHEAT_RATE_PER_WORKER_PER_HOUR,
-  STONE_RATE_PER_WORKER_PER_HOUR
+  WOOD_RATE_PER_WORKER_PER_MINUTE,
+  WHEAT_RATE_PER_WORKER_PER_MINUTE,
+  STONE_RATE_PER_WORKER_PER_MINUTE
 };

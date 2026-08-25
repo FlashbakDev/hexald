@@ -1,6 +1,7 @@
 export type ProducerState = {
   stock: number;
-  productionRatePerHour: number;
+  /** Unités produites par minute. */
+  productionRatePerMinute: number;
   lastCalculatedAt: number;
   cap?: number;
 };
@@ -10,8 +11,8 @@ export function applyOfflineProduction(
   producer: ProducerState,
   now: number
 ): ProducerState {
-  const elapsedHours = Math.max(0, (now - producer.lastCalculatedAt) / 3_600_000);
-  const produced = elapsedHours * producer.productionRatePerHour;
+  const elapsedMinutes = Math.max(0, (now - producer.lastCalculatedAt) / 60_000);
+  const produced = elapsedMinutes * producer.productionRatePerMinute;
   const uncapped = producer.stock + produced;
   const stock = producer.cap === undefined ? uncapped : Math.min(producer.cap, uncapped);
 

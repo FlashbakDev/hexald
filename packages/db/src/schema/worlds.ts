@@ -1,4 +1,5 @@
 import {
+  boolean,
   doublePrecision,
   integer,
   pgTable,
@@ -18,7 +19,7 @@ export const worlds = pgTable("worlds", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   /** Économie v0 — pop + extracteurs */
   populationTotal: integer("population_total").notNull().default(4),
-  populationCap: integer("population_cap").notNull().default(12),
+  populationCap: integer("population_cap").notNull().default(4),
   woodcutters: integer("woodcutters").notNull().default(0),
   farmers: integer("farmers").notNull().default(0),
   quarriers: integer("quarriers").notNull().default(0),
@@ -55,7 +56,11 @@ export const worldTiles = pgTable(
     /** Fin de chantier ; null = bâtiment opérationnel (ou tuile vide). */
     constructionCompletesAt: timestamp("construction_completes_at", {
       withTimezone: true
-    })
+    }),
+    /** Workers assignés sur ce site (0–1 pour extracteur niveau 1). */
+    assignedWorkers: integer("assigned_workers").notNull().default(0),
+    /** Worker par défaut déjà géré (évite réassigner si le joueur retire). */
+    defaultWorkerSeeded: boolean("default_worker_seeded").notNull().default(false)
   },
   (table) => [primaryKey({ columns: [table.worldId, table.q, table.r] })]
 );

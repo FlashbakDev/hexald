@@ -11,16 +11,15 @@ import type {
   WorldSummary
 } from "@hexald/shared";
 import {
-  assignExtractorWorkers,
-  countBuildings,
+  assignWorkersAtTile,
+  buildingWoodCost,
+  countBuildingSites,
   createInitialEconomy,
   createStartingWorld,
-  FARM_MAX_WORKERS,
   generateRegionTiles,
   hasCompletedBuilding,
   isPrimaryBiome,
-  LUMBER_CAMP_MAX_WORKERS,
-  QUARRY_MAX_WORKERS,
+  maxAssignableWorkersForJob,
   settleEconomy,
   spendWood,
   startConstruction,
@@ -28,8 +27,10 @@ import {
   validateBuildPlacement,
   WHEAT_STOCK_CAP,
   WOOD_STOCK_CAP,
+  workerTotalsFromTiles,
+  committedWorkersFromTiles,
+  seedDefaultWorkersForCompletedTiles,
   computeRegionExpansionCost,
-  reserveWorkerForConstruction,
   type EconomyState
 } from "@hexald/game-core";
 import type { Database, PersistedWorld, WorldEconomyRow, WorldTileRow } from "@hexald/db";
@@ -40,13 +41,13 @@ import {
   insertWorldWithTerrain,
   listWorldsByOwner,
   setTileBuilding,
+  setTileWorkerState,
   updateWorldEconomy
 } from "@hexald/db";
 import { hexKey } from "@hexald/shared";
 import { env } from "../env.ts";
 
 const START_VILLAGE = { q: 0, r: 0 };
-const EXTRACTOR_JOBS = new Set(["woodcutter", "farmer", "quarrier"]);
 
 function isStartVillage(q: number, r: number) {
   return q === START_VILLAGE.q && r === START_VILLAGE.r;
@@ -54,6 +55,9 @@ function isStartVillage(q: number, r: number) {
 
 function buildingFlags(world: PersistedWorld, now = Date.now()) {
   return {
+    lumberCampSites: countBuildingSites(world.tiles, "lumber_camp"),
+    farmSites: countBuildingSites(world.tiles, "farm"),
+    quarrySites: countBuildingSites(world.tiles, "quarry"),
     hasLumberCamp: hasCompletedBuilding(world.tiles, "lumber_camp", now),
     hasFarm: hasCompletedBuilding(world.tiles, "farm", now),
     hasQuarry: hasCompletedBuilding(world.tiles, "quarry", now)
@@ -68,20 +72,24 @@ function tileSnapshot(tile: WorldTileRow) {
     buildingId: tile.buildingId,
     constructionCompletesAt: tile.constructionCompletesAt
       ? tile.constructionCompletesAt.toISOString()
-      : null
+      : null,
+    assignedWorkers: tile.assignedWorkers ?? 0
   };
 }
 
 function rowToEconomyState(
   row: WorldEconomyRow,
-  flags: ReturnType<typeof buildingFlags>
+  flags: ReturnType<typeof buildingFlags>,
+  tiles: WorldTileRow[],
+  now: number
 ): EconomyState {
+  const totals = workerTotalsFromTiles(tiles, now);
   return {
     population: row.populationTotal,
     populationCap: row.populationCap,
-    woodcutters: row.woodcutters,
-    farmers: row.farmers,
-    quarriers: row.quarriers,
+    woodcutters: totals.woodcutters,
+    farmers: totals.farmers,
+    quarriers: totals.quarriers,
     wood: row.woodStock,
     woodLastCalculatedAt: row.woodLastCalculatedAt.getTime(),
     wheat: row.wheatStock,
@@ -115,9 +123,9 @@ function toEconomySnapshot(state: EconomyState): WorldEconomySnapshot {
     woodcutters: state.woodcutters,
     farmers: state.farmers,
     quarriers: state.quarriers,
-    lumberCampMaxWorkers: LUMBER_CAMP_MAX_WORKERS,
-    farmMaxWorkers: FARM_MAX_WORKERS,
-    quarryMaxWorkers: QUARRY_MAX_WORKERS,
+    lumberCampMaxWorkers: maxAssignableWorkersForJob("woodcutter", state),
+    farmMaxWorkers: maxAssignableWorkersForJob("farmer", state),
+    quarryMaxWorkers: maxAssignableWorkersForJob("quarrier", state),
     hasLumberCamp: state.hasLumberCamp,
     hasFarm: state.hasFarm,
     hasQuarry: state.hasQuarry,
@@ -159,19 +167,57 @@ function stocksChanged(before: EconomyState, after: EconomyState) {
   );
 }
 
+function tileWorkerStateChanged(before: WorldTileRow, after: WorldTileRow) {
+  return (
+    before.assignedWorkers !== after.assignedWorkers ||
+    before.defaultWorkerSeeded !== after.defaultWorkerSeeded
+  );
+}
+
+async function persistTileWorkerChanges(
+  db: Database["db"],
+  worldId: string,
+  before: WorldTileRow[],
+  after: WorldTileRow[]
+) {
+  for (const tile of after) {
+    const prev = before.find((entry) => entry.q === tile.q && entry.r === tile.r);
+    if (!prev || !tileWorkerStateChanged(prev, tile)) continue;
+    await setTileWorkerState(db, worldId, { q: tile.q, r: tile.r }, {
+      assignedWorkers: tile.assignedWorkers,
+      defaultWorkerSeeded: tile.defaultWorkerSeeded
+    });
+  }
+}
+
 async function settleAndPersist(
   db: Database["db"],
   world: PersistedWorld,
   now = Date.now()
 ): Promise<{ world: PersistedWorld; economy: EconomyState }> {
-  const flags = buildingFlags(world, now);
-  const before = rowToEconomyState(world.economy, flags);
+  const population = world.economy.populationTotal;
+  const seeded = seedDefaultWorkersForCompletedTiles(world.tiles, population, now);
+  let tiles = seeded.changed ? seeded.tiles : world.tiles;
+
+  if (seeded.changed) {
+    await persistTileWorkerChanges(db, world.id, world.tiles, tiles);
+  }
+
+  const flags = buildingFlags({ ...world, tiles }, now);
+  const before = rowToEconomyState(world.economy, flags, tiles, now);
   const settled = settleEconomy(before, now);
-  if (stocksChanged(before, settled)) {
+
+  if (stocksChanged(before, settled) || seeded.changed) {
     const row = economyStateToRow(settled);
     await updateWorldEconomy(db, world.id, row);
     return {
-      world: { ...world, economy: row, updatedAt: new Date() },
+      world: { ...world, tiles, economy: row, updatedAt: new Date() },
+      economy: settled
+    };
+  }
+  if (seeded.changed) {
+    return {
+      world: { ...world, tiles, updatedAt: new Date() },
       economy: settled
     };
   }
@@ -192,7 +238,9 @@ export async function createWorldService(
       r: r!,
       biome,
       buildingId: null,
-      constructionCompletesAt: null
+      constructionCompletesAt: null,
+      assignedWorkers: 0,
+      defaultWorkerSeeded: false
     });
   }
 
@@ -286,7 +334,10 @@ export async function grantDevResourcesService(
 
   const now = Date.now();
   const flags = buildingFlags(world, now);
-  const settled = settleEconomy(rowToEconomyState(world.economy, flags), now);
+  const settled = settleEconomy(
+    rowToEconomyState(world.economy, flags, world.tiles, now),
+    now
+  );
   const next: EconomyState = {
     ...settled,
     wood: Math.min(WOOD_STOCK_CAP, settled.wood + DEV_RESOURCE_GRANT),
@@ -348,7 +399,7 @@ export async function expandRegionService(
   });
 
   const flags = buildingFlags(world, now);
-  const current = rowToEconomyState(world.economy, flags);
+  const current = rowToEconomyState(world.economy, flags, world.tiles, now);
   const spent = spendWood(current, cost.wood, now);
   if (!spent.ok) {
     return { ok: false, error: "insufficient_resources" };
@@ -360,7 +411,9 @@ export async function expandRegionService(
     tiles: created.map((tile) => ({
       ...tile,
       buildingId: null,
-      constructionCompletesAt: null
+      constructionCompletesAt: null,
+      assignedWorkers: 0,
+      defaultWorkerSeeded: false
     }))
   });
 
@@ -374,7 +427,9 @@ export async function expandRegionService(
       r: tile.r,
       biome: tile.biome,
       buildingId: null,
-      constructionCompletesAt: null
+      constructionCompletesAt: null,
+      assignedWorkers: 0,
+      defaultWorkerSeeded: false
     }))
   ];
   const updatedWorld: PersistedWorld = {
@@ -400,7 +455,9 @@ export async function expandRegionService(
       tiles: created.map((tile) => ({
         ...tile,
         buildingId: null,
-        constructionCompletesAt: null
+        constructionCompletesAt: null,
+        assignedWorkers: 0,
+        defaultWorkerSeeded: false
       })),
       cost,
       world: toSnapshot(updatedWorld, spent.state)
@@ -410,11 +467,11 @@ export async function expandRegionService(
 
 export type AssignWorkersError =
   | "world_not_found"
+  | "tile_not_found"
   | "invalid_count"
   | "over_population"
-  | "over_building_cap"
-  | "unsupported_job"
-  | "no_building";
+  | "no_building"
+  | "under_construction";
 
 export async function assignWorkersService(
   db: Database["db"],
@@ -425,28 +482,55 @@ export async function assignWorkersService(
   | { ok: true; world: WorldSnapshot }
   | { ok: false; error: AssignWorkersError }
 > {
-  if (!EXTRACTOR_JOBS.has(input.job)) {
-    return { ok: false, error: "unsupported_job" };
-  }
-
   const world = await fetchWorldForOwner(db, worldId, ownerId);
   if (!world) {
     return { ok: false, error: "world_not_found" };
   }
 
   const now = Date.now();
-  const current = rowToEconomyState(world.economy, buildingFlags(world, now));
-  const result = assignExtractorWorkers(current, input.job, input.count, now);
+  const flags = buildingFlags(world, now);
+  const before = rowToEconomyState(world.economy, flags, world.tiles, now);
+  const settled = settleEconomy(before, now);
+
+  const result = assignWorkersAtTile(
+    world.tiles,
+    input.origin,
+    input.count,
+    settled.population,
+    now
+  );
   if (!result.ok) {
     return { ok: false, error: result.reason };
   }
 
-  const row = economyStateToRow(result.state);
+  const updatedTiles: WorldTileRow[] = world.tiles.map((entry) => {
+    const next = result.tiles.find((tile) => tile.q === entry.q && tile.r === entry.r);
+    if (!next) return entry;
+    return { ...entry, assignedWorkers: next.assignedWorkers ?? 0, defaultWorkerSeeded: true };
+  });
+
+  await setTileWorkerState(db, worldId, input.origin, {
+    assignedWorkers: input.count,
+    defaultWorkerSeeded: true
+  });
+
+  const updatedWorld: PersistedWorld = {
+    ...world,
+    tiles: updatedTiles,
+    updatedAt: new Date()
+  };
+  const after = rowToEconomyState(
+    economyStateToRow(settled),
+    buildingFlags(updatedWorld, now),
+    updatedTiles,
+    now
+  );
+  const row = economyStateToRow(after);
   await updateWorldEconomy(db, worldId, row);
 
   return {
     ok: true,
-    world: toSnapshot({ ...world, economy: row, updatedAt: new Date() }, result.state)
+    world: toSnapshot({ ...updatedWorld, economy: row }, after)
   };
 }
 
@@ -458,8 +542,8 @@ export type BuildError =
   | "wrong_terrain"
   | "tile_occupied"
   | "has_village"
-  | "building_limit"
-  | "no_idle_workers";
+  | "insufficient_resources"
+  | "insufficient_population";
 
 export async function buildService(
   db: Database["db"],
@@ -484,8 +568,7 @@ export async function buildService(
     origin: input.origin,
     biome: tile.biome,
     hasVillage: isStartVillage(tile.q, tile.r),
-    existingBuildingId: tile.buildingId,
-    buildingCount: countBuildings(world.tiles, input.buildingId)
+    existingBuildingId: tile.buildingId
   });
 
   if (!placement.ok) {
@@ -494,35 +577,42 @@ export async function buildService(
 
   const now = Date.now();
   const flags = buildingFlags(world, now);
-  const current = rowToEconomyState(world.economy, flags);
-  const reserved = reserveWorkerForConstruction(
-    current,
-    placement.buildingId,
-    now
-  );
-  if (!reserved.ok) {
-    return { ok: false, error: "no_idle_workers" };
+  const current = rowToEconomyState(world.economy, flags, world.tiles, now);
+  const committed = committedWorkersFromTiles(world.tiles);
+  const idlePopulation = current.population - committed;
+  if (idlePopulation < 1) {
+    return { ok: false, error: "insufficient_population" };
+  }
+
+  const spent = spendWood(current, buildingWoodCost(placement.buildingId), now);
+  if (!spent.ok) {
+    return { ok: false, error: "insufficient_resources" };
   }
 
   const construction = startConstruction(placement.buildingId, now, {
     isDev: env.isDev
   });
   const completesAt = new Date(construction.constructionCompletesAt);
+  const reserveWorker = 1;
 
   await setTileBuilding(db, worldId, {
     q: tile.q,
     r: tile.r,
     buildingId: placement.buildingId,
-    constructionCompletesAt: completesAt
+    constructionCompletesAt: completesAt,
+    assignedWorkers: reserveWorker,
+    defaultWorkerSeeded: reserveWorker > 0
   });
 
-  const economyRow = economyStateToRow(reserved.state);
+  const economyRow = economyStateToRow(spent.state);
   await updateWorldEconomy(db, worldId, economyRow);
 
   const updatedTile: WorldTileRow = {
     ...tile,
     buildingId: placement.buildingId,
-    constructionCompletesAt: completesAt
+    constructionCompletesAt: completesAt,
+    assignedWorkers: reserveWorker,
+    defaultWorkerSeeded: reserveWorker > 0
   };
   const updatedTiles = world.tiles.map((entry) =>
     entry.q === tile.q && entry.r === tile.r ? updatedTile : entry
@@ -534,8 +624,13 @@ export async function buildService(
     updatedAt: new Date()
   };
 
-  // Chantier : worker réservé, pas encore de prod (flags incomplets).
-  const economy = rowToEconomyState(economyRow, buildingFlags(updatedWorld, now));
+  // Chantier posé : prod au fil de l’eau une fois le site achevé et des workers assignés.
+  const economy = rowToEconomyState(
+    economyRow,
+    buildingFlags(updatedWorld, now),
+    updatedTiles,
+    now
+  );
 
   return {
     ok: true,

@@ -17,6 +17,8 @@ export {
   appendRegion,
   updateWorldEconomy,
   setTileBuilding,
+  setTileWorkerState,
+  setTileAssignedWorkers,
   deleteWorldForOwner,
   type PersistedWorld,
   type PersistedWorldSummary,

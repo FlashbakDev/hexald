@@ -1,4 +1,5 @@
 import {
+  BUILD_COST_WOOD,
   PLACEABLE_EXTRACTORS,
   buildings,
   type BuildingDefinition,
@@ -13,8 +14,6 @@ export type BuildPlacementInput = {
   biome: BiomeId;
   hasVillage: boolean;
   existingBuildingId: BuildingId | null;
-  /** Compteur actuel de ce type de bâtiment dans le monde. */
-  buildingCount: number;
 };
 
 export type BuildPlacementResult =
@@ -26,8 +25,7 @@ export type BuildPlacementResult =
         | "not_buildable"
         | "wrong_terrain"
         | "tile_occupied"
-        | "has_village"
-        | "building_limit";
+        | "has_village";
     };
 
 export function getBuildingDefinition(
@@ -42,6 +40,10 @@ export function isPlaceableExtractor(
   return (PLACEABLE_EXTRACTORS as readonly string[]).includes(id);
 }
 
+export function buildingWoodCost(buildingId: PlaceableExtractorId): number {
+  return BUILD_COST_WOOD[buildingId];
+}
+
 export function terrainAllowsBuilding(
   terrain: BuildingDefinition["terrain"],
   biome: BiomeId
@@ -52,18 +54,18 @@ export function terrainAllowsBuilding(
   return biomeInfluences(biome).includes(terrain as PrimaryBiomeId);
 }
 
-/** Extracteurs posables sur ce biome, pas encore présents (compteurs fournis). */
+/** Extracteurs posables sur ce biome (le bois / pop libre sont vérifiés à part). */
 export function listBuildOptionsForTile(input: {
   biome: BiomeId;
   hasVillage: boolean;
   existingBuildingId: BuildingId | null;
-  counts: Partial<Record<PlaceableExtractorId, number>>;
+  wood: number;
 }): PlaceableExtractorId[] {
   if (input.hasVillage || input.existingBuildingId) return [];
   if (!isBuildableBiome(input.biome)) return [];
 
   return PLACEABLE_EXTRACTORS.filter((id) => {
-    if ((input.counts[id] ?? 0) >= 1) return false;
+    if (input.wood + 1e-9 < BUILD_COST_WOOD[id]) return false;
     const definition = getBuildingDefinition(id);
     if (!definition) return false;
     return terrainAllowsBuilding(definition.terrain, input.biome);
@@ -96,10 +98,6 @@ export function validateBuildPlacement(
 
   if (!terrainAllowsBuilding(definition.terrain, input.biome)) {
     return { ok: false, reason: "wrong_terrain" };
-  }
-
-  if (input.buildingCount >= 1) {
-    return { ok: false, reason: "building_limit" };
   }
 
   return {

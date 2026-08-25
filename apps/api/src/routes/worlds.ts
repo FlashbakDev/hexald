@@ -31,18 +31,13 @@ function isHexCoord(value: unknown): value is { q: number; r: number } {
   );
 }
 
-const EXTRACTOR_JOBS = new Set(["woodcutter", "farmer", "quarrier"]);
-const PLACEABLE_BUILDINGS = new Set(["lumber_camp", "farm", "quarry"]);
-
 function isAssignWorkersBody(value: unknown): value is AssignWorkersRequest {
   if (!value || typeof value !== "object") return false;
-  const body = value as { job?: unknown; count?: unknown };
-  return (
-    typeof body.job === "string" &&
-    EXTRACTOR_JOBS.has(body.job) &&
-    Number.isInteger(body.count)
-  );
+  const body = value as { origin?: unknown; count?: unknown };
+  return isHexCoord(body.origin) && Number.isInteger(body.count);
 }
+
+const PLACEABLE_BUILDINGS = new Set(["lumber_camp", "farm", "quarry"]);
 
 function isBuildBody(value: unknown): value is BuildRequest {
   if (!value || typeof value !== "object") return false;
@@ -186,15 +181,15 @@ export async function worldRoutes(app: FastifyInstance) {
       }
 
       const outcome = await assignWorkersService(app.db, id, player.id, {
-        job: request.body.job,
+        origin: request.body.origin,
         count: request.body.count
       });
 
       if (!outcome.ok) {
         const status =
-          outcome.error === "world_not_found"
+          outcome.error === "world_not_found" || outcome.error === "tile_not_found"
             ? 404
-            : outcome.error === "unsupported_job"
+            : outcome.error === "invalid_count" || outcome.error === "under_construction"
               ? 400
               : 409;
         return reply.code(status).send({ error: outcome.error });

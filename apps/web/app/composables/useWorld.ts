@@ -4,7 +4,6 @@ import type {
   BuildResult,
   ExpandRegionRequest,
   ExpandRegionResult,
-  ExtractorJob,
   HexCoord,
   PrimaryBiomeId,
   WorldSnapshot,
@@ -30,8 +29,11 @@ function buildErrorMessage(err: unknown): string {
     err && typeof err === "object" && "data" in err
       ? (err as { data?: { error?: string } }).data
       : undefined;
-  if (data?.error === "no_idle_workers") {
-    return "Il faut au moins 1 habitant libre pour construire.";
+  if (data?.error === "insufficient_resources") {
+    return "Pas assez de bois pour construire.";
+  }
+  if (data?.error === "insufficient_population") {
+    return "Pas assez de pop libre pour construire (1 requis).";
   }
   return err instanceof Error ? err.message : "build_failed";
 }
@@ -119,12 +121,12 @@ export function useWorld() {
 
   async function assignWorkers(
     id: string,
-    job: ExtractorJob,
+    origin: HexCoord,
     count: number
   ): Promise<WorldSnapshot | null> {
     error.value = null;
     try {
-      const body: AssignWorkersRequest = { job, count };
+      const body: AssignWorkersRequest = { origin, count };
       const snapshot = await $fetch<WorldSnapshot>(`/v1/worlds/${id}/workers`, {
         baseURL: config.public.apiBase,
         method: "POST",

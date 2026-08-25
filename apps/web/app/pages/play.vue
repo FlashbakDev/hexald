@@ -1,22 +1,29 @@
 <script setup lang="ts">
 import type {
   BuildingId,
-  ExtractorJob,
   HexCoord,
   PrimaryBiomeId,
   WorldTileSnapshot
 } from "@hexald/shared";
 import {
   buildings,
+  BUILD_COST_WOOD,
+  BUILD_IDLE_POP_REQUIREMENT,
   BUILD_DURATION_MS,
   DEV_BUILD_DURATION_MS,
   primaryBiomes,
-  STONE_RATE_PER_WORKER_PER_HOUR,
-  WHEAT_RATE_PER_WORKER_PER_HOUR,
-  WOOD_RATE_PER_WORKER_PER_HOUR,
+  STONE_RATE_PER_WORKER_PER_MINUTE,
+  WHEAT_RATE_PER_WORKER_PER_MINUTE,
+  WOOD_RATE_PER_WORKER_PER_MINUTE,
   type PlaceableExtractorId
 } from "@hexald/content";
-import { computeRegionExpansionCost, listBuildOptionsForTile, isBuildingUnderConstruction } from "@hexald/game-core";
+import {
+  computeRegionExpansionCost,
+  listBuildOptionsForTile,
+  isBuildingUnderConstruction,
+  committedWorkersFromTiles,
+  WORKERS_PER_EXTRACTOR_L1
+} from "@hexald/game-core";
 import type { HexScreenPoint, SelectedTile } from "~/renderer/createHexScene";
 
 definePageMeta({
@@ -99,7 +106,7 @@ onBeforeUnmount(() => {
 });
 
 const economy = computed(() => world.value?.economy ?? null);
-const population = computed(() => economy.value?.population ?? 0);
+const populationCap = computed(() => economy.value?.populationCap ?? 0);
 
 const buildingDefs: Record<
   PlaceableExtractorId,
@@ -114,19 +121,19 @@ function projectedStock(
   stock: number,
   cap: number,
   lastIso: string,
-  ratePerHour: number
+  ratePerMinute: number
 ) {
   const last = Date.parse(lastIso);
   if (Number.isNaN(last)) return Math.floor(stock);
-  const hours = Math.max(0, (nowTick.value - last) / 3_600_000);
-  return Math.min(cap, stock + ratePerHour * hours);
+  const minutes = Math.max(0, (nowTick.value - last) / 60_000);
+  return Math.min(cap, stock + ratePerMinute * minutes);
 }
 
 const displayedWood = computed(() => {
   const eco = economy.value;
   if (!eco) return 0;
   const rate = eco.hasLumberCamp
-    ? eco.woodcutters * WOOD_RATE_PER_WORKER_PER_HOUR
+    ? eco.woodcutters * WOOD_RATE_PER_WORKER_PER_MINUTE
     : 0;
   return projectedStock(eco.wood, eco.woodCap, eco.woodLastCalculatedAt, rate);
 });
@@ -134,7 +141,7 @@ const displayedWood = computed(() => {
 const displayedWheat = computed(() => {
   const eco = economy.value;
   if (!eco) return 0;
-  const rate = eco.hasFarm ? eco.farmers * WHEAT_RATE_PER_WORKER_PER_HOUR : 0;
+  const rate = eco.hasFarm ? eco.farmers * WHEAT_RATE_PER_WORKER_PER_MINUTE : 0;
   return projectedStock(eco.wheat, eco.wheatCap, eco.wheatLastCalculatedAt, rate);
 });
 
@@ -142,38 +149,39 @@ const displayedStone = computed(() => {
   const eco = economy.value;
   if (!eco) return 0;
   const rate = eco.hasQuarry
-    ? eco.quarriers * STONE_RATE_PER_WORKER_PER_HOUR
+    ? eco.quarriers * STONE_RATE_PER_WORKER_PER_MINUTE
     : 0;
   return projectedStock(eco.stone, eco.stoneCap, eco.stoneLastCalculatedAt, rate);
 });
 
 const idlePop = computed(() => {
   const eco = economy.value;
-  if (!eco) return 0;
-  return Math.max(0, eco.population - eco.woodcutters - eco.farmers - eco.quarriers);
+  const tiles = world.value?.tiles;
+  if (!eco || !tiles) return 0;
+  return Math.max(0, eco.population - committedWorkersFromTiles(tiles));
 });
 
 function rateLabel(count: number, rate: number, active: boolean) {
-  if (!active || count === 0) return "0/h";
-  return `${count * rate}/h`;
+  if (!active || count === 0) return "0/min";
+  return `${count * rate}/min`;
 }
 
 const woodRateLabel = computed(() => {
   const eco = economy.value;
-  if (!eco) return "0/h";
-  return rateLabel(eco.woodcutters, WOOD_RATE_PER_WORKER_PER_HOUR, eco.hasLumberCamp);
+  if (!eco) return "0/min";
+  return rateLabel(eco.woodcutters, WOOD_RATE_PER_WORKER_PER_MINUTE, eco.hasLumberCamp);
 });
 
 const wheatRateLabel = computed(() => {
   const eco = economy.value;
-  if (!eco) return "0/h";
-  return rateLabel(eco.farmers, WHEAT_RATE_PER_WORKER_PER_HOUR, eco.hasFarm);
+  if (!eco) return "0/min";
+  return rateLabel(eco.farmers, WHEAT_RATE_PER_WORKER_PER_MINUTE, eco.hasFarm);
 });
 
 const stoneRateLabel = computed(() => {
   const eco = economy.value;
-  if (!eco) return "0/h";
-  return rateLabel(eco.quarriers, STONE_RATE_PER_WORKER_PER_HOUR, eco.hasQuarry);
+  if (!eco) return "0/min";
+  return rateLabel(eco.quarriers, STONE_RATE_PER_WORKER_PER_MINUTE, eco.hasQuarry);
 });
 
 const selectedWorldTile = computed(() => {
@@ -245,20 +253,18 @@ const overlayPositions = ref(
 const START_VILLAGE = { q: 0, r: 0 } as const;
 
 function workersForBuilding(
-  buildingId: string
+  tile: WorldTileSnapshot
 ): { count: number; max: number } | null {
-  const eco = economy.value;
-  if (!eco) return null;
-  if (buildingId === "lumber_camp" && eco.hasLumberCamp) {
-    return { count: eco.woodcutters, max: eco.lumberCampMaxWorkers };
+  const buildingId = tile.buildingId;
+  if (
+    buildingId !== "lumber_camp" &&
+    buildingId !== "farm" &&
+    buildingId !== "quarry"
+  ) {
+    return null;
   }
-  if (buildingId === "farm" && eco.hasFarm) {
-    return { count: eco.farmers, max: eco.farmMaxWorkers };
-  }
-  if (buildingId === "quarry" && eco.hasQuarry) {
-    return { count: eco.quarriers, max: eco.quarryMaxWorkers };
-  }
-  return null;
+  const assigned = tile.assignedWorkers ?? 0;
+  return { count: assigned, max: WORKERS_PER_EXTRACTOR_L1 };
 }
 
 const mapBadges = computed((): MapBadge[] => {
@@ -275,7 +281,7 @@ const mapBadges = computed((): MapBadge[] => {
     q: START_VILLAGE.q,
     r: START_VILLAGE.r,
     kind: "pop",
-    label: `${eco.population}/${eco.populationCap}`,
+    label: `${idlePop.value}/${eco.populationCap}`,
     icon: "i-lucide-users",
     x: villagePos?.x ?? -9999,
     y: villagePos?.y ?? -9999,
@@ -309,7 +315,7 @@ const mapBadges = computed((): MapBadge[] => {
       continue;
     }
 
-    const workers = workersForBuilding(tile.buildingId);
+    const workers = workersForBuilding(tile);
     if (workers == null) continue;
     out.push({
       key: `workers:${key}`,
@@ -392,11 +398,7 @@ watch(nowTick, (now) => {
     const at = tile.constructionCompletesAt;
     if (!at || !tile.buildingId) return false;
     const ends = Date.parse(at);
-    if (Number.isNaN(ends) || ends > now) return false;
-    if (tile.buildingId === "lumber_camp" && !economy.value?.hasLumberCamp) return true;
-    if (tile.buildingId === "farm" && !economy.value?.hasFarm) return true;
-    if (tile.buildingId === "quarry" && !economy.value?.hasQuarry) return true;
-    return false;
+    return !Number.isNaN(ends) && ends <= now;
   });
   if (due) void refreshWorld();
 });
@@ -409,24 +411,28 @@ const buildOptions = computed(() => {
     biome: tile.biome,
     hasVillage: tile.hasVillage,
     existingBuildingId: tile.buildingId ?? null,
-    counts: {
-      lumber_camp: tiles.filter((entry) => entry.buildingId === "lumber_camp").length,
-      farm: tiles.filter((entry) => entry.buildingId === "farm").length,
-      quarry: tiles.filter((entry) => entry.buildingId === "quarry").length
-    }
+    wood: displayedWood.value
   });
 });
 
 const buildWheelSlots = computed(() => {
   const options = buildOptions.value;
   const n = options.length;
+  const hasWood = (cost: number) => displayedWood.value + 1e-9 >= cost;
+  const hasIdlePop = idlePop.value + 1e-9 >= BUILD_IDLE_POP_REQUIREMENT;
   return options.map((id, index) => {
     const angle =
       n === 1 ? -Math.PI / 2 : -Math.PI / 2 + (index * 2 * Math.PI) / n;
     const radius = 56;
     const def = buildingDefs[id];
+    const woodCost = BUILD_COST_WOOD[id];
+    const canAffordWood = hasWood(woodCost);
     return {
       id,
+      woodCost,
+      canAffordWood,
+      hasIdlePop,
+      canAfford: canAffordWood && hasIdlePop,
       ...def,
       style: {
         transform: `translate(-50%, -50%) translate(${Math.cos(angle) * radius}px, ${Math.sin(angle) * radius}px)`
@@ -436,7 +442,6 @@ const buildWheelSlots = computed(() => {
 });
 
 type WorkerPanel = {
-  job: ExtractorJob;
   title: string;
   hint: string;
   count: number;
@@ -447,54 +452,54 @@ type WorkerPanel = {
 };
 
 const selectedWorkerPanel = computed((): WorkerPanel | null => {
-  const tile = selected.value;
+  const tile = selectedWorldTile.value;
   const eco = economy.value;
   if (!tile?.buildingId || !eco) return null;
   if (selectedConstruction.value) return null;
 
-  if (tile.buildingId === "lumber_camp" && eco.hasLumberCamp) {
+  const assigned = tile.assignedWorkers ?? 0;
+  const max = WORKERS_PER_EXTRACTOR_L1;
+
+  if (tile.buildingId === "lumber_camp") {
     return {
-      job: "woodcutter",
-      title: "Bûcherons",
-      hint: "Assigne des travailleurs pour produire du bois.",
-      count: eco.woodcutters,
-      max: eco.lumberCampMaxWorkers,
-      rateLabel: woodRateLabel.value,
-      canAdd:
-        !assigning.value &&
-        eco.woodcutters < eco.lumberCampMaxWorkers &&
-        idlePop.value > 0,
-      canRemove: !assigning.value && eco.woodcutters > 0
+      title: "Bûcheron",
+      hint: "Assigne un habitant du village pour produire du bois sur ce camp.",
+      count: assigned,
+      max,
+      rateLabel:
+        assigned > 0
+          ? `${assigned * WOOD_RATE_PER_WORKER_PER_MINUTE}/min`
+          : "0/min",
+      canAdd: !assigning.value && assigned < max && idlePop.value > 0,
+      canRemove: !assigning.value && assigned > 0
     };
   }
-  if (tile.buildingId === "farm" && eco.hasFarm) {
+  if (tile.buildingId === "farm") {
     return {
-      job: "farmer",
-      title: "Fermiers",
-      hint: "Assigne des travailleurs pour produire du blé.",
-      count: eco.farmers,
-      max: eco.farmMaxWorkers,
-      rateLabel: wheatRateLabel.value,
-      canAdd:
-        !assigning.value &&
-        eco.farmers < eco.farmMaxWorkers &&
-        idlePop.value > 0,
-      canRemove: !assigning.value && eco.farmers > 0
+      title: "Fermier",
+      hint: "Assigne un habitant du village pour produire du blé sur cette ferme.",
+      count: assigned,
+      max,
+      rateLabel:
+        assigned > 0
+          ? `${assigned * WHEAT_RATE_PER_WORKER_PER_MINUTE}/min`
+          : "0/min",
+      canAdd: !assigning.value && assigned < max && idlePop.value > 0,
+      canRemove: !assigning.value && assigned > 0
     };
   }
-  if (tile.buildingId === "quarry" && eco.hasQuarry) {
+  if (tile.buildingId === "quarry") {
     return {
-      job: "quarrier",
-      title: "Carriers",
-      hint: "Assigne des travailleurs pour produire de la pierre.",
-      count: eco.quarriers,
-      max: eco.quarryMaxWorkers,
-      rateLabel: stoneRateLabel.value,
-      canAdd:
-        !assigning.value &&
-        eco.quarriers < eco.quarryMaxWorkers &&
-        idlePop.value > 0,
-      canRemove: !assigning.value && eco.quarriers > 0
+      title: "Carrier",
+      hint: "Assigne un habitant du village pour produire de la pierre sur cette carrière.",
+      count: assigned,
+      max,
+      rateLabel:
+        assigned > 0
+          ? `${assigned * STONE_RATE_PER_WORKER_PER_MINUTE}/min`
+          : "0/min",
+      canAdd: !assigning.value && assigned < max && idlePop.value > 0,
+      canRemove: !assigning.value && assigned > 0
     };
   }
   return null;
@@ -545,13 +550,18 @@ const canAffordRegion = computed(() => {
   return displayedWood.value + 1e-9 >= cost.wood;
 });
 
+const regionExpansionDiscountPct = computed(() => {
+  const cost = regionExpansionCost.value;
+  if (!cost || cost.discount <= 0) return 0;
+  return Math.round(cost.discount * 100);
+});
+
 const regionCostLabel = computed(() => {
   const cost = regionExpansionCost.value;
   if (!cost) return "";
   const wood = `${cost.wood} bois`;
   if (cost.discount <= 0) return wood;
-  const pct = Math.round(cost.discount * 100);
-  return `${wood} (−${pct}%)`;
+  return `${wood} (−${regionExpansionDiscountPct.value}%)`;
 });
 
 const showBuildWheel = computed(
@@ -687,8 +697,13 @@ async function placeBuilding(buildingId: PlaceableExtractorId) {
   const id = world.value?.id;
   if (!tile?.biome || !id || building.value) return;
   if (!buildOptions.value.includes(buildingId)) return;
-  if (idlePop.value < 1) {
-    expandError.value = "Il faut au moins 1 habitant libre pour construire.";
+  const cost = BUILD_COST_WOOD[buildingId];
+  if (displayedWood.value + 1e-9 < cost) {
+    expandError.value = `Pas assez de bois (${cost} requis).`;
+    return;
+  }
+  if (idlePop.value < BUILD_IDLE_POP_REQUIREMENT) {
+    expandError.value = "Pas assez de pop libre (1 requis).";
     return;
   }
 
@@ -714,13 +729,14 @@ async function placeBuilding(buildingId: PlaceableExtractorId) {
   }
 }
 
-async function setWorkers(job: ExtractorJob, count: number) {
+async function setWorkers(count: number) {
   const id = world.value?.id;
-  if (!id || assigning.value) return;
+  const tile = selected.value;
+  if (!id || !tile || assigning.value) return;
   assigning.value = true;
   expandError.value = null;
   try {
-    const result = await assignWorkers(id, job, count);
+    const result = await assignWorkers(id, { q: tile.q, r: tile.r }, count);
     if (!result) {
       expandError.value = worldError.value ?? "Impossible d’assigner.";
     }
@@ -869,7 +885,7 @@ function formatStock(value: number) {
             <p class="play-cloud-header__stat" title="Population">
               <UIcon name="i-lucide-users" class="play-cloud-header__stat-icon" aria-hidden="true" />
               <span class="sr-only">Pop</span>
-              {{ idlePop }}/{{ population }}
+              {{ idlePop }}/{{ populationCap }}
             </p>
             <p v-if="economy" class="play-cloud-header__stat" title="Bois">
               <UIcon name="i-lucide-tree-pine" class="play-cloud-header__stat-icon" aria-hidden="true" />
@@ -980,7 +996,13 @@ function formatStock(value: number) {
             "
             :style="regionCostStyle"
           >
-            {{ regionCostLabel }}
+            {{ regionExpansionCost.wood }} bois
+            <span
+              v-if="regionExpansionDiscountPct > 0"
+              class="text-[#6ecf7a]"
+            >
+              (−{{ regionExpansionDiscountPct }}%)
+            </span>
           </p>
           <button
             type="button"
@@ -1047,23 +1069,39 @@ function formatStock(value: number) {
             type="button"
             class="absolute left-0 top-0 flex size-12 flex-col items-center justify-center rounded-full border-2 bg-[#2d5248] text-[#f2f6ee] shadow-md transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e8a54b]"
             :class="
-              idlePop >= 1
+              slot.canAfford
                 ? 'border-[#e8a54b]/80 hover:scale-110'
                 : 'border-white/30 opacity-45'
             "
             :style="slot.style"
             :title="
-              idlePop >= 1
-                ? `${slot.label} · 1 habitant requis`
-                : `${slot.label} · aucun habitant libre`
+              !slot.canAfford
+                ? !slot.canAffordWood && !slot.hasIdlePop
+                  ? `${slot.label} · pas assez de bois ni de pop libre`
+                  : !slot.canAffordWood
+                    ? `${slot.label} · pas assez de bois`
+                    : `${slot.label} · pas assez de pop libre`
+                : `${slot.label} · ${slot.woodCost} bois · ${BUILD_IDLE_POP_REQUIREMENT} pop`
             "
             :aria-label="slot.label"
-            :disabled="idlePop < 1"
+            :disabled="!slot.canAfford"
             @click="placeBuilding(slot.id)"
           >
             <UIcon :name="slot.icon" class="size-4" />
             <span class="mt-0.5 text-[9px] font-semibold uppercase tracking-wide">
               {{ slot.short }}
+            </span>
+            <span
+              class="text-[8px] font-medium"
+              :class="slot.canAffordWood ? 'opacity-80' : 'text-red-300'"
+            >
+              {{ slot.woodCost }} bois
+            </span>
+            <span
+              class="text-[8px] font-medium"
+              :class="slot.hasIdlePop ? 'text-[#6ecf7a]' : 'text-red-300'"
+            >
+              {{ BUILD_IDLE_POP_REQUIREMENT }} pop
             </span>
           </button>
         </div>
@@ -1169,7 +1207,7 @@ function formatStock(value: number) {
                 class="building-sheet__stepper"
                 :disabled="!selectedWorkerPanel.canRemove"
                 :aria-label="`Retirer un ${selectedWorkerPanel.title.toLowerCase()}`"
-                @click="setWorkers(selectedWorkerPanel.job, selectedWorkerPanel.count - 1)"
+                @click="setWorkers(selectedWorkerPanel.count - 1)"
               >
                 −
               </button>
@@ -1178,7 +1216,7 @@ function formatStock(value: number) {
                 class="building-sheet__stepper"
                 :disabled="!selectedWorkerPanel.canAdd"
                 :aria-label="`Ajouter un ${selectedWorkerPanel.title.toLowerCase()}`"
-                @click="setWorkers(selectedWorkerPanel.job, selectedWorkerPanel.count + 1)"
+                @click="setWorkers(selectedWorkerPanel.count + 1)"
               >
                 +
               </button>
