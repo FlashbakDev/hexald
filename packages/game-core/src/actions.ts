@@ -4,13 +4,15 @@ export type ActionResult =
   | { ok: true }
   | { ok: false; reason: string };
 
+const extractorJobs = new Set(["woodcutter", "farmer", "quarrier"]);
+
 /**
  * Validation structurelle légère.
  * Les effets métier (économie, monde) passent par les services dédiés.
  */
 export function validateAction(action: GameAction): ActionResult {
   if (action.type === "assign_workers") {
-    if (action.job !== "woodcutter") {
+    if (!extractorJobs.has(action.job)) {
       return { ok: false, reason: "unsupported_job" };
     }
     if (!Number.isInteger(action.count) || action.count < 0) {

@@ -101,12 +101,15 @@ Pour rester en localhost uniquement : `pnpm --filter @hexald/api dev -- --host 1
 | `POST` | `/v1/actions` | Action joueur → `game-core` (session requise) |
 | `GET` | `/v1/admin/overview` | Stats admin (sans auth pour l’instant) |
 | `POST` | `/v1/worlds/:id/workers` | Assigne des bûcherons (pop + bois v0) |
+| `POST` | `/v1/worlds/:id/buildings` | Pose un `lumber_camp` sur une tuile |
 
 La session anonyme est un cookie httpOnly signé. Les mondes appartiennent au `playerId` de la session.
 
 UI admin (dev) : [`/admin`](http://127.0.0.1:9089/admin).
 
-Économie v0 : pop fixe 8, camp de bûcherons implicite (max 4), bois lazy offline.
+Économie v0 : pop fixe 8, camp de bûcherons **posé** sur la carte (max 1), bois lazy offline.
+
+`ads.txt` : [`apps/web/public/ads.txt`](apps/web/public/ads.txt).
 
 ## Web
 

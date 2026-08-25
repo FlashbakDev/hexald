@@ -11,15 +11,19 @@ import type {
   WorldSummary
 } from "@hexald/shared";
 import {
-  assignWoodcutters,
+  assignExtractorWorkers,
   countBuildings,
   createInitialEconomy,
   createStartingWorld,
+  FARM_MAX_WORKERS,
   generateRegionTiles,
   isPrimaryBiome,
   LUMBER_CAMP_MAX_WORKERS,
+  QUARRY_MAX_WORKERS,
   settleEconomy,
+  STONE_STOCK_CAP,
   validateBuildPlacement,
+  WHEAT_STOCK_CAP,
   WOOD_STOCK_CAP,
   type EconomyState
 } from "@hexald/game-core";
@@ -35,22 +39,37 @@ import {
 import { hexKey } from "@hexald/shared";
 
 const START_VILLAGE = { q: 0, r: 0 };
+const EXTRACTOR_JOBS = new Set(["woodcutter", "farmer", "quarrier"]);
 
 function isStartVillage(q: number, r: number) {
   return q === START_VILLAGE.q && r === START_VILLAGE.r;
 }
 
+function buildingFlags(world: PersistedWorld) {
+  return {
+    hasLumberCamp: countBuildings(world.tiles, "lumber_camp") > 0,
+    hasFarm: countBuildings(world.tiles, "farm") > 0,
+    hasQuarry: countBuildings(world.tiles, "quarry") > 0
+  };
+}
+
 function rowToEconomyState(
   row: WorldEconomyRow,
-  hasLumberCamp: boolean
+  flags: ReturnType<typeof buildingFlags>
 ): EconomyState {
   return {
     population: row.populationTotal,
     populationCap: row.populationCap,
     woodcutters: row.woodcutters,
+    farmers: row.farmers,
+    quarriers: row.quarriers,
     wood: row.woodStock,
     woodLastCalculatedAt: row.woodLastCalculatedAt.getTime(),
-    hasLumberCamp
+    wheat: row.wheatStock,
+    wheatLastCalculatedAt: row.wheatLastCalculatedAt.getTime(),
+    stone: row.stoneStock,
+    stoneLastCalculatedAt: row.stoneLastCalculatedAt.getTime(),
+    ...flags
   };
 }
 
@@ -59,8 +78,14 @@ function economyStateToRow(state: EconomyState): WorldEconomyRow {
     populationTotal: state.population,
     populationCap: state.populationCap,
     woodcutters: state.woodcutters,
+    farmers: state.farmers,
+    quarriers: state.quarriers,
     woodStock: state.wood,
-    woodLastCalculatedAt: new Date(state.woodLastCalculatedAt)
+    woodLastCalculatedAt: new Date(state.woodLastCalculatedAt),
+    wheatStock: state.wheat,
+    wheatLastCalculatedAt: new Date(state.wheatLastCalculatedAt),
+    stoneStock: state.stone,
+    stoneLastCalculatedAt: new Date(state.stoneLastCalculatedAt)
   };
 }
 
@@ -69,16 +94,24 @@ function toEconomySnapshot(state: EconomyState): WorldEconomySnapshot {
     population: state.population,
     populationCap: state.populationCap,
     woodcutters: state.woodcutters,
+    farmers: state.farmers,
+    quarriers: state.quarriers,
     lumberCampMaxWorkers: LUMBER_CAMP_MAX_WORKERS,
+    farmMaxWorkers: FARM_MAX_WORKERS,
+    quarryMaxWorkers: QUARRY_MAX_WORKERS,
     hasLumberCamp: state.hasLumberCamp,
+    hasFarm: state.hasFarm,
+    hasQuarry: state.hasQuarry,
     wood: state.wood,
     woodCap: WOOD_STOCK_CAP,
-    woodLastCalculatedAt: new Date(state.woodLastCalculatedAt).toISOString()
+    woodLastCalculatedAt: new Date(state.woodLastCalculatedAt).toISOString(),
+    wheat: state.wheat,
+    wheatCap: WHEAT_STOCK_CAP,
+    wheatLastCalculatedAt: new Date(state.wheatLastCalculatedAt).toISOString(),
+    stone: state.stone,
+    stoneCap: STONE_STOCK_CAP,
+    stoneLastCalculatedAt: new Date(state.stoneLastCalculatedAt).toISOString()
   };
-}
-
-function hasLumberCampOnWorld(world: PersistedWorld) {
-  return countBuildings(world.tiles, "lumber_camp") > 0;
 }
 
 function toSnapshot(world: PersistedWorld, economy: EconomyState): WorldSnapshot {
@@ -101,18 +134,26 @@ function toSnapshot(world: PersistedWorld, economy: EconomyState): WorldSnapshot
   };
 }
 
+function stocksChanged(before: EconomyState, after: EconomyState) {
+  return (
+    after.wood !== before.wood ||
+    after.woodLastCalculatedAt !== before.woodLastCalculatedAt ||
+    after.wheat !== before.wheat ||
+    after.wheatLastCalculatedAt !== before.wheatLastCalculatedAt ||
+    after.stone !== before.stone ||
+    after.stoneLastCalculatedAt !== before.stoneLastCalculatedAt
+  );
+}
+
 async function settleAndPersist(
   db: Database["db"],
   world: PersistedWorld,
   now = Date.now()
 ): Promise<{ world: PersistedWorld; economy: EconomyState }> {
-  const hasCamp = hasLumberCampOnWorld(world);
-  const before = rowToEconomyState(world.economy, hasCamp);
+  const flags = buildingFlags(world);
+  const before = rowToEconomyState(world.economy, flags);
   const settled = settleEconomy(before, now);
-  if (
-    settled.wood !== before.wood ||
-    settled.woodLastCalculatedAt !== before.woodLastCalculatedAt
-  ) {
+  if (stocksChanged(before, settled)) {
     const row = economyStateToRow(settled);
     await updateWorldEconomy(db, world.id, row);
     return {
@@ -231,7 +272,7 @@ export type AssignWorkersError =
   | "over_population"
   | "over_building_cap"
   | "unsupported_job"
-  | "no_lumber_camp";
+  | "no_building";
 
 export async function assignWorkersService(
   db: Database["db"],
@@ -242,7 +283,7 @@ export async function assignWorkersService(
   | { ok: true; world: WorldSnapshot }
   | { ok: false; error: AssignWorkersError }
 > {
-  if (input.job !== "woodcutter") {
+  if (!EXTRACTOR_JOBS.has(input.job)) {
     return { ok: false, error: "unsupported_job" };
   }
 
@@ -252,8 +293,8 @@ export async function assignWorkersService(
   }
 
   const now = Date.now();
-  const current = rowToEconomyState(world.economy, hasLumberCampOnWorld(world));
-  const result = assignWoodcutters(current, input.count, now);
+  const current = rowToEconomyState(world.economy, buildingFlags(world));
+  const result = assignExtractorWorkers(current, input.job, input.count, now);
   if (!result.ok) {
     return { ok: false, error: result.reason };
   }
@@ -275,7 +316,7 @@ export type BuildError =
   | "wrong_terrain"
   | "tile_occupied"
   | "has_village"
-  | "lumber_camp_limit";
+  | "building_limit";
 
 export async function buildService(
   db: Database["db"],
@@ -301,7 +342,7 @@ export async function buildService(
     biome: tile.biome,
     hasVillage: isStartVillage(tile.q, tile.r),
     existingBuildingId: tile.buildingId,
-    lumberCampCount: countBuildings(world.tiles, "lumber_camp")
+    buildingCount: countBuildings(world.tiles, input.buildingId)
   });
 
   if (!placement.ok) {

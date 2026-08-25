@@ -16,12 +16,26 @@ export const worlds = pgTable("worlds", {
     .references(() => players.id, { onDelete: "cascade" }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
-  /** Économie v0 — pop + bois */
+  /** Économie v0 — pop + extracteurs */
   populationTotal: integer("population_total").notNull().default(8),
   populationCap: integer("population_cap").notNull().default(12),
   woodcutters: integer("woodcutters").notNull().default(0),
+  farmers: integer("farmers").notNull().default(0),
+  quarriers: integer("quarriers").notNull().default(0),
   woodStock: doublePrecision("wood_stock").notNull().default(30),
   woodLastCalculatedAt: timestamp("wood_last_calculated_at", {
+    withTimezone: true
+  })
+    .defaultNow()
+    .notNull(),
+  wheatStock: doublePrecision("wheat_stock").notNull().default(0),
+  wheatLastCalculatedAt: timestamp("wheat_last_calculated_at", {
+    withTimezone: true
+  })
+    .defaultNow()
+    .notNull(),
+  stoneStock: doublePrecision("stone_stock").notNull().default(0),
+  stoneLastCalculatedAt: timestamp("stone_last_calculated_at", {
     withTimezone: true
   })
     .defaultNow()

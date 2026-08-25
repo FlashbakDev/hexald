@@ -4,6 +4,7 @@ import type {
   BuildResult,
   ExpandRegionRequest,
   ExpandRegionResult,
+  ExtractorJob,
   HexCoord,
   PrimaryBiomeId,
   WorldSnapshot,
@@ -92,11 +93,12 @@ export function useWorld() {
 
   async function assignWorkers(
     id: string,
+    job: ExtractorJob,
     count: number
   ): Promise<WorldSnapshot | null> {
     error.value = null;
     try {
-      const body: AssignWorkersRequest = { job: "woodcutter", count };
+      const body: AssignWorkersRequest = { job, count };
       const snapshot = await $fetch<WorldSnapshot>(`/v1/worlds/${id}/workers`, {
         baseURL: config.public.apiBase,
         method: "POST",
@@ -111,13 +113,14 @@ export function useWorld() {
     }
   }
 
-  async function buildLumberCamp(
+  async function buildBuilding(
     id: string,
+    buildingId: BuildRequest["buildingId"],
     origin: HexCoord
   ): Promise<BuildResult | null> {
     error.value = null;
     try {
-      const body: BuildRequest = { buildingId: "lumber_camp", origin };
+      const body: BuildRequest = { buildingId, origin };
       const result = await $fetch<BuildResult>(`/v1/worlds/${id}/buildings`, {
         baseURL: config.public.apiBase,
         method: "POST",
@@ -143,6 +146,6 @@ export function useWorld() {
     refreshWorld,
     expandRegion,
     assignWorkers,
-    buildLumberCamp
+    buildBuilding
   };
 }

@@ -132,13 +132,14 @@
                 <span class="badge badge-accent">PostgreSQL</span>
                 <span class="badge badge-accent">Docker</span>
                 <span class="badge badge-accent">Admin</span>
+                <span class="badge badge-neutral">ads.txt</span>
                 <span class="badge badge-neutral">Wiki contenu</span>
               </div>
             </article>
             <article class="card">
               <h3>Dernière décision importante</h3>
-              <p><span class="badge badge-accent">DEC-013</span> Population v0 : pop fixe 8, camp de bûcherons implicite, assign workers + prod bois lazy (cap 200).</p>
-              <p>Phase 3 : valider la boucle assigner → stock hors ligne, puis élargir (farm / mine / builds).</p>
+              <p><span class="badge badge-accent">DEC-014</span> Camp de bûcherons posé sur la carte (roue build comme biomes). Plus de camp implicite. Prod bois liée au camp posé.</p>
+              <p>Phase 3 : farm / mine / autres extracteurs sur le même modèle.</p>
             </article>
           </div>
 
@@ -146,11 +147,11 @@
             <article class="card">
               <h3>Prochaines étapes</h3>
               <ol class="next-list">
-                <li><span>01</span> Session anonyme + claim pseudo — fait</li>
-                <li><span>02</span> Landing <code>/</code> + écran <code>/play</code> — fait</li>
-                <li><span>03</span> Admin stats / présence (<code>/admin</code>) — fait</li>
-                <li><span>04</span> Pop + workers + bois (v0) — fait</li>
-                <li><span>05</span> Poser bâtiments / autres extracteurs</li>
+                <li><span>01</span> Pop + workers + bois lazy — fait</li>
+                <li><span>02</span> Poser <code>lumber_camp</code> (roue build) — fait</li>
+                <li><span>03</span> <code>ads.txt</code> AdSense — fait</li>
+                <li><span>04</span> Farm / carrière (même pattern) — fait</li>
+                <li><span>05</span> Sécuriser <code>/admin</code></li>
               </ol>
             </article>
             <article class="card notes-card">
@@ -378,6 +379,31 @@
               <div class="formula-box"><b>Décision</b>DEC-006<br>Pas de tick permanent<br>Calcul lazy à la requête</div>
             </div>
           </article>
+
+          <article class="card" style="margin-top:14px">
+            <h3>Bonus d’adjacence <span class="status status-planned">Planned</span> <span class="badge badge-neutral">Civ-like</span></h3>
+            <p>Reprise Civilization : un bâtiment reçoit des <strong>bonus de production selon les tuiles voisines</strong> (les 6 hex autour). Le placement compte autant que le biome de la case.</p>
+            <div class="grid grid-2" style="margin-top:12px">
+              <div>
+                <h4 style="margin:0 0 8px">Exemples cibles</h4>
+                <ul class="tech-list">
+                  <li><strong>Camp de bûcherons</strong> — +rate par voisin forêt (ou lisière)</li>
+                  <li><strong>Ferme</strong> — +rate par voisin plaine ; malus eau / montagne ?</li>
+                  <li><strong>Mine / carrière</strong> — +rate par voisin montagne</li>
+                  <li><strong>Transformateurs</strong> (scierie, forge) — bonus plus faibles ou liés aux routes / village (plus tard)</li>
+                </ul>
+              </div>
+              <div>
+                <h4 style="margin:0 0 8px">Règles de design</h4>
+                <ul class="tech-list">
+                  <li>Bonus <strong>additifs plafonnés</strong> (ex. +10&nbsp;% par voisin pertinent, cap +40&nbsp;%)</li>
+                  <li>Recalcul lazy avec le rate (DEC-006) — pas de tick voisinage</li>
+                  <li>Lisibilité UI : afficher « +2 forêt → +20&nbsp;% » sur le panneau bâtiment</li>
+                  <li>Hors scope slice bois actuel ; viser Phase 3b / 4 une fois plusieurs extracteurs posés</li>
+                </ul>
+              </div>
+            </div>
+          </article>
         </section>
 
         <!-- 6. Production chains -->
@@ -563,7 +589,7 @@
             </article>
             <article class="card">
               <h3>Client jouable</h3>
-              <p>Landing <code>/</code> (pseudo + CTA). Carte Three.js dans <code>/play</code> (session requise). Dev sandbox <code>/poc</code>. Admin ops <code>/admin</code> (stats, présence).</p>
+              <p>Landing <code>/</code> (pseudo + CTA). Carte Three.js dans <code>/play</code> : roue biomes + roue build (camp), pop / bois / workers. Dev <code>/poc</code>. Admin <code>/admin</code>. <code>ads.txt</code> AdSense en public.</p>
             </article>
           </div>
 
@@ -595,15 +621,15 @@
             <div class="tab-panels">
               <div class="panel-front card">
                 <h3>Nuxt 4 · Vue · TypeScript · Three.js</h3>
-                <p>Routes : <code>/</code> landing, <code>/play</code> jeu, <code>/admin</code> ops, <code>/poc</code> sandbox. Proxy <code>/backend</code> → API. Three.js uniquement pour la carte (<code>app/renderer</code>).</p>
+                <p>Routes : <code>/</code> landing, <code>/play</code> jeu, <code>/admin</code> ops, <code>/poc</code> sandbox. Proxy <code>/backend</code> → API. Static <code>public/ads.txt</code>. Three.js uniquement pour la carte (<code>app/renderer</code>).</p>
               </div>
               <div class="panel-back card">
                 <h3>Node.js · TypeScript · Fastify</h3>
-                <p>Serveur autoritaire. Session cookie <code>tw_sid</code>, claim pseudo, mondes, actions, content catalogue, admin overview. Présence « en ligne » en mémoire (TTL 5&nbsp;min).</p>
+                <p>Session cookie <code>tw_sid</code>, mondes, régions, <code>POST …/buildings</code>, <code>POST …/workers</code>, content, admin. Présence en mémoire (TTL 5&nbsp;min).</p>
               </div>
               <div class="panel-data card">
                 <h3>PostgreSQL · Drizzle ORM</h3>
-                <p>Schéma : <code>players</code> (pseudo unique), <code>worlds</code>, tuiles / régions. Contenu design (biomes, bâtiments, recettes) reste dans <code>packages/content</code> — pas en DB.</p>
+                <p>Schéma : <code>players</code>, <code>worlds</code> (éco pop/bois), tuiles (<code>building_id</code>) / régions. Contenu design dans <code>packages/content</code>.</p>
               </div>
               <div class="panel-arch">
                 <pre class="mono"><span class="tree-key">hexald/</span>
@@ -677,7 +703,7 @@
         <section id="decisions">
           <p class="section-kicker">Decision log</p>
           <h2>Technical Decisions</h2>
-          <p>Dupliquer le bloc en pointillés en bas de liste pour ajouter une décision. Incrémenter l’ID (DEC-014, etc.).</p>
+          <p>Dupliquer le bloc en pointillés en bas de liste pour ajouter une décision. Incrémenter l’ID (DEC-015, etc.).</p>
 
           <div class="decision-grid">
             <article class="decision">
@@ -871,7 +897,22 @@
                 <dt>Contexte</dt><dd>Phase 3 doit valider assignation → production hors ligne sans poser encore tout le système de bâtiments.</dd>
                 <dt>Décision</dt><dd>Pop fixe <strong>8</strong> (cap 12 affiché). Camp de bûcherons implicite (max 4). Rate 12 bois/worker/h, cap stock 200, départ 30. <code>POST /v1/worlds/:id/workers</code>. Settle lazy au load / assign (DEC-006).</dd>
                 <dt>Raison</dt><dd>Prouve la boucle navigateur (Travian-like + idle) avec un scope minimal. Pas de croissance / food / pathfinding au v0.</dd>
-                <dt>Conséquences</dt><dd>Colonnes économie sur <code>worlds</code>. UI <code>/play</code> : panneau workers ± et stocks. Prochaine étape : instances de bâtiments sur la carte + autres extracteurs.</dd>
+                <dt>Conséquences</dt><dd>Colonnes économie sur <code>worlds</code>. UI <code>/play</code> : panneau workers ± et stocks. Remplacé en partie par DEC-014 (camp posé sur carte).</dd>
+              </dl>
+            </article>
+
+            <article class="decision">
+              <header>
+                <span class="id">DEC-014</span>
+                <span class="status status-accepted">Accepted</span>
+                <span class="badge badge-neutral">2026-08-25</span>
+              </header>
+              <h3>Pose du camp de bûcherons (roue build)</h3>
+              <dl>
+                <dt>Contexte</dt><dd>Le camp implicite ne collait pas au fantasme « poser sur le diorama ». Il faut le même geste UX que le choix de biome.</dd>
+                <dt>Décision</dt><dd>Sélection tuile sans village / sans bâtiment → roue build (comme biomes). <code>lumber_camp</code> uniquement, terrain forêt (ou influence forêt), max 1 par monde. <code>POST /v1/worlds/:id/buildings</code>. Colonne <code>world_tiles.building_id</code>. Mesh low-poly + workers seulement si camp posé.</dd>
+                <dt>Raison</dt><dd>Lisibilité carte + même pattern d’interaction. Prod bois conditionnée à un bâtiment réel.</dd>
+                <dt>Conséquences</dt><dd>Plus de camp implicite. Suite : farm / mine / carrière sur le même modèle. <code>ads.txt</code> AdSense ajouté en <code>apps/web/public/ads.txt</code>.</dd>
               </dl>
             </article>
 
@@ -1099,6 +1140,7 @@
           <p class="section-kicker">Wiki · Bâtiments</p>
           <h2>Bâtiments</h2>
           <p>Définitions alignées sur <code>packages/content/src/buildings.ts</code>. <code>terrain: any</code> = toute tuile constructible (pas l’eau pure).</p>
+          <p><span class="badge badge-neutral">Planned</span> <strong>Bonus d’adjacence (Civ-like)</strong> — le rate d’un bâtiment dépend aussi des biomes des 6 voisins (voir <a href="#economy">Economy</a>). Pas encore dans le code.</p>
 
           <div class="filters" role="group" aria-label="Filtrer les bâtiments">
             <button type="button" class="filter-btn is-on" data-wiki-filter="all" data-wiki-target="buildings">Tous</button>
@@ -1432,7 +1474,7 @@
             </article>
             <article class="card">
               <h3>No Ads</h3>
-              <p>Formule Remove Ads si des publicités non intrusives sont ajoutées. Jamais d’avantage de jeu.</p>
+              <p>Formule Remove Ads si des publicités non intrusives sont ajoutées. Jamais d’avantage de jeu. <code>ads.txt</code> déjà en place pour AdSense (<code>pub-2502594141763499</code>).</p>
             </article>
           </div>
         </section>
@@ -1488,8 +1530,11 @@
               <ul>
                 <li>Landing + session + claim pseudo — fait</li>
                 <li>Admin ops (<code>/admin</code>, overview API) — fait</li>
-                <li>Pop + workers + bois lazy (camp implicite) — fait</li>
-                <li>Poser bâtiments / farm / mine / stone</li>
+                <li>Pop + workers + bois lazy — fait</li>
+                <li>Pose <code>lumber_camp</code> (roue build, 1 max) — fait</li>
+                <li><code>ads.txt</code> AdSense — fait</li>
+                <li>Farm / carrière (même pattern) — fait</li>
+                <li>Bonus d’adjacence Civ (voisins → rate)</li>
                 <li>Croissance pop + food (plus tard)</li>
               </ul>
             </article>
@@ -1552,13 +1597,15 @@
                 <li>Client → persistance monde — validé</li>
                 <li>Landing + pseudo + play — validé</li>
                 <li>Pop + bois v0 — validé</li>
-                <li>Bâtiments posés + autres ressources</li>
+                <li>Pose lumber_camp — validé</li>
+                <li>Farm / mine / autres extracteurs</li>
               </ul>
             </article>
             <article class="card priority-col">
               <h3><span class="priority priority-p1">P1</span> Important</h3>
               <ul>
                 <li>Chaînes industrielles</li>
+                <li>Bonus d’adjacence (Civ-like)</li>
                 <li>Sécuriser /admin</li>
                 <li>Routes</li>
                 <li>Villages additionnels</li>
@@ -1597,6 +1644,10 @@
                 <strong>Âges technologiques</strong>
                 <p>Débloquer de nouvelles chaînes sans casser le MVP.</p>
               </article>
+              <article class="task" draggable="true" data-id="task-adjacency-bonus">
+                <strong>Bonus d’adjacence Civ</strong>
+                <p>Rate bâtiment = f(workers) × (1 + bonus voisins). Cap, UI panneau.</p>
+              </article>
               <article class="task" draggable="true" data-id="task-visits">
                 <strong>Visites de mondes</strong>
                 <p>Parcourir le diorama d’un autre joueur, sans le modifier.</p>
@@ -1604,13 +1655,13 @@
             </div>
             <div class="kanban-col" data-column="todo">
               <h3>Todo</h3>
-              <article class="task" draggable="true" data-id="task-place-buildings">
-                <strong>Poser bâtiments sur la carte</strong>
-                <p>Remplacer le camp implicite par une instance lumber_camp (puis farm / mine).</p>
-              </article>
               <article class="task" draggable="true" data-id="task-economy-resources">
-                <strong>Autres ressources MVP</strong>
-                <p>Wheat, stone, iron ore — même modèle lazy que le bois.</p>
+                <strong>Autres extracteurs MVP</strong>
+                <p>Mine (fer) — même roue build + workers (après carrière).</p>
+              </article>
+              <article class="task" draggable="true" data-id="task-adjacency-after-extractors">
+                <strong>Adjacence après extracteurs</strong>
+                <p>Brancher les bonus voisins une fois farm/mine/camp en place.</p>
               </article>
               <article class="task" draggable="true" data-id="task-admin-auth">
                 <strong>Sécuriser /admin</strong>
@@ -1622,9 +1673,17 @@
             </div>
             <div class="kanban-col" data-column="done">
               <h3>Done</h3>
+              <article class="task" draggable="true" data-id="task-place-lumber">
+                <strong>Pose lumber_camp</strong>
+                <p>Roue build, mesh, <code>building_id</code>, <code>POST …/buildings</code>, prod liée au camp.</p>
+              </article>
+              <article class="task" draggable="true" data-id="task-ads-txt">
+                <strong>ads.txt AdSense</strong>
+                <p><code>apps/web/public/ads.txt</code> — pub-2502594141763499.</p>
+              </article>
               <article class="task" draggable="true" data-id="task-economy-pop">
                 <strong>Population + travailleurs + bois</strong>
-                <p>Pop 8, camp implicite max 4, rate 12/h, cap 200, <code>POST …/workers</code>.</p>
+                <p>Pop 8, max 4 workers, rate 12/h, cap 200, <code>POST …/workers</code>.</p>
               </article>
               <article class="task" draggable="true" data-id="task-admin-ops">
                 <strong>Admin ops</strong>
@@ -1723,6 +1782,11 @@
             <button type="button" class="filter-btn" data-filter="rejected">Rejected</button>
           </div>
           <div class="grid grid-3" id="ideas-grid">
+              <article class="card idea" data-status="confirmed">
+                <span class="status status-confirmed">Confirmed</span>
+                <h3>Bonus d’adjacence (Civ)</h3>
+                <p>Production du bâtiment bonusée par les tuiles voisines (forêt autour du camp, plaine autour de la ferme…). Cap de bonus, UI lisible. Voir Economy.</p>
+              </article>
             <article class="card idea" data-status="experiment">
               <span class="status status-experiment">Experiment</span>
               <h3>PvP instancié</h3>
@@ -1842,7 +1906,8 @@
             <div class="check-item is-done"><span class="check-box"></span>Génération d’une nouvelle région</div>
             <div class="check-item is-done"><span class="check-box"></span>Village</div>
             <div class="check-item is-done"><span class="check-box"></span>Population + affectation travailleurs (bois v0)</div>
-            <div class="check-item is-done"><span class="check-box"></span>Récolte bois (lazy offline)</div>
+            <div class="check-item is-done"><span class="check-box"></span>Récolte bois (lazy offline + camp posé)</div>
+            <div class="check-item is-done"><span class="check-box"></span>Pose extracteurs (camp / ferme / carrière)</div>
             <div class="check-item"><span class="check-box"></span>Autres ressources (blé, pierre, minerai)</div>
             <div class="check-item"><span class="check-box"></span>Mine + minerai</div>
             <div class="check-item"><span class="check-box"></span>Fonderie + lingot</div>
@@ -1868,7 +1933,7 @@
         </section>
 
         <footer class="page-foot">
-          Hexald — Project Hub. Site statique de documentation, pas le jeu. Ouvrir <code>docs/index.html</code> dans le navigateur. Dernière mise à jour du contenu : 25 août 2026 (DEC-013 pop + bois v0 · Phase 3).
+          Hexald — Project Hub. Site statique de documentation, pas le jeu. Ouvrir <code>docs/index.html</code> dans le navigateur. Dernière mise à jour du contenu : 25 août 2026 (bonus adjacence Civ · DEC-014 · Phase 3).
         </footer>
       </div>
     </div>

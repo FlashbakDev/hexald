@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type {
   BuildingId,
+  ExtractorJob,
   HexCoord,
   PrimaryBiomeId,
   WorldTileSnapshot
@@ -8,9 +9,12 @@ import type {
 import {
   buildings,
   primaryBiomes,
-  WOOD_RATE_PER_WORKER_PER_HOUR
+  STONE_RATE_PER_WORKER_PER_HOUR,
+  WHEAT_RATE_PER_WORKER_PER_HOUR,
+  WOOD_RATE_PER_WORKER_PER_HOUR,
+  type PlaceableExtractorId
 } from "@hexald/content";
-import { terrainAllowsBuilding } from "@hexald/game-core";
+import { listBuildOptionsForTile } from "@hexald/game-core";
 import type { SelectedTile } from "~/renderer/createHexScene";
 
 definePageMeta({
@@ -22,7 +26,7 @@ const {
   ensureWorld,
   expandRegion,
   assignWorkers,
-  buildLumberCamp,
+  buildBuilding,
   refreshWorld,
   world,
   error: worldError
@@ -82,52 +86,177 @@ onBeforeUnmount(() => {
 const economy = computed(() => world.value?.economy ?? null);
 const population = computed(() => economy.value?.population ?? 0);
 
-const lumberDef = computed(
-  () => buildings.find((entry) => entry.id === "lumber_camp")!
-);
+const buildingDefs: Record<
+  PlaceableExtractorId,
+  { label: string; icon: string; short: string }
+> = {
+  lumber_camp: { label: "Camp de bûcherons", icon: "i-lucide-trees", short: "Camp" },
+  farm: { label: "Ferme", icon: "i-lucide-wheat", short: "Ferme" },
+  quarry: { label: "Carrière", icon: "i-lucide-mountain", short: "Carrière" }
+};
+
+function projectedStock(
+  stock: number,
+  cap: number,
+  lastIso: string,
+  ratePerHour: number
+) {
+  const last = Date.parse(lastIso);
+  if (Number.isNaN(last)) return Math.floor(stock);
+  const hours = Math.max(0, (nowTick.value - last) / 3_600_000);
+  return Math.min(cap, stock + ratePerHour * hours);
+}
 
 const displayedWood = computed(() => {
   const eco = economy.value;
   if (!eco) return 0;
-  const last = Date.parse(eco.woodLastCalculatedAt);
-  if (Number.isNaN(last)) return Math.floor(eco.wood);
-  const hours = Math.max(0, (nowTick.value - last) / 3_600_000);
   const rate = eco.hasLumberCamp
     ? eco.woodcutters * WOOD_RATE_PER_WORKER_PER_HOUR
     : 0;
-  return Math.min(eco.woodCap, eco.wood + rate * hours);
+  return projectedStock(eco.wood, eco.woodCap, eco.woodLastCalculatedAt, rate);
+});
+
+const displayedWheat = computed(() => {
+  const eco = economy.value;
+  if (!eco) return 0;
+  const rate = eco.hasFarm ? eco.farmers * WHEAT_RATE_PER_WORKER_PER_HOUR : 0;
+  return projectedStock(eco.wheat, eco.wheatCap, eco.wheatLastCalculatedAt, rate);
+});
+
+const displayedStone = computed(() => {
+  const eco = economy.value;
+  if (!eco) return 0;
+  const rate = eco.hasQuarry
+    ? eco.quarriers * STONE_RATE_PER_WORKER_PER_HOUR
+    : 0;
+  return projectedStock(eco.stone, eco.stoneCap, eco.stoneLastCalculatedAt, rate);
 });
 
 const idlePop = computed(() => {
   const eco = economy.value;
   if (!eco) return 0;
-  return Math.max(0, eco.population - eco.woodcutters);
+  return Math.max(0, eco.population - eco.woodcutters - eco.farmers - eco.quarriers);
 });
+
+function rateLabel(count: number, rate: number, active: boolean) {
+  if (!active || count === 0) return "0/h";
+  return `${count * rate}/h`;
+}
 
 const woodRateLabel = computed(() => {
   const eco = economy.value;
-  if (!eco || !eco.hasLumberCamp || eco.woodcutters === 0) return "0/h";
-  return `${eco.woodcutters * WOOD_RATE_PER_WORKER_PER_HOUR}/h`;
+  if (!eco) return "0/h";
+  return rateLabel(eco.woodcutters, WOOD_RATE_PER_WORKER_PER_HOUR, eco.hasLumberCamp);
 });
 
-const canAddWoodcutter = computed(() => {
+const wheatRateLabel = computed(() => {
   const eco = economy.value;
-  if (!eco || !eco.hasLumberCamp || assigning.value) return false;
-  return eco.woodcutters < eco.lumberCampMaxWorkers && idlePop.value > 0;
+  if (!eco) return "0/h";
+  return rateLabel(eco.farmers, WHEAT_RATE_PER_WORKER_PER_HOUR, eco.hasFarm);
 });
 
-const canRemoveWoodcutter = computed(() => {
+const stoneRateLabel = computed(() => {
   const eco = economy.value;
-  if (!eco || !eco.hasLumberCamp || assigning.value) return false;
-  return eco.woodcutters > 0;
+  if (!eco) return "0/h";
+  return rateLabel(eco.quarriers, STONE_RATE_PER_WORKER_PER_HOUR, eco.hasQuarry);
 });
 
-const canBuildLumberCampHere = computed(() => {
+const buildOptions = computed(() => {
   const tile = selected.value;
   const eco = economy.value;
-  if (!tile?.biome || tile.hasVillage || tile.buildingId || !eco) return false;
-  if (eco.hasLumberCamp) return false;
-  return terrainAllowsBuilding(lumberDef.value.terrain, tile.biome);
+  if (!tile?.biome || !eco) return [] as PlaceableExtractorId[];
+  return listBuildOptionsForTile({
+    biome: tile.biome,
+    hasVillage: tile.hasVillage,
+    existingBuildingId: tile.buildingId ?? null,
+    counts: {
+      lumber_camp: eco.hasLumberCamp ? 1 : 0,
+      farm: eco.hasFarm ? 1 : 0,
+      quarry: eco.hasQuarry ? 1 : 0
+    }
+  });
+});
+
+const buildWheelSlots = computed(() => {
+  const options = buildOptions.value;
+  const n = options.length;
+  return options.map((id, index) => {
+    const angle =
+      n === 1 ? -Math.PI / 2 : -Math.PI / 2 + (index * 2 * Math.PI) / n;
+    const radius = 56;
+    const def = buildingDefs[id];
+    return {
+      id,
+      ...def,
+      style: {
+        transform: `translate(-50%, -50%) translate(${Math.cos(angle) * radius}px, ${Math.sin(angle) * radius}px)`
+      }
+    };
+  });
+});
+
+type WorkerPanel = {
+  job: ExtractorJob;
+  title: string;
+  hint: string;
+  count: number;
+  max: number;
+  rateLabel: string;
+  canAdd: boolean;
+  canRemove: boolean;
+};
+
+const selectedWorkerPanel = computed((): WorkerPanel | null => {
+  const tile = selected.value;
+  const eco = economy.value;
+  if (!tile?.buildingId || !eco) return null;
+
+  if (tile.buildingId === "lumber_camp" && eco.hasLumberCamp) {
+    return {
+      job: "woodcutter",
+      title: "Bûcherons",
+      hint: "Assigne des travailleurs pour produire du bois.",
+      count: eco.woodcutters,
+      max: eco.lumberCampMaxWorkers,
+      rateLabel: woodRateLabel.value,
+      canAdd:
+        !assigning.value &&
+        eco.woodcutters < eco.lumberCampMaxWorkers &&
+        idlePop.value > 0,
+      canRemove: !assigning.value && eco.woodcutters > 0
+    };
+  }
+  if (tile.buildingId === "farm" && eco.hasFarm) {
+    return {
+      job: "farmer",
+      title: "Fermiers",
+      hint: "Assigne des travailleurs pour produire du blé.",
+      count: eco.farmers,
+      max: eco.farmMaxWorkers,
+      rateLabel: wheatRateLabel.value,
+      canAdd:
+        !assigning.value &&
+        eco.farmers < eco.farmMaxWorkers &&
+        idlePop.value > 0,
+      canRemove: !assigning.value && eco.farmers > 0
+    };
+  }
+  if (tile.buildingId === "quarry" && eco.hasQuarry) {
+    return {
+      job: "quarrier",
+      title: "Carriers",
+      hint: "Assigne des travailleurs pour produire de la pierre.",
+      count: eco.quarriers,
+      max: eco.quarryMaxWorkers,
+      rateLabel: stoneRateLabel.value,
+      canAdd:
+        !assigning.value &&
+        eco.quarriers < eco.quarryMaxWorkers &&
+        idlePop.value > 0,
+      canRemove: !assigning.value && eco.quarriers > 0
+    };
+  }
+  return null;
 });
 
 const buildingLabel = (id: BuildingId | null | undefined) => {
@@ -139,7 +268,7 @@ const biomeSwatch: Record<PrimaryBiomeId, string> = {
   forest: "#62c46f",
   plains: "#8fce6e",
   mountain: "#d0d7e2",
-  water: "#4aa3d9"
+  water: "#62bfe8"
 };
 
 const biomeIcon: Record<PrimaryBiomeId, string> = {
@@ -161,7 +290,7 @@ const showBiomeWheel = computed(
 const showBuildWheel = computed(
   () =>
     selected.value != null &&
-    canBuildLumberCampHere.value &&
+    buildOptions.value.length > 0 &&
     !expanding.value &&
     !building.value
 );
@@ -179,10 +308,6 @@ const selectedBuildingTitle = computed(() => {
   if (tile.hasVillage) return "Village";
   return buildingLabel(tile.buildingId) ?? "Bâtiment";
 });
-
-const isLumberCampSelected = computed(
-  () => selected.value?.buildingId === "lumber_camp"
-);
 
 const anyWheelOpen = computed(() => showBiomeWheel.value || showBuildWheel.value);
 
@@ -227,10 +352,6 @@ const wheelSlots = computed(() => {
     };
   });
 });
-
-const buildSlotStyle = {
-  transform: "translate(-50%, -50%) translate(0px, -56px)"
-};
 
 const cancelButtonStyle = {
   transform: "translate(-50%, -50%)"
@@ -282,25 +403,26 @@ async function generate(biome: PrimaryBiomeId) {
   }
 }
 
-async function placeLumberCamp() {
+async function placeBuilding(buildingId: PlaceableExtractorId) {
   const tile = selected.value;
   const id = world.value?.id;
-  if (!tile?.biome || !id || building.value || !canBuildLumberCampHere.value) return;
+  if (!tile?.biome || !id || building.value) return;
+  if (!buildOptions.value.includes(buildingId)) return;
 
   building.value = true;
   expandError.value = null;
   const origin = { q: tile.q, r: tile.r };
 
   try {
-    const result = await buildLumberCamp(id, origin);
+    const result = await buildBuilding(id, buildingId, origin);
     if (!result) {
       expandError.value = worldError.value ?? "Impossible de construire.";
       return;
     }
-    preview.value?.applyBuilding(result.tile.q, result.tile.r, "lumber_camp");
+    preview.value?.applyBuilding(result.tile.q, result.tile.r, buildingId);
     selected.value = {
       ...tile,
-      buildingId: "lumber_camp",
+      buildingId,
       clientX: tile.clientX,
       clientY: tile.clientY
     };
@@ -309,13 +431,13 @@ async function placeLumberCamp() {
   }
 }
 
-async function setWoodcutters(count: number) {
+async function setWorkers(job: ExtractorJob, count: number) {
   const id = world.value?.id;
   if (!id || assigning.value) return;
   assigning.value = true;
   expandError.value = null;
   try {
-    const result = await assignWorkers(id, count);
+    const result = await assignWorkers(id, job, count);
     if (!result) {
       expandError.value = worldError.value ?? "Impossible d’assigner.";
     }
@@ -366,29 +488,81 @@ function formatStock(value: number) {
 
     <header
       v-if="world"
-      class="play-cloud-header pointer-events-none absolute inset-x-0 top-0 z-50 flex justify-center px-3 pt-3 sm:px-5 sm:pt-4"
+      class="play-cloud-header pointer-events-none absolute inset-x-0 top-0 z-50"
     >
-      <div class="play-cloud-header__cloud pointer-events-auto">
+      <div class="play-cloud-header__sky" aria-hidden="true">
+        <svg
+          class="play-cloud-header__svg"
+          viewBox="0 0 1200 160"
+          preserveAspectRatio="none"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <defs>
+            <linearGradient id="play-cloud-fill" x1="50%" y1="0%" x2="50%" y2="100%">
+              <stop offset="0%" stop-color="#ffffff" stop-opacity="0.97" />
+              <stop offset="55%" stop-color="#f4f8f5" stop-opacity="0.92" />
+              <stop offset="100%" stop-color="#e4eee8" stop-opacity="0.72" />
+            </linearGradient>
+            <filter id="play-cloud-soft" x="-5%" y="-30%" width="110%" height="170%">
+              <feGaussianBlur in="SourceGraphic" stdDeviation="6" />
+            </filter>
+          </defs>
+          <path
+            fill="url(#play-cloud-fill)"
+            filter="url(#play-cloud-soft)"
+            d="M0 0H1200V70
+              C1120 70 1060 92 980 88
+              C880 83 820 108 720 102
+              C620 96 560 118 460 110
+              C360 102 300 122 210 112
+              C130 104 70 92 0 84
+              Z"
+          />
+        </svg>
+        <div class="play-cloud-header__puff play-cloud-header__puff--1" />
+        <div class="play-cloud-header__puff play-cloud-header__puff--2" />
+        <div class="play-cloud-header__puff play-cloud-header__puff--3" />
+        <div class="play-cloud-header__puff play-cloud-header__puff--4" />
+      </div>
+
+      <div class="play-cloud-header__content pointer-events-auto">
         <p class="play-cloud-header__name truncate">
           {{ pseudo ?? "…" }}
         </p>
         <div class="play-cloud-header__stats">
-          <p class="play-cloud-header__stat">
-            <span class="play-cloud-header__stat-label">Pop</span>
+          <p class="play-cloud-header__stat" title="Population">
+            <UIcon name="i-lucide-users" class="play-cloud-header__stat-icon" aria-hidden="true" />
+            <span class="sr-only">Pop</span>
             {{ idlePop }}/{{ population }}
           </p>
-          <p v-if="economy" class="play-cloud-header__stat">
-            <span class="play-cloud-header__stat-label">Bois</span>
+          <p v-if="economy" class="play-cloud-header__stat" title="Bois">
+            <UIcon name="i-lucide-tree-pine" class="play-cloud-header__stat-icon" aria-hidden="true" />
+            <span class="sr-only">Bois</span>
             {{ formatStock(displayedWood) }}
             <span class="opacity-70">· {{ woodRateLabel }}</span>
           </p>
+          <p v-if="economy" class="play-cloud-header__stat" title="Blé">
+            <UIcon name="i-lucide-wheat" class="play-cloud-header__stat-icon" aria-hidden="true" />
+            <span class="sr-only">Blé</span>
+            {{ formatStock(displayedWheat) }}
+            <span class="opacity-70">· {{ wheatRateLabel }}</span>
+          </p>
+          <p v-if="economy" class="play-cloud-header__stat" title="Pierre">
+            <UIcon name="i-lucide-gem" class="play-cloud-header__stat-icon" aria-hidden="true" />
+            <span class="sr-only">Pierre</span>
+            {{ formatStock(displayedStone) }}
+            <span class="opacity-70">· {{ stoneRateLabel }}</span>
+          </p>
         </div>
       </div>
+
       <p
         v-if="expandError"
-        class="pointer-events-none absolute top-full mt-2 rounded-full bg-[#2a1212]/85 px-3 py-1 text-xs text-red-200 shadow-md backdrop-blur-sm"
+        class="pointer-events-none absolute inset-x-0 top-full z-10 flex justify-center px-3"
       >
-        {{ expandError }}
+        <span class="mt-1 rounded-full bg-[#2a1212]/85 px-3 py-1 text-xs text-red-200 shadow-md backdrop-blur-sm">
+          {{ expandError }}
+        </span>
       </p>
     </header>
 
@@ -462,15 +636,19 @@ function formatStock(value: number) {
             <UIcon name="i-lucide-x" class="size-3.5" />
           </button>
           <button
+            v-for="slot in buildWheelSlots"
+            :key="slot.id"
             type="button"
             class="absolute left-0 top-0 flex size-12 flex-col items-center justify-center rounded-full border-2 border-[#e8a54b]/80 bg-[#2d5248] text-[#f2f6ee] shadow-md transition hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e8a54b]"
-            :style="buildSlotStyle"
-            :title="lumberDef.label"
-            :aria-label="lumberDef.label"
-            @click="placeLumberCamp"
+            :style="slot.style"
+            :title="slot.label"
+            :aria-label="slot.label"
+            @click="placeBuilding(slot.id)"
           >
-            <UIcon name="i-lucide-trees" class="size-4" />
-            <span class="mt-0.5 text-[9px] font-semibold uppercase tracking-wide">Camp</span>
+            <UIcon :name="slot.icon" class="size-4" />
+            <span class="mt-0.5 text-[9px] font-semibold uppercase tracking-wide">
+              {{ slot.short }}
+            </span>
           </button>
         </div>
       </div>
@@ -480,25 +658,58 @@ function formatStock(value: number) {
       <aside
         v-if="showBuildingSheet && selected && economy"
         ref="buildingSheet"
-        class="building-sheet pointer-events-auto absolute inset-x-0 bottom-0 z-50 mx-auto w-full max-w-lg px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]"
+        class="building-sheet pointer-events-none absolute inset-x-0 bottom-0 z-50"
       >
-        <div class="building-sheet__panel text-[#f2f6ee]">
-          <div class="building-sheet__handle" aria-hidden="true" />
-          <div class="mb-3 flex items-start justify-between gap-3">
-            <div>
-              <p class="font-display text-lg font-semibold tracking-tight">
+        <div class="building-sheet__sky" aria-hidden="true">
+          <svg
+            class="building-sheet__svg"
+            viewBox="0 0 1200 180"
+            preserveAspectRatio="none"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <defs>
+              <linearGradient id="play-cloud-sheet-fill" x1="50%" y1="100%" x2="50%" y2="0%">
+                <stop offset="0%" stop-color="#ffffff" stop-opacity="0.97" />
+                <stop offset="55%" stop-color="#f4f8f5" stop-opacity="0.94" />
+                <stop offset="100%" stop-color="#e4eee8" stop-opacity="0.78" />
+              </linearGradient>
+              <filter id="play-cloud-sheet-soft" x="-4%" y="-35%" width="108%" height="180%">
+                <feGaussianBlur in="SourceGraphic" stdDeviation="7" />
+              </filter>
+            </defs>
+            <path
+              fill="url(#play-cloud-sheet-fill)"
+              filter="url(#play-cloud-sheet-soft)"
+              d="M0 180H1200V48
+                C1080 48 1000 28 880 34
+                C740 42 660 22 520 30
+                C380 38 300 20 180 32
+                C90 40 40 44 0 48
+                Z"
+            />
+          </svg>
+          <div class="building-sheet__puff building-sheet__puff--1" />
+          <div class="building-sheet__puff building-sheet__puff--2" />
+          <div class="building-sheet__puff building-sheet__puff--3" />
+          <div class="building-sheet__puff building-sheet__puff--4" />
+        </div>
+
+        <div class="building-sheet__content pointer-events-auto">
+          <div class="flex items-start justify-between gap-3">
+            <div class="min-w-0">
+              <p class="building-sheet__title truncate">
                 {{ selectedBuildingTitle }}
               </p>
-              <p v-if="isLumberCampSelected" class="mt-1 text-xs text-[#9aab9e]">
-                Assigne des travailleurs pour produire du bois.
+              <p v-if="selectedWorkerPanel" class="building-sheet__hint">
+                {{ selectedWorkerPanel.hint }}
               </p>
-              <p v-else-if="selected.hasVillage" class="mt-1 text-xs text-[#9aab9e]">
+              <p v-else-if="selected.hasVillage" class="building-sheet__hint">
                 Cœur de ton territoire.
               </p>
             </div>
             <button
               type="button"
-              class="rounded-md px-2 py-1 text-[#c8d5c0] transition hover:bg-white/5 hover:text-[#e8a54b]"
+              class="building-sheet__close"
               aria-label="Fermer"
               @click="clearSelection"
             >
@@ -506,34 +717,37 @@ function formatStock(value: number) {
             </button>
           </div>
 
-          <div v-if="isLumberCampSelected" class="flex items-center justify-between gap-3">
+          <div
+            v-if="selectedWorkerPanel"
+            class="mt-3 flex items-center justify-between gap-3"
+          >
             <div>
-              <p class="text-sm">
-                Bûcherons
+              <p class="building-sheet__metric">
+                {{ selectedWorkerPanel.title }}
                 <span class="font-mono">
-                  {{ economy.woodcutters }}/{{ economy.lumberCampMaxWorkers }}
+                  {{ selectedWorkerPanel.count }}/{{ selectedWorkerPanel.max }}
                 </span>
               </p>
-              <p class="mt-0.5 text-xs text-[#9aab9e]">
-                {{ woodRateLabel }} · {{ idlePop }} libre{{ idlePop === 1 ? "" : "s" }}
+              <p class="building-sheet__hint mt-0.5">
+                {{ selectedWorkerPanel.rateLabel }} · {{ idlePop }} libre{{ idlePop === 1 ? "" : "s" }}
               </p>
             </div>
             <div class="flex items-center gap-2">
               <button
                 type="button"
-                class="flex size-9 items-center justify-center rounded-md border border-white/15 text-[#c8d5c0] transition hover:border-[#e8a54b]/50 hover:text-[#e8a54b] disabled:opacity-35"
-                :disabled="!canRemoveWoodcutter"
-                aria-label="Retirer un bûcheron"
-                @click="setWoodcutters(economy.woodcutters - 1)"
+                class="building-sheet__stepper"
+                :disabled="!selectedWorkerPanel.canRemove"
+                :aria-label="`Retirer un ${selectedWorkerPanel.title.toLowerCase()}`"
+                @click="setWorkers(selectedWorkerPanel.job, selectedWorkerPanel.count - 1)"
               >
                 −
               </button>
               <button
                 type="button"
-                class="flex size-9 items-center justify-center rounded-md border border-white/15 text-[#c8d5c0] transition hover:border-[#e8a54b]/50 hover:text-[#e8a54b] disabled:opacity-35"
-                :disabled="!canAddWoodcutter"
-                aria-label="Ajouter un bûcheron"
-                @click="setWoodcutters(economy.woodcutters + 1)"
+                class="building-sheet__stepper"
+                :disabled="!selectedWorkerPanel.canAdd"
+                :aria-label="`Ajouter un ${selectedWorkerPanel.title.toLowerCase()}`"
+                @click="setWorkers(selectedWorkerPanel.job, selectedWorkerPanel.count + 1)"
               >
                 +
               </button>

@@ -1,20 +1,32 @@
 export { applyOfflineProduction, type ProducerState } from "./production.ts";
 export { validateAction, type ActionResult } from "./actions.ts";
 export {
+  assignExtractorWorkers,
   assignWoodcutters,
+  assignedWorkers,
   createInitialEconomy,
   idleWorkers,
   settleEconomy,
   woodProductionRatePerHour,
+  wheatProductionRatePerHour,
+  stoneProductionRatePerHour,
   LUMBER_CAMP_MAX_WORKERS,
+  FARM_MAX_WORKERS,
+  QUARRY_MAX_WORKERS,
   WOOD_STOCK_CAP,
+  WHEAT_STOCK_CAP,
+  STONE_STOCK_CAP,
   WOOD_RATE_PER_WORKER_PER_HOUR,
+  WHEAT_RATE_PER_WORKER_PER_HOUR,
+  STONE_RATE_PER_WORKER_PER_HOUR,
   type EconomyState,
   type AssignWorkersResult
 } from "./economy.ts";
 export {
   countBuildings,
   getBuildingDefinition,
+  isPlaceableExtractor,
+  listBuildOptionsForTile,
   terrainAllowsBuilding,
   validateBuildPlacement,
   type BuildPlacementInput,

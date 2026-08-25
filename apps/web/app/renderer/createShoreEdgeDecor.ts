@@ -68,14 +68,14 @@ export function createShoreEdgeDecorKit() {
     roughness: 0.45,
     metalness: 0.05,
     transparent: true,
-    opacity: 0.88
+    opacity: 0.55
   });
   const foamSoft = new MeshStandardMaterial({
     color: 0xd8eef4,
     roughness: 0.55,
     metalness: 0.04,
     transparent: true,
-    opacity: 0.55
+    opacity: 0.32
   });
   const driftwood = new MeshStandardMaterial({
     color: 0x8a6e4e,

@@ -31,7 +31,8 @@ export type {
   ExpandRegionResult,
   AssignWorkersRequest,
   BuildRequest,
-  BuildResult
+  BuildResult,
+  ExtractorJob
 } from "./world.ts";
 export type { SessionSnapshot } from "./session.ts";
 export {

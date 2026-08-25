@@ -28,16 +28,27 @@ function isHexCoord(value: unknown): value is { q: number; r: number } {
   );
 }
 
+const EXTRACTOR_JOBS = new Set(["woodcutter", "farmer", "quarrier"]);
+const PLACEABLE_BUILDINGS = new Set(["lumber_camp", "farm", "quarry"]);
+
 function isAssignWorkersBody(value: unknown): value is AssignWorkersRequest {
   if (!value || typeof value !== "object") return false;
   const body = value as { job?: unknown; count?: unknown };
-  return body.job === "woodcutter" && Number.isInteger(body.count);
+  return (
+    typeof body.job === "string" &&
+    EXTRACTOR_JOBS.has(body.job) &&
+    Number.isInteger(body.count)
+  );
 }
 
 function isBuildBody(value: unknown): value is BuildRequest {
   if (!value || typeof value !== "object") return false;
   const body = value as { buildingId?: unknown; origin?: unknown };
-  return body.buildingId === "lumber_camp" && isHexCoord(body.origin);
+  return (
+    typeof body.buildingId === "string" &&
+    PLACEABLE_BUILDINGS.has(body.buildingId) &&
+    isHexCoord(body.origin)
+  );
 }
 
 export async function worldRoutes(app: FastifyInstance) {

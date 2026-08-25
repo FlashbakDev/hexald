@@ -20,8 +20,14 @@ export type WorldEconomyRow = {
   populationTotal: number;
   populationCap: number;
   woodcutters: number;
+  farmers: number;
+  quarriers: number;
   woodStock: number;
   woodLastCalculatedAt: Date;
+  wheatStock: number;
+  wheatLastCalculatedAt: Date;
+  stoneStock: number;
+  stoneLastCalculatedAt: Date;
 };
 
 export type PersistedWorld = {
@@ -41,19 +47,19 @@ export type PersistedWorldSummary = {
   updatedAt: Date;
 };
 
-function economyFromRow(world: {
-  populationTotal: number;
-  populationCap: number;
-  woodcutters: number;
-  woodStock: number;
-  woodLastCalculatedAt: Date;
-}): WorldEconomyRow {
+function economyFromRow(world: WorldEconomyRow): WorldEconomyRow {
   return {
     populationTotal: world.populationTotal,
     populationCap: world.populationCap,
     woodcutters: world.woodcutters,
+    farmers: world.farmers,
+    quarriers: world.quarriers,
     woodStock: world.woodStock,
-    woodLastCalculatedAt: world.woodLastCalculatedAt
+    woodLastCalculatedAt: world.woodLastCalculatedAt,
+    wheatStock: world.wheatStock,
+    wheatLastCalculatedAt: world.wheatLastCalculatedAt,
+    stoneStock: world.stoneStock,
+    stoneLastCalculatedAt: world.stoneLastCalculatedAt
   };
 }
 
@@ -80,11 +86,29 @@ export async function insertWorldWithTerrain(
         ...(input.economy?.woodcutters !== undefined
           ? { woodcutters: input.economy.woodcutters }
           : {}),
+        ...(input.economy?.farmers !== undefined
+          ? { farmers: input.economy.farmers }
+          : {}),
+        ...(input.economy?.quarriers !== undefined
+          ? { quarriers: input.economy.quarriers }
+          : {}),
         ...(input.economy?.woodStock !== undefined
           ? { woodStock: input.economy.woodStock }
           : {}),
         ...(input.economy?.woodLastCalculatedAt !== undefined
           ? { woodLastCalculatedAt: input.economy.woodLastCalculatedAt }
+          : {}),
+        ...(input.economy?.wheatStock !== undefined
+          ? { wheatStock: input.economy.wheatStock }
+          : {}),
+        ...(input.economy?.wheatLastCalculatedAt !== undefined
+          ? { wheatLastCalculatedAt: input.economy.wheatLastCalculatedAt }
+          : {}),
+        ...(input.economy?.stoneStock !== undefined
+          ? { stoneStock: input.economy.stoneStock }
+          : {}),
+        ...(input.economy?.stoneLastCalculatedAt !== undefined
+          ? { stoneLastCalculatedAt: input.economy.stoneLastCalculatedAt }
           : {})
       })
       .returning();
@@ -214,8 +238,14 @@ export async function updateWorldEconomy(
       populationTotal: economy.populationTotal,
       populationCap: economy.populationCap,
       woodcutters: economy.woodcutters,
+      farmers: economy.farmers,
+      quarriers: economy.quarriers,
       woodStock: economy.woodStock,
       woodLastCalculatedAt: economy.woodLastCalculatedAt,
+      wheatStock: economy.wheatStock,
+      wheatLastCalculatedAt: economy.wheatLastCalculatedAt,
+      stoneStock: economy.stoneStock,
+      stoneLastCalculatedAt: economy.stoneLastCalculatedAt,
       updatedAt: new Date()
     })
     .where(eq(worlds.id, worldId));

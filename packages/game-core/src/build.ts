@@ -1,4 +1,9 @@
-import { buildings, type BuildingDefinition } from "@hexald/content";
+import {
+  PLACEABLE_EXTRACTORS,
+  buildings,
+  type BuildingDefinition,
+  type PlaceableExtractorId
+} from "@hexald/content";
 import type { BiomeId, BuildingId, HexCoord, PrimaryBiomeId } from "@hexald/shared";
 import { biomeInfluences, isBuildableBiome } from "./world.ts";
 
@@ -8,11 +13,12 @@ export type BuildPlacementInput = {
   biome: BiomeId;
   hasVillage: boolean;
   existingBuildingId: BuildingId | null;
-  lumberCampCount: number;
+  /** Compteur actuel de ce type de bâtiment dans le monde. */
+  buildingCount: number;
 };
 
 export type BuildPlacementResult =
-  | { ok: true; buildingId: BuildingId; origin: HexCoord }
+  | { ok: true; buildingId: PlaceableExtractorId; origin: HexCoord }
   | {
       ok: false;
       reason:
@@ -21,13 +27,19 @@ export type BuildPlacementResult =
         | "wrong_terrain"
         | "tile_occupied"
         | "has_village"
-        | "lumber_camp_limit";
+        | "building_limit";
     };
 
 export function getBuildingDefinition(
   id: BuildingId
 ): BuildingDefinition | undefined {
   return buildings.find((building) => building.id === id);
+}
+
+export function isPlaceableExtractor(
+  id: BuildingId
+): id is PlaceableExtractorId {
+  return (PLACEABLE_EXTRACTORS as readonly string[]).includes(id);
 }
 
 export function terrainAllowsBuilding(
@@ -40,15 +52,33 @@ export function terrainAllowsBuilding(
   return biomeInfluences(biome).includes(terrain as PrimaryBiomeId);
 }
 
+/** Extracteurs posables sur ce biome, pas encore présents (compteurs fournis). */
+export function listBuildOptionsForTile(input: {
+  biome: BiomeId;
+  hasVillage: boolean;
+  existingBuildingId: BuildingId | null;
+  counts: Partial<Record<PlaceableExtractorId, number>>;
+}): PlaceableExtractorId[] {
+  if (input.hasVillage || input.existingBuildingId) return [];
+  if (!isBuildableBiome(input.biome)) return [];
+
+  return PLACEABLE_EXTRACTORS.filter((id) => {
+    if ((input.counts[id] ?? 0) >= 1) return false;
+    const definition = getBuildingDefinition(id);
+    if (!definition) return false;
+    return terrainAllowsBuilding(definition.terrain, input.biome);
+  });
+}
+
 export function validateBuildPlacement(
   input: BuildPlacementInput
 ): BuildPlacementResult {
-  const definition = getBuildingDefinition(input.buildingId);
-  if (!definition || definition.status === "later") {
+  if (!isPlaceableExtractor(input.buildingId)) {
     return { ok: false, reason: "unknown_building" };
   }
 
-  if (input.buildingId !== "lumber_camp") {
+  const definition = getBuildingDefinition(input.buildingId);
+  if (!definition || definition.status === "later") {
     return { ok: false, reason: "unknown_building" };
   }
 
@@ -68,8 +98,8 @@ export function validateBuildPlacement(
     return { ok: false, reason: "wrong_terrain" };
   }
 
-  if (input.lumberCampCount >= 1) {
-    return { ok: false, reason: "lumber_camp_limit" };
+  if (input.buildingCount >= 1) {
+    return { ok: false, reason: "building_limit" };
   }
 
   return {

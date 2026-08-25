@@ -36,6 +36,13 @@
       "when": 1787672818327,
       "tag": "0004_reflective_sway",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1787674445814,
+      "tag": "0005_hard_masque",
+      "breakpoints": true
     }
   ]
 }

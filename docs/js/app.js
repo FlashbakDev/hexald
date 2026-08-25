@@ -3,12 +3,12 @@
 
   var STORAGE = {
     notes: "hexald.notes",
-    backlog: "hexald.backlog.v4"
+    backlog: "hexald.backlog.v6"
   };
 
   var LEGACY_STORAGE = {
     notes: "tinyworld.notes",
-    backlog: "hexald.backlog.v3"
+    backlog: "hexald.backlog.v5"
   };
 
   function storageGet(key) {

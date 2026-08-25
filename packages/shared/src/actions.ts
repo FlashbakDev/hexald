@@ -1,5 +1,6 @@
 import type { BuildingId, PrimaryBiomeId, WorkerJob } from "./ids.ts";
 import type { HexCoord } from "./hex.ts";
+import type { ExtractorJob } from "./world.ts";
 
 export type BuildAction = {
   type: "build";
@@ -9,7 +10,7 @@ export type BuildAction = {
 
 export type AssignWorkersAction = {
   type: "assign_workers";
-  job: Extract<WorkerJob, "woodcutter">;
+  job: ExtractorJob;
   /** Effectif cible (absolu) pour ce métier. */
   count: number;
 };
@@ -21,3 +22,5 @@ export type GenerateRegionAction = {
 };
 
 export type GameAction = BuildAction | AssignWorkersAction | GenerateRegionAction;
+
+export type { ExtractorJob, WorkerJob };

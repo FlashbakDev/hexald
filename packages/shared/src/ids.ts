@@ -37,6 +37,7 @@ export type WorkerJob =
   | "idle"
   | "woodcutter"
   | "miner"
+  | "quarrier"
   | "farmer"
   | "laborer"
   | "artisan"
