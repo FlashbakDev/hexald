@@ -17,31 +17,34 @@ export const worlds = pgTable("worlds", {
     .references(() => players.id, { onDelete: "cascade" }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
-  /** Économie v0 — pop + extracteurs */
+  /** Population (stocks → world_inventory). */
   populationTotal: integer("population_total").notNull().default(4),
   populationCap: integer("population_cap").notNull().default(4),
+  /** DEC-017 — surplus food cumulé vers +1 pop. */
+  foodSurplusAccumulated: integer("food_surplus_accumulated").notNull().default(0),
+  /** Agrégats dénormalisés (vérité = world_tiles.assigned_workers). */
   woodcutters: integer("woodcutters").notNull().default(0),
   farmers: integer("farmers").notNull().default(0),
-  quarriers: integer("quarriers").notNull().default(0),
-  woodStock: doublePrecision("wood_stock").notNull().default(30),
-  woodLastCalculatedAt: timestamp("wood_last_calculated_at", {
-    withTimezone: true
-  })
-    .defaultNow()
-    .notNull(),
-  wheatStock: doublePrecision("wheat_stock").notNull().default(0),
-  wheatLastCalculatedAt: timestamp("wheat_last_calculated_at", {
-    withTimezone: true
-  })
-    .defaultNow()
-    .notNull(),
-  stoneStock: doublePrecision("stone_stock").notNull().default(0),
-  stoneLastCalculatedAt: timestamp("stone_last_calculated_at", {
-    withTimezone: true
-  })
-    .defaultNow()
-    .notNull()
+  quarriers: integer("quarriers").notNull().default(0)
 });
+
+/** Inventaire générique — une ligne par (monde, ressource). */
+export const worldInventory = pgTable(
+  "world_inventory",
+  {
+    worldId: uuid("world_id")
+      .notNull()
+      .references(() => worlds.id, { onDelete: "cascade" }),
+    resourceId: text("resource_id").notNull(),
+    amount: doublePrecision("amount").notNull().default(0),
+    lastCalculatedAt: timestamp("last_calculated_at", {
+      withTimezone: true
+    })
+      .defaultNow()
+      .notNull()
+  },
+  (table) => [primaryKey({ columns: [table.worldId, table.resourceId] })]
+);
 
 export const worldTiles = pgTable(
   "world_tiles",

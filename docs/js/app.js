@@ -3,12 +3,12 @@
 
   var STORAGE = {
     notes: "hexald.notes",
-    backlog: "hexald.backlog.v6"
+    backlog: "hexald.backlog.v9"
   };
 
   var LEGACY_STORAGE = {
     notes: "tinyworld.notes",
-    backlog: "hexald.backlog.v5"
+    backlog: "hexald.backlog.v8"
   };
 
   function storageGet(key) {
@@ -134,6 +134,7 @@
     { id: "backlog", label: "Backlog" },
     { id: "ideas", label: "Ideas — Parking lot" },
     { id: "pvp", label: "PvP" },
+    { id: "pvm", label: "PvM — Villages hostiles" },
     { id: "risks", label: "Risks" },
     { id: "mvp", label: "MVP — Scope" }
   ];

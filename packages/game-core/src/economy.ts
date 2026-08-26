@@ -1,22 +1,51 @@
 import {
-  FARM_MAX_WORKERS,
+  FOOD_CONSUMPTION_PER_POP_PER_MINUTE,
+  FUSION_TILE_PRODUCTION_BONUS,
   LUMBER_CAMP_MAX_WORKERS,
+  POP_GROWTH_SURPLUS_FOOD_REQUIRED,
   POPULATION_CAP,
+  FARM_MAX_WORKERS,
   QUARRY_MAX_WORKERS,
+  STARTING_FOOD,
   STARTING_POPULATION,
   STARTING_STONE,
   STARTING_WHEAT,
   STARTING_WOOD,
+  STARTING_WORLDSHARD,
   STONE_RATE_PER_WORKER_PER_MINUTE,
   STONE_STOCK_CAP,
+  TOWN_HALL_FOOD_PRODUCTION_PER_MINUTE,
+  TOWN_HALL_WORLDSHARD_INTERVAL_MS,
   WHEAT_RATE_PER_WORKER_PER_MINUTE,
   WHEAT_STOCK_CAP,
+  WHEAT_TO_FOOD_EMERGENCY_RATIO,
   WOOD_RATE_PER_WORKER_PER_MINUTE,
   WOOD_STOCK_CAP,
+  WORLDSHARD_STOCK_CAP,
+  buildingRateFromCatalog,
+  getBuildingDefinition,
+  resourceOutputForBuilding,
+  stockCapFor,
   type PlaceableExtractorId
 } from "@hexald/content";
-import type { ExtractorJob } from "@hexald/shared";
+import type { BiomeId, BuildingId, ExtractorJob, ResourceId } from "@hexald/shared";
 import { applyOfflineProduction } from "./production.ts";
+import { isBuildingComplete } from "./construction.ts";
+import { isPlaceableExtractor } from "./build.ts";
+import { isFusionBiome } from "./world.ts";
+
+export type StockEntry = {
+  amount: number;
+  lastCalculatedAt: number;
+};
+
+/** Site extracteur pour rates avec bonus biome. */
+export type ExtractorSite = {
+  buildingId: PlaceableExtractorId;
+  biome: BiomeId;
+  workers: number;
+  complete: boolean;
+};
 
 export type EconomyState = {
   population: number;
@@ -24,12 +53,8 @@ export type EconomyState = {
   woodcutters: number;
   farmers: number;
   quarriers: number;
-  wood: number;
-  woodLastCalculatedAt: number;
-  wheat: number;
-  wheatLastCalculatedAt: number;
-  stone: number;
-  stoneLastCalculatedAt: number;
+  /** Inventaire générique (resource_id → stock). */
+  stocks: Partial<Record<ResourceId, StockEntry>>;
   /** Sites posés (y compris en chantier). */
   lumberCampSites: number;
   farmSites: number;
@@ -38,7 +63,145 @@ export type EconomyState = {
   hasLumberCamp: boolean;
   hasFarm: boolean;
   hasQuarry: boolean;
+  /** DEC-017 — surplus food cumulé vers le prochain habitant. */
+  foodSurplusAccumulated: number;
+  /** Sites extracteurs (biome + workers) pour bonus fusion. */
+  extractorSites: ExtractorSite[];
 };
+
+export function tileProductionMultiplier(biome: BiomeId): number {
+  return isFusionBiome(biome) ? 1 + FUSION_TILE_PRODUCTION_BONUS : 1;
+}
+
+export function extractorSitesFromTiles(
+  tiles: readonly {
+    buildingId?: BuildingId | string | null;
+    biome: BiomeId;
+    assignedWorkers?: number;
+    constructionCompletesAt?: number | string | Date | null;
+  }[],
+  now: number
+): ExtractorSite[] {
+  const sites: ExtractorSite[] = [];
+  for (const tile of tiles) {
+    const buildingId = tile.buildingId;
+    if (!buildingId || !isPlaceableExtractor(buildingId as BuildingId)) continue;
+    const complete = isBuildingComplete(tile.constructionCompletesAt, now);
+    sites.push({
+      buildingId: buildingId as PlaceableExtractorId,
+      biome: tile.biome,
+      workers: Math.max(0, Math.floor(tile.assignedWorkers ?? 0)),
+      complete
+    });
+  }
+  return sites;
+}
+
+function rateFromSites(
+  state: EconomyState,
+  buildingId: PlaceableExtractorId
+): number {
+  const base = buildingRateFromCatalog(buildingId);
+  if (base <= 0) return 0;
+  const sites = state.extractorSites.filter(
+    (site) => site.buildingId === buildingId && site.complete
+  );
+  if (sites.length === 0) {
+    const { workers, active } = workersAndActiveForBuilding(buildingId, state);
+    if (!active) return 0;
+    return Math.max(0, workers) * base;
+  }
+  let total = 0;
+  for (const site of sites) {
+    total += site.workers * base * tileProductionMultiplier(site.biome);
+  }
+  return total;
+}
+
+type ExtractorProducer = {
+  resourceId: ResourceId;
+  buildingId: PlaceableExtractorId;
+  ratePerMinute: (state: EconomyState) => number;
+  cap: number;
+};
+
+function workersAndActiveForBuilding(
+  buildingId: PlaceableExtractorId,
+  state: EconomyState
+): { workers: number; active: boolean } {
+  if (buildingId === "lumber_camp") {
+    return { workers: state.woodcutters, active: state.hasLumberCamp };
+  }
+  if (buildingId === "farm") {
+    return { workers: state.farmers, active: state.hasFarm };
+  }
+  return { workers: state.quarriers, active: state.hasQuarry };
+}
+
+function buildExtractorProducers(): ExtractorProducer[] {
+  const ids: PlaceableExtractorId[] = ["lumber_camp", "farm", "quarry"];
+  const producers: ExtractorProducer[] = [];
+  for (const buildingId of ids) {
+    const output = resourceOutputForBuilding(buildingId);
+    if (!output) continue;
+    producers.push({
+      buildingId,
+      resourceId: output,
+      cap: stockCapFor(output),
+      ratePerMinute: (state) => rateFromSites(state, buildingId)
+    });
+  }
+  return producers;
+}
+
+const EXTRACTOR_PRODUCERS: ExtractorProducer[] = buildExtractorProducers();
+
+export function emptyStock(now = Date.now()): StockEntry {
+  return { amount: 0, lastCalculatedAt: now };
+}
+
+export function getStock(state: EconomyState, resourceId: ResourceId): StockEntry {
+  return state.stocks[resourceId] ?? emptyStock();
+}
+
+export function getStockAmount(state: EconomyState, resourceId: ResourceId): number {
+  return getStock(state, resourceId).amount;
+}
+
+export function setStock(
+  state: EconomyState,
+  resourceId: ResourceId,
+  entry: StockEntry
+): EconomyState {
+  return {
+    ...state,
+    stocks: {
+      ...state.stocks,
+      [resourceId]: entry
+    }
+  };
+}
+
+/**
+ * Ramène chaque stock au plafond content (sans toucher lastCalculatedAt).
+ * Sert de soft-migration au settle : un inventaire legacy au-dessus du cap
+ * est tronqué, puis persisté via settleAndPersist.
+ */
+export function clampStocksToCaps(state: EconomyState): EconomyState {
+  let next = state;
+  for (const resourceId of Object.keys(state.stocks) as ResourceId[]) {
+    const entry = state.stocks[resourceId];
+    if (!entry) continue;
+    const cap = stockCapFor(resourceId);
+    const amount = Math.max(0, Math.min(cap, entry.amount));
+    if (amount === entry.amount) continue;
+    next = setStock(next, resourceId, {
+      amount,
+      lastCalculatedAt: entry.lastCalculatedAt
+    });
+  }
+  return next;
+}
 
 export function createInitialEconomy(now = Date.now()): EconomyState {
   return {
@@ -47,18 +210,21 @@ export function createInitialEconomy(now = Date.now()): EconomyState {
     woodcutters: 0,
     farmers: 0,
     quarriers: 0,
-    wood: STARTING_WOOD,
-    woodLastCalculatedAt: now,
-    wheat: STARTING_WHEAT,
-    wheatLastCalculatedAt: now,
-    stone: STARTING_STONE,
-    stoneLastCalculatedAt: now,
+    stocks: {
+      wood: { amount: STARTING_WOOD, lastCalculatedAt: now },
+      wheat: { amount: STARTING_WHEAT, lastCalculatedAt: now },
+      stone: { amount: STARTING_STONE, lastCalculatedAt: now },
+      food: { amount: STARTING_FOOD, lastCalculatedAt: now },
+      worldshard: { amount: STARTING_WORLDSHARD, lastCalculatedAt: now }
+    },
     lumberCampSites: 0,
     farmSites: 0,
     quarrySites: 0,
     hasLumberCamp: false,
     hasFarm: false,
-    hasQuarry: false
+    hasQuarry: false,
+    foodSurplusAccumulated: 0,
+    extractorSites: []
   };
 }
 
@@ -86,54 +252,275 @@ export function stoneProductionRatePerMinute(
   return Math.max(0, quarriers) * STONE_RATE_PER_WORKER_PER_MINUTE;
 }
 
-/** DEC-006 — recalcul lazy de tous les stocks extracteurs. */
-export function settleEconomy(state: EconomyState, now: number): EconomyState {
-  const wood = applyOfflineProduction(
-    {
-      stock: state.wood,
-      productionRatePerMinute: woodProductionRatePerMinute(
-        state.woodcutters,
-        state.hasLumberCamp
-      ),
-      lastCalculatedAt: state.woodLastCalculatedAt,
-      cap: WOOD_STOCK_CAP
-    },
-    now
-  );
-  const wheat = applyOfflineProduction(
-    {
-      stock: state.wheat,
-      productionRatePerMinute: wheatProductionRatePerMinute(
-        state.farmers,
-        state.hasFarm
-      ),
-      lastCalculatedAt: state.wheatLastCalculatedAt,
-      cap: WHEAT_STOCK_CAP
-    },
-    now
-  );
-  const stone = applyOfflineProduction(
-    {
-      stock: state.stone,
-      productionRatePerMinute: stoneProductionRatePerMinute(
-        state.quarriers,
-        state.hasQuarry
-      ),
-      lastCalculatedAt: state.stoneLastCalculatedAt,
-      cap: STONE_STOCK_CAP
-    },
-    now
-  );
+/** Rates effectifs (sites + bonus fusion si présents). */
+export function woodRateFromState(state: EconomyState): number {
+  return rateFromSites(state, "lumber_camp");
+}
+
+export function wheatRateFromState(state: EconomyState): number {
+  return rateFromSites(state, "farm");
+}
+
+export function stoneRateFromState(state: EconomyState): number {
+  return rateFromSites(state, "quarry");
+}
+
+export function wheatFoodEquivalentPerMinute(state: EconomyState): number {
+  const wheatRate = wheatRateFromState(state);
+  if (wheatRate <= 0 || WHEAT_TO_FOOD_EMERGENCY_RATIO <= 0) return 0;
+  return Math.floor(wheatRate / WHEAT_TO_FOOD_EMERGENCY_RATIO);
+}
+
+/** Prod food : hôtel de ville + équivalent blé brut (ferme, sans moulin). */
+export function foodProductionPerMinute(state: EconomyState): number {
+  return TOWN_HALL_FOOD_PRODUCTION_PER_MINUTE + wheatFoodEquivalentPerMinute(state);
+}
+
+export function foodConsumptionPerMinute(state: EconomyState): number {
+  return Math.max(0, state.population) * FOOD_CONSUMPTION_PER_POP_PER_MINUTE;
+}
+
+/** Prod totale − conso pop (peut être négatif). */
+export function foodNetRatePerMinute(state: EconomyState): number {
+  return foodProductionPerMinute(state) - foodConsumptionPerMinute(state);
+}
+
+export function popGrowthProgress(state: EconomyState): {
+  accumulated: number;
+  required: number;
+} {
+  return {
+    accumulated: Math.max(0, Math.floor(state.foodSurplusAccumulated)),
+    required: POP_GROWTH_SURPLUS_FOOD_REQUIRED
+  };
+}
+
+/** Applique une conso nette (rate ≥ 0 = unités consommées / min). */
+function applyOfflineConsumption(
+  stock: number,
+  consumptionRatePerMinute: number,
+  lastCalculatedAt: number,
+  now: number
+): { stock: number; lastCalculatedAt: number; shortfall: number } {
+  const elapsedMinutes = Math.max(0, (now - lastCalculatedAt) / 60_000);
+  const needed = elapsedMinutes * Math.max(0, consumptionRatePerMinute);
+  const available = Math.max(0, stock);
+  const consumed = Math.min(available, needed);
+  return {
+    stock: available - consumed,
+    lastCalculatedAt: now,
+    shortfall: needed - consumed
+  };
+}
+
+/**
+ * Convertit du blé en food d’urgence (ratio entier).
+ * Retourne l’état mis à jour (wheat ↓, food ↑ plafonné).
+ */
+function convertWheatEmergency(
+  state: EconomyState,
+  foodNeeded: number,
+  now: number
+): EconomyState {
+  if (foodNeeded <= 0) return state;
+  const wheat = getStock(state, "wheat");
+  const food = getStock(state, "food");
+  const foodCap = stockCapFor("food");
+  const room = Math.max(0, foodCap - food.amount);
+  const maxFromNeed = Math.ceil(foodNeeded);
+  const maxFood = Math.min(room, maxFromNeed);
+  if (maxFood <= 0) return state;
+
+  const wheatNeeded = maxFood * WHEAT_TO_FOOD_EMERGENCY_RATIO;
+  const wheatAvailable = Math.floor(wheat.amount);
+  const batches = Math.floor(wheatAvailable / WHEAT_TO_FOOD_EMERGENCY_RATIO);
+  const foodGained = Math.min(maxFood, batches);
+  if (foodGained <= 0) return state;
+
+  let next = setStock(state, "wheat", {
+    amount: wheat.amount - foodGained * WHEAT_TO_FOOD_EMERGENCY_RATIO,
+    lastCalculatedAt: now
+  });
+  next = setStock(next, "food", {
+    amount: food.amount + foodGained,
+    lastCalculatedAt: now
+  });
+  return next;
+}
+
+/**
+ * Hôtel de ville : +1 éclat de monde tous les `TOWN_HALL_WORLDSHARD_INTERVAL_MS`.
+ * Au cap : horloge gelée (pas d’accumulation hors plafond).
+ */
+export function settleWorldshard(state: EconomyState, now: number): EconomyState {
+  const cap = stockCapFor("worldshard");
+  const current = state.stocks.worldshard ?? {
+    amount: 0,
+    lastCalculatedAt: now
+  };
+  let amount = Math.max(0, current.amount);
+  let last = current.lastCalculatedAt;
+
+  if (amount >= cap) {
+    return setStock(state, "worldshard", {
+      amount: Math.min(cap, amount),
+      lastCalculatedAt: now
+    });
+  }
+
+  if (TOWN_HALL_WORLDSHARD_INTERVAL_MS <= 0) {
+    return setStock(state, "worldshard", { amount, lastCalculatedAt: now });
+  }
+
+  const elapsed = Math.max(0, now - last);
+  const gained = Math.floor(elapsed / TOWN_HALL_WORLDSHARD_INTERVAL_MS);
+  if (gained <= 0) {
+    return setStock(state, "worldshard", { amount, lastCalculatedAt: last });
+  }
+
+  const room = Math.max(0, cap - amount);
+  const applied = Math.min(room, gained);
+  amount += applied;
+  last += applied * TOWN_HALL_WORLDSHARD_INTERVAL_MS;
+  if (amount >= cap) {
+    last = now;
+  }
+
+  return setStock(state, "worldshard", {
+    amount,
+    lastCalculatedAt: last
+  });
+}
+
+/** Minutes restantes avant le prochain éclat (null si plein). */
+export function worldshardMinutesUntilNext(state: EconomyState, now = Date.now()): number | null {
+  const cap = stockCapFor("worldshard");
+  const current = state.stocks.worldshard;
+  if (!current || current.amount >= cap) return null;
+  if (TOWN_HALL_WORLDSHARD_INTERVAL_MS <= 0) return 0;
+  const elapsed = Math.max(0, now - current.lastCalculatedAt);
+  const remainingMs = TOWN_HALL_WORLDSHARD_INTERVAL_MS - (elapsed % TOWN_HALL_WORLDSHARD_INTERVAL_MS);
+  return remainingMs / 60_000;
+}
+
+function settleFoodAndGrowth(state: EconomyState, now: number): EconomyState {
+  const foodCap = stockCapFor("food");
+  const current = state.stocks.food ?? { amount: 0, lastCalculatedAt: now };
+  const elapsedMinutes = Math.max(0, (now - current.lastCalculatedAt) / 60_000);
+
+  let next = state;
+  let population = state.population;
+  let surplus = Math.max(0, Math.floor(state.foodSurplusAccumulated));
+
+  // Stock food : uniquement l’hôtel de ville (le blé reste du blé jusqu’à conversion).
+  const hallNet =
+    TOWN_HALL_FOOD_PRODUCTION_PER_MINUTE -
+    population * FOOD_CONSUMPTION_PER_POP_PER_MINUTE;
+  const wheatRate = wheatProductionRatePerMinute(next.farmers, next.hasFarm);
+  const wheatFoodRate = wheatFoodEquivalentPerMinute(next);
+
+  if (hallNet >= 0) {
+    const settled = applyOfflineProduction(
+      {
+        stock: current.amount,
+        productionRatePerMinute: hallNet,
+        lastCalculatedAt: current.lastCalculatedAt,
+        cap: foodCap
+      },
+      now
+    );
+    next = setStock(next, "food", {
+      amount: settled.stock,
+      lastCalculatedAt: settled.lastCalculatedAt
+    });
+  } else {
+    const result = applyOfflineConsumption(
+      current.amount,
+      -hallNet,
+      current.lastCalculatedAt,
+      now
+    );
+    next = setStock(next, "food", {
+      amount: result.stock,
+      lastCalculatedAt: result.lastCalculatedAt
+    });
+
+    if (result.shortfall > 0) {
+      next = convertWheatEmergency(next, result.shortfall, now);
+    }
+  }
+
+  // Croissance : surplus HDV + blé brut (5 blé ≈ 1 food).
+  // On accumule même au cap (barre visible) ; le +1 pop attend une place libre.
+  if (elapsedMinutes > 0) {
+    let growthFood = 0;
+    if (hallNet > 0) {
+      growthFood += Math.floor(hallNet * elapsedMinutes);
+    }
+
+    if (wheatFoodRate > 0) {
+      const wheat = getStock(next, "wheat");
+      const fromRate = Math.floor(
+        (wheatRate * elapsedMinutes) / WHEAT_TO_FOOD_EMERGENCY_RATIO
+      );
+      const fromStock = Math.floor(
+        Math.max(0, wheat.amount) / WHEAT_TO_FOOD_EMERGENCY_RATIO
+      );
+      const fromWheat = Math.min(fromRate, fromStock);
+      if (fromWheat > 0) {
+        growthFood += fromWheat;
+        next = setStock(next, "wheat", {
+          amount: wheat.amount - fromWheat * WHEAT_TO_FOOD_EMERGENCY_RATIO,
+          lastCalculatedAt: now
+        });
+      }
+    }
+
+    surplus += growthFood;
+    while (
+      surplus >= POP_GROWTH_SURPLUS_FOOD_REQUIRED &&
+      population < state.populationCap
+    ) {
+      surplus -= POP_GROWTH_SURPLUS_FOOD_REQUIRED;
+      population += 1;
+    }
+    // Au plafond logements : on garde la barre remplie, sans stocker l’infini.
+    if (population >= state.populationCap) {
+      surplus = Math.min(surplus, POP_GROWTH_SURPLUS_FOOD_REQUIRED);
+    }
+  }
 
   return {
-    ...state,
-    wood: wood.stock,
-    woodLastCalculatedAt: wood.lastCalculatedAt,
-    wheat: wheat.stock,
-    wheatLastCalculatedAt: wheat.lastCalculatedAt,
-    stone: stone.stock,
-    stoneLastCalculatedAt: stone.lastCalculatedAt
+    ...next,
+    population,
+    foodSurplusAccumulated: surplus
   };
+}
+
+/** DEC-006 — recalcul lazy extracteurs + food / croissance (DEC-016 / 017) + éclats. */
+export function settleEconomy(state: EconomyState, now: number): EconomyState {
+  // Soft-migration : stocks déjà au-dessus du cap (avant caps / grant hors plafond)
+  // sont ramenés au max au premier settle après déploiement.
+  let next = clampStocksToCaps(state);
+  for (const producer of EXTRACTOR_PRODUCERS) {
+    const current =
+      next.stocks[producer.resourceId] ?? { amount: 0, lastCalculatedAt: now };
+    const settled = applyOfflineProduction(
+      {
+        stock: current.amount,
+        productionRatePerMinute: producer.ratePerMinute(next),
+        lastCalculatedAt: current.lastCalculatedAt,
+        cap: producer.cap
+      },
+      now
+    );
+    next = setStock(next, producer.resourceId, {
+      amount: settled.stock,
+      lastCalculatedAt: settled.lastCalculatedAt
+    });
+  }
+  next = settleWorldshard(next, now);
+  return settleFoodAndGrowth(next, now);
 }
 
 export type AssignWorkersResult =
@@ -193,8 +580,17 @@ export function idleWorkers(state: EconomyState): number {
 export function extractorJobForBuilding(
   buildingId: PlaceableExtractorId
 ): ExtractorJob {
-  if (buildingId === "lumber_camp") return "woodcutter";
-  if (buildingId === "farm") return "farmer";
+  const definition = getBuildingDefinition(buildingId);
+  if (
+    definition?.workerJob === "woodcutter" ||
+    definition?.workerJob === "farmer" ||
+    definition?.workerJob === "quarrier"
+  ) {
+    return definition.workerJob;
+  }
+  const output = resourceOutputForBuilding(buildingId);
+  if (output === "wood") return "woodcutter";
+  if (output === "wheat") return "farmer";
   return "quarrier";
 }
 
@@ -243,32 +639,60 @@ export function assignWoodcutters(
   return assignExtractorWorkers(state, "woodcutter", count, now);
 }
 
-export type SpendWoodResult =
+export type SpendResourceResult =
   | { ok: true; state: EconomyState }
   | { ok: false; reason: "insufficient_resources" };
 
-/** Settle puis débit bois (expansion, constructions, …). */
+/** Settle puis débit d’une ressource (craft, expansion, constructions, …). */
+export function spendResource(
+  state: EconomyState,
+  resourceId: ResourceId,
+  amount: number,
+  now = Date.now()
+): SpendResourceResult {
+  const settled = settleEconomy(state, now);
+  if (amount < 0 || !Number.isFinite(amount)) {
+    return { ok: false, reason: "insufficient_resources" };
+  }
+  const current = getStockAmount(settled, resourceId);
+  if (current + 1e-9 < amount) {
+    return { ok: false, reason: "insufficient_resources" };
+  }
+  return {
+    ok: true,
+    state: setStock(settled, resourceId, {
+      amount: Math.max(0, current - amount),
+      lastCalculatedAt: now
+    })
+  };
+}
+
+/** @deprecated Prefer spendResource('wood', …) */
+export type SpendWoodResult = SpendResourceResult;
+
 export function spendWood(
   state: EconomyState,
   amount: number,
   now = Date.now()
 ): SpendWoodResult {
-  const settled = settleEconomy(state, now);
-  if (amount < 0 || !Number.isFinite(amount)) {
-    return { ok: false, reason: "insufficient_resources" };
-  }
-  if (settled.wood + 1e-9 < amount) {
-    return { ok: false, reason: "insufficient_resources" };
-  }
-  return {
-    ok: true,
-    state: {
-      ...settled,
-      wood: Math.max(0, settled.wood - amount)
-    }
-  };
+  return spendResource(state, "wood", amount, now);
 }
 
+/** Crédite une ressource (plafonnée) après settle. */
+export function grantResource(
+  state: EconomyState,
+  resourceId: ResourceId,
+  amount: number,
+  now = Date.now(),
+  cap = stockCapFor(resourceId)
+): EconomyState {
+  const settled = settleEconomy(state, now);
+  const current = getStock(settled, resourceId);
+  return setStock(settled, resourceId, {
+    amount: Math.min(cap, current.amount + amount),
+    lastCalculatedAt: now
+  });
+}
 
 export {
   LUMBER_CAMP_MAX_WORKERS,
@@ -279,5 +703,13 @@ export {
   STONE_STOCK_CAP,
   WOOD_RATE_PER_WORKER_PER_MINUTE,
   WHEAT_RATE_PER_WORKER_PER_MINUTE,
-  STONE_RATE_PER_WORKER_PER_MINUTE
+  STONE_RATE_PER_WORKER_PER_MINUTE,
+  FOOD_CONSUMPTION_PER_POP_PER_MINUTE,
+  TOWN_HALL_FOOD_PRODUCTION_PER_MINUTE,
+  POP_GROWTH_SURPLUS_FOOD_REQUIRED,
+  FUSION_TILE_PRODUCTION_BONUS,
+  WHEAT_TO_FOOD_EMERGENCY_RATIO,
+  WORLDSHARD_STOCK_CAP,
+  TOWN_HALL_WORLDSHARD_INTERVAL_MS,
+  stockCapFor
 };

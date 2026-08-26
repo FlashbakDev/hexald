@@ -20,8 +20,17 @@ docs/
 ├── css/style.css       Design system et composants
 ├── js/app.js           Navigation, recherche, kanban, notes
 ├── assets/             Logo, favicon, motif
+├── patchnotes/         Pointeur → source unique des actus joueurs
 └── README.md
 ```
+
+**Actualités / patch notes joueurs** (source unique) :
+
+```text
+apps/web/content/news/*.md
+```
+
+Un fichier Markdown = une entrée sur `/news`. Frontmatter YAML (`kind`, `title`, `date`, `dateLabel`, `summary`) + corps Markdown. Ne pas dupliquer ailleurs.
 
 Le reste du monorepo (`apps/`, `packages/`) est un niveau au-dessus.
 
@@ -44,7 +53,7 @@ Le JavaScript est facultatif. Notes rapides et backlog kanban utilisent `localSt
 
 1. Copier le bloc `.decision.decision-template` dans `#decisions`.
 2. Retirer la classe `decision-template`.
-3. Remplacer `DEC-00X` par le prochain ID (`DEC-015`, …).
+3. Remplacer `DEC-00X` par le prochain ID (`DEC-021`, …).
 4. Remplir date, titre, statut, contexte, décision, raison, conséquences.
 
 ## Ajouter une phase

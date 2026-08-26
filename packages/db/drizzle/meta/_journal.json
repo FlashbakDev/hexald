@@ -78,6 +78,41 @@
       "when": 1787685400000,
       "tag": "0010_population_cap_four",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1787685500000,
+      "tag": "0011_world_inventory",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1787685600000,
+      "tag": "0012_food_surplus_accumulated",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1787685700000,
+      "tag": "0013_population_cap_eight",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1787685800000,
+      "tag": "0014_recalc_village_population",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1787685900000,
+      "tag": "0015_town_hall_population_cap_four",
+      "breakpoints": true
     }
   ]
 }

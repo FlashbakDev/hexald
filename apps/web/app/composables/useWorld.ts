@@ -1,41 +1,53 @@
 import type {
-  AssignWorkersRequest,
+  ApplyActionOutcome,
+  BiomeId,
   BuildRequest,
   BuildResult,
-  ExpandRegionRequest,
+  DestroyBuildingRequest,
+  DestroyBuildingResult,
   ExpandRegionResult,
+  GameAction,
   HexCoord,
   PrimaryBiomeId,
   WorldSnapshot,
   WorldSummary
 } from "@hexald/shared";
 
+function fetchErrorCode(err: unknown): string | undefined {
+  if (!err || typeof err !== "object" || !("data" in err)) return undefined;
+  return (err as { data?: { error?: string } }).data?.error;
+}
+
 function expandErrorMessage(err: unknown): string {
-  const data =
-    err && typeof err === "object" && "data" in err
-      ? (err as { data?: { error?: string } }).data
-      : undefined;
-  if (data?.error === "insufficient_resources") {
-    return "Pas assez de bois pour étendre.";
+  const code = fetchErrorCode(err);
+  if (code === "insufficient_resources") {
+    return "Pas assez d’éclats de monde pour étendre.";
   }
-  if (data?.error === "cannot_place_region") {
+  if (code === "cannot_place_region") {
     return "Impossible de placer cette région.";
   }
   return err instanceof Error ? err.message : "expand_failed";
 }
 
 function buildErrorMessage(err: unknown): string {
-  const data =
-    err && typeof err === "object" && "data" in err
-      ? (err as { data?: { error?: string } }).data
-      : undefined;
-  if (data?.error === "insufficient_resources") {
+  const code = fetchErrorCode(err);
+  if (code === "insufficient_resources") {
     return "Pas assez de bois pour construire.";
   }
-  if (data?.error === "insufficient_population") {
+  if (code === "insufficient_population") {
     return "Pas assez de pop libre pour construire (1 requis).";
   }
   return err instanceof Error ? err.message : "build_failed";
+}
+
+function actionErrorMessage(action: GameAction, err: unknown): string {
+  const code = fetchErrorCode(err);
+  if (code === "world_busy") {
+    return "Monde occupé — réessaie dans un instant.";
+  }
+  if (action.type === "generate_region") return expandErrorMessage(err);
+  if (action.type === "build") return buildErrorMessage(err);
+  return err instanceof Error ? err.message : "action_failed";
 }
 
 export function useWorld() {
@@ -97,26 +109,47 @@ export function useWorld() {
     }
   }
 
+  async function applyAction(
+    id: string,
+    action: GameAction
+  ): Promise<ApplyActionOutcome | null> {
+    error.value = null;
+    try {
+      const outcome = await $fetch<ApplyActionOutcome>(
+        `/v1/worlds/${id}/actions`,
+        {
+          baseURL: config.public.apiBase,
+          method: "POST",
+          credentials: "include",
+          body: action
+        }
+      );
+      if (outcome.ok) {
+        if (outcome.type === "assign_workers") {
+          world.value = outcome.world;
+        } else {
+          world.value = outcome.result.world;
+        }
+      }
+      return outcome;
+    } catch (err) {
+      error.value = actionErrorMessage(action, err);
+      return null;
+    }
+  }
+
   async function expandRegion(
     id: string,
     center: HexCoord,
     biome: PrimaryBiomeId
   ): Promise<ExpandRegionResult | null> {
-    error.value = null;
-    try {
-      const body: ExpandRegionRequest = { center, biome };
-      const result = await $fetch<ExpandRegionResult>(`/v1/worlds/${id}/regions`, {
-        baseURL: config.public.apiBase,
-        method: "POST",
-        credentials: "include",
-        body
-      });
-      world.value = result.world;
-      return result;
-    } catch (err) {
-      error.value = expandErrorMessage(err);
-      return null;
-    }
+    const outcome = await applyAction(id, {
+      type: "generate_region",
+      center,
+      biome
+    });
+    if (!outcome?.ok || outcome.type !== "generate_region") return null;
+    return outcome.result;
   }
 
   async function assignWorkers(
@@ -124,21 +157,13 @@ export function useWorld() {
     origin: HexCoord,
     count: number
   ): Promise<WorldSnapshot | null> {
-    error.value = null;
-    try {
-      const body: AssignWorkersRequest = { origin, count };
-      const snapshot = await $fetch<WorldSnapshot>(`/v1/worlds/${id}/workers`, {
-        baseURL: config.public.apiBase,
-        method: "POST",
-        credentials: "include",
-        body
-      });
-      world.value = snapshot;
-      return snapshot;
-    } catch (err) {
-      error.value = err instanceof Error ? err.message : "assign_failed";
-      return null;
-    }
+    const outcome = await applyAction(id, {
+      type: "assign_workers",
+      origin,
+      count
+    });
+    if (!outcome?.ok || outcome.type !== "assign_workers") return null;
+    return outcome.world;
   }
 
   async function buildBuilding(
@@ -146,19 +171,35 @@ export function useWorld() {
     buildingId: BuildRequest["buildingId"],
     origin: HexCoord
   ): Promise<BuildResult | null> {
+    const outcome = await applyAction(id, {
+      type: "build",
+      buildingId,
+      origin
+    });
+    if (!outcome?.ok || outcome.type !== "build") return null;
+    return outcome.result;
+  }
+
+  async function destroyBuilding(
+    id: string,
+    origin: HexCoord
+  ): Promise<DestroyBuildingResult | null> {
     error.value = null;
     try {
-      const body: BuildRequest = { buildingId, origin };
-      const result = await $fetch<BuildResult>(`/v1/worlds/${id}/buildings`, {
-        baseURL: config.public.apiBase,
-        method: "POST",
-        credentials: "include",
-        body
-      });
+      const body: DestroyBuildingRequest = { origin };
+      const result = await $fetch<DestroyBuildingResult>(
+        `/v1/worlds/${id}/buildings/destroy`,
+        {
+          baseURL: config.public.apiBase,
+          method: "POST",
+          credentials: "include",
+          body
+        }
+      );
       world.value = result.world;
       return result;
     } catch (err) {
-      error.value = buildErrorMessage(err);
+      error.value = err instanceof Error ? err.message : "destroy_failed";
       return null;
     }
   }
@@ -199,6 +240,30 @@ export function useWorld() {
     }
   }
 
+  async function setTileBiomeDev(
+    id: string,
+    origin: HexCoord,
+    biome: BiomeId
+  ): Promise<WorldSnapshot | null> {
+    error.value = null;
+    try {
+      const snapshot = await $fetch<WorldSnapshot>(
+        `/v1/worlds/${id}/dev/set-tile-biome`,
+        {
+          baseURL: config.public.apiBase,
+          method: "POST",
+          credentials: "include",
+          body: { q: origin.q, r: origin.r, biome }
+        }
+      );
+      world.value = snapshot;
+      return snapshot;
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : "set_biome_failed";
+      return null;
+    }
+  }
+
   return {
     worldId,
     world,
@@ -208,10 +273,13 @@ export function useWorld() {
     getWorld,
     ensureWorld,
     refreshWorld,
+    applyAction,
     expandRegion,
     assignWorkers,
     buildBuilding,
+    destroyBuilding,
     resetWorld,
-    grantDevResources
+    grantDevResources,
+    setTileBiomeDev
   };
 }

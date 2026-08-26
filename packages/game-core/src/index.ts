@@ -9,6 +9,7 @@ export {
   workerTotalsFromTiles,
   WORKERS_PER_EXTRACTOR_L1,
   seedDefaultWorkersForCompletedTiles,
+  releaseHousingConstructionWorkers,
   type AssignTileWorkersResult,
   type TileWorkerState
 } from "./tileWorkers.ts";
@@ -21,10 +22,29 @@ export {
   idleWorkers,
   maxAssignableWorkersForJob,
   settleEconomy,
+  settleWorldshard,
+  worldshardMinutesUntilNext,
   spendWood,
+  spendResource,
+  grantResource,
+  getStock,
+  getStockAmount,
+  setStock,
+  emptyStock,
+  clampStocksToCaps,
   woodProductionRatePerMinute,
   wheatProductionRatePerMinute,
   stoneProductionRatePerMinute,
+  woodRateFromState,
+  wheatRateFromState,
+  stoneRateFromState,
+  foodProductionPerMinute,
+  wheatFoodEquivalentPerMinute,
+  foodConsumptionPerMinute,
+  foodNetRatePerMinute,
+  popGrowthProgress,
+  tileProductionMultiplier,
+  extractorSitesFromTiles,
   LUMBER_CAMP_MAX_WORKERS,
   FARM_MAX_WORKERS,
   QUARRY_MAX_WORKERS,
@@ -34,14 +54,26 @@ export {
   WOOD_RATE_PER_WORKER_PER_MINUTE,
   WHEAT_RATE_PER_WORKER_PER_MINUTE,
   STONE_RATE_PER_WORKER_PER_MINUTE,
+  FOOD_CONSUMPTION_PER_POP_PER_MINUTE,
+  TOWN_HALL_FOOD_PRODUCTION_PER_MINUTE,
+  POP_GROWTH_SURPLUS_FOOD_REQUIRED,
+  FUSION_TILE_PRODUCTION_BONUS,
+  WORLDSHARD_STOCK_CAP,
+  TOWN_HALL_WORLDSHARD_INTERVAL_MS,
+  stockCapFor,
   type EconomyState,
+  type ExtractorSite,
+  type StockEntry,
   type AssignWorkersResult,
-  type SpendWoodResult
+  type SpendWoodResult,
+  type SpendResourceResult
 } from "./economy.ts";
 export {
   buildingWoodCost,
+  woodRefundOnDestroy,
   countBuildings,
   getBuildingDefinition,
+  isPlaceableBuilding,
   isPlaceableExtractor,
   listBuildOptionsForTile,
   terrainAllowsBuilding,
@@ -59,6 +91,11 @@ export {
   type ConstructionTimeInput
 } from "./construction.ts";
 export {
+  computePopulationCap,
+  HOUSE_POPULATION_CAP_BONUS,
+  TOWN_HALL_POPULATION_CAP
+} from "./housing.ts";
+export {
   REGION_NEIGHBOR_OFFSETS,
   REGION_RADIUS,
   REGION_STEP,
@@ -71,7 +108,9 @@ export {
   fusionBiome,
   generateRegionTiles,
   isBuildableBiome,
+  isBiomeId,
   isCoastBiome,
+  isFusionBiome,
   isPrimaryBiome,
   isRegionLatticeCenter,
   isWaterBiome,

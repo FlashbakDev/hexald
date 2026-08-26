@@ -98,20 +98,52 @@ Pour rester en localhost uniquement : `pnpm --filter @hexald/api dev -- --host 1
 | `GET` | `/v1/worlds` | Liste les mondes du joueur courant |
 | `POST` | `/v1/worlds` | Crée un monde de départ (owner = session) |
 | `GET` | `/v1/worlds/:id` | Charge un monde (owner uniquement) |
-| `POST` | `/v1/actions` | Action joueur → `game-core` (session requise) |
+| `POST` | `/v1/worlds/:id/actions` | Action unifiée (`build` / `assign_workers` / `generate_region`) |
+| `POST` | `/v1/worlds/:id/buildings/destroy` | Démolit un bâtiment (hors village) |
 | `GET` | `/v1/admin/overview` | Stats admin (sans auth pour l’instant) |
-| `POST` | `/v1/worlds/:id/workers` | Assigne des travailleurs extracteurs |
-| `POST` | `/v1/worlds/:id/buildings` | Pose un extracteur sur une tuile |
 
 La session anonyme est un cookie httpOnly signé. Les mondes appartiennent au `playerId` de la session.
 
+Mutations monde : `SELECT … FOR UPDATE` (`withWorldLock`) sérialise les écritures concurrentes (multi-onglets / bots). Timeout 3 s → `429 world_busy`.
+
+Build / extracteurs : catalogue `packages/content` (`buildings.placeable`, coûts, durées, rates). Chaînes (`chains`) exposées + helpers craft (`listProcessorRecipes`) — processors pas encore posables.
+
+Renderer : streaming GPU des tuiles biome (`syncBiomeTiles`) — état logique complet en mémoire, meshes chargés/déchargés selon le viewport (hystérésis). Les tuiles vides streamaient déjà.
+
 UI admin (dev) : [`/admin`](http://127.0.0.1:9089/admin).
 
-Économie v0 : pop fixe 8, extracteurs **posés** sur la carte (max 1 chacun), prod lazy offline.
+Économie live : pop + food/croissance (DEC-016–017), extracteurs posés (bois / blé / pierre), inventaire générique, bonus fusion +20&nbsp;% (DEC-019).
 
-Expansion de région (DEC-015) : coût bois `30 × hop` (distance au village), remise −20 % / bâtiment à d=1, −5 % à d=2 (cap 50 %). `409` si stock insuffisant.
+Expansion de région (DEC-020) : coût en **éclats de monde** (`worldshard`) = `hop` (1 voisin, 2 au rang suivant…). Prod hôtel de ville : 1 / 15&nbsp;min, cap 5, départ 1. `409 insufficient_resources` si stock insuffisant. (DEC-015 bois supersédé.)
 
 `ads.txt` : [`apps/web/public/ads.txt`](apps/web/public/ads.txt).
+
+## Advertising
+
+Side Rail Ads are managed automatically by Google AdSense on wide desktops. The game shell is centered with a max width (`1400px`) so margins stay available; the app never reserves left/right ad DOM slots in production, and never depends on an ad being shown.
+
+| Mode | Behaviour |
+| --- | --- |
+| Development | Fake Side Rails (≥1700px) + fake mobile Anchor (≤768px). **No** AdSense script. |
+| Production (free) | AdSense script loads when `NUXT_PUBLIC_ADSENSE_CLIENT_ID` is set. Side Rails (desktop) and Anchor ads (mobile) are placed by Google if enabled in the AdSense console. Bottom CTAs keep a modest inset on mobile. |
+| Production (No Ads) | No AdSense script, no fake ads ; plein écran (`.game-shell--full`), aucun inset bas. |
+
+Config (see [`apps/web/.env.example`](apps/web/.env.example)):
+
+```text
+NUXT_PUBLIC_ADSENSE_CLIENT_ID=ca-pub-XXXXXXXXXXXXXXXX
+```
+
+`hasNoAds` is centralized in `apps/web/app/composables/useAds.ts`. In dev it can be toggled from the play HUD (**Ads → Free / No Ads**) or the console:
+
+```js
+__hexaldAds.setDevNoAds(true)   // No Ads
+__hexaldAds.setDevNoAds(false)  // Free user (fake rails)
+```
+
+Later, wire `applyEntitlements({ noAds })` from `GET /me` (or equivalent). CMP consent is stubbed as `consentAllowsAds` until the CMP signal is exposed in app code.
+
+On laptop / tablet the shell is full width — no artificial side gaps. On mobile, free users get a small bottom inset for Anchor ads; No Ads clears it.
 
 ## Web
 
@@ -128,3 +160,11 @@ pnpm dev:web
 | `/admin` | Stats joueurs / mondes / présence (sans auth) |
 | `/poc` | Grille hexagonale plein écran (dev) |
 | `/backend/**` | Proxy vers l’API Fastify `:9088` |
+
+### PWA
+
+Installable via `@vite-pwa/nuxt` (manifest + service worker). **Pas de jeu hors ligne** : l’API (`/backend/**`) est `NetworkOnly`, et un overlay plein écran s’affiche dès que `navigator.onLine` est faux (`OfflineBlocker`).
+
+Le shell est précaché uniquement pour pouvoir afficher ce message à l’ouverture hors ligne. Le SW n’est pas actif en `nuxt dev` (`pwa.devOptions.enabled: false`) — tester via `pnpm --filter @hexald/web build` + `preview` (HTTPS ou localhost).
+
+Icônes : `apps/web/public/pwa/pwa-192x192.png`, `pwa-512x512.png`.

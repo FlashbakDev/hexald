@@ -8,6 +8,7 @@ import {
 import type {
   HexCoord,
   BuildingId,
+  BiomeId,
   PrimaryBiomeId,
   WorldRegionSnapshot,
   WorldTileSnapshot
@@ -73,6 +74,9 @@ if (import.meta.hot) {
   import.meta.hot.accept("../renderer/createLumberCampMesh", () => {
     mountScene();
   });
+  import.meta.hot.accept("../renderer/createHouseMesh", () => {
+    mountScene();
+  });
   import.meta.hot.accept("../renderer/createForestDecor", () => {
     mountScene();
   });
@@ -97,7 +101,12 @@ defineExpose({
   ) => api?.applyRegion(center, biome, tiles) ?? false,
   applyBuilding: (q: number, r: number, buildingId: BuildingId) =>
     api?.applyBuilding(q, r, buildingId) ?? false,
-  projectTile: (q: number, r: number) => api?.projectTile(q, r) ?? null
+  removeBuilding: (q: number, r: number) => api?.removeBuilding(q, r) ?? false,
+  applyTileBiome: (q: number, r: number, biome: BiomeId) =>
+    api?.applyTileBiome(q, r, biome) ?? false,
+  projectTile: (q: number, r: number) => api?.projectTile(q, r) ?? null,
+  setTutorialHighlights: (coords: readonly HexCoord[]) =>
+    api?.setTutorialHighlights(coords)
 });
 </script>
 

@@ -1,4 +1,4 @@
-import type { BiomeId, BuildingId, PrimaryBiomeId } from "./ids.ts";
+import type { BiomeId, BuildingId, PrimaryBiomeId, ResourceId } from "./ids.ts";
 import type { HexCoord } from "./hex.ts";
 
 export type WorldTileSnapshot = {
@@ -23,7 +23,15 @@ export type WorldRegionSnapshot = {
 
 export type ExtractorJob = "woodcutter" | "farmer" | "quarrier";
 
-/** Économie monde — extracteurs bois / blé / pierre. */
+/** Ligne d’inventaire générique (API / client). */
+export type InventoryStockSnapshot = {
+  resourceId: ResourceId;
+  amount: number;
+  cap: number;
+  lastCalculatedAt: string;
+};
+
+/** Économie monde — pop + inventaire générique (+ champs extracteurs). */
 export type WorldEconomySnapshot = {
   population: number;
   populationCap: number;
@@ -40,6 +48,10 @@ export type WorldEconomySnapshot = {
   hasFarm: boolean;
   hasQuarry: boolean;
 
+  /** Inventaire générique — source de vérité pour craft / nouvelles ressources. */
+  stocks: InventoryStockSnapshot[];
+
+  /** Raccourcis extracteurs (dérivés de `stocks`) — UI legacy. */
   wood: number;
   woodCap: number;
   woodLastCalculatedAt: string;
@@ -51,6 +63,18 @@ export type WorldEconomySnapshot = {
   stone: number;
   stoneCap: number;
   stoneLastCalculatedAt: string;
+
+  /** DEC-016 — food hôtel de ville. */
+  food: number;
+  foodCap: number;
+  foodLastCalculatedAt: string;
+  foodProductionPerMinute: number;
+  foodConsumptionPerMinute: number;
+  foodNetPerMinute: number;
+
+  /** DEC-017 — barre croissance. */
+  foodSurplusAccumulated: number;
+  popGrowthSurplusRequired: number;
 };
 
 export type WorldSnapshot = {
@@ -75,14 +99,12 @@ export type ExpandRegionRequest = {
   biome: PrimaryBiomeId;
 };
 
-/** Détail du coût d’expansion (DEC-015). */
+/** Détail du coût d’expansion (éclats de monde). */
 export type RegionExpansionCostSnapshot = {
+  /** Distance en hops de régions depuis le village (1 = voisin). */
   hop: number;
-  baseWood: number;
-  buildingsAtDistance1: number;
-  buildingsAtDistance2: number;
-  discount: number;
-  wood: number;
+  /** Éclats à payer (= hop au MVP). */
+  worldshards: number;
 };
 
 export type ExpandRegionResult = {
@@ -99,12 +121,29 @@ export type AssignWorkersRequest = {
   count: number;
 };
 
+/** Bâtiments posables — aligné sur le catalogue content. */
+export type PlaceableBuildingId = "lumber_camp" | "farm" | "quarry" | "house";
+
 export type BuildRequest = {
-  buildingId: "lumber_camp" | "farm" | "quarry";
+  buildingId: PlaceableBuildingId;
   origin: HexCoord;
 };
 
 export type BuildResult = {
   tile: WorldTileSnapshot;
   world: WorldSnapshot;
+};
+
+export type DestroyBuildingRequest = {
+  origin: HexCoord;
+};
+
+export type DestroyBuildingResult = {
+  tile: WorldTileSnapshot;
+  world: WorldSnapshot;
+  /** Ressources / pop libérées (pour feedback UI). */
+  refunds: {
+    wood: number;
+    workers: number;
+  };
 };

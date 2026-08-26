@@ -61,13 +61,15 @@
           <a href="#priorities"><span class="nav-dot"></span>Priorities</a>
           <a href="#backlog"><span class="nav-dot"></span>Backlog</a>
           <a href="#ideas"><span class="nav-dot"></span>Ideas</a>
+          <a href="#pvp"><span class="nav-dot"></span>PvP</a>
+          <a href="#pvm"><span class="nav-dot"></span>PvM</a>
           <a href="#risks"><span class="nav-dot"></span>Risks</a>
           <a href="#mvp"><span class="nav-dot"></span>MVP</a>
         </div>
       </nav>
 
       <div class="sidebar-foot">
-        <div>Phase actuelle : <strong id="sidebar-phase">Economy POC</strong></div>
+        <div>Phase actuelle : <strong id="sidebar-phase">Economy POC · Food live</strong></div>
         <div>Statut : <strong>Pre-production · Prod live</strong></div>
       </div>
     </aside>
@@ -102,12 +104,12 @@
             <article class="card stat-card">
               <div class="label">Phase</div>
               <div class="value">POC</div>
-              <div class="hint">Phase 3 — Economy POC</div>
+              <div class="hint">Phase 3 — éclats · food · extracteurs</div>
             </article>
             <article class="card stat-card">
               <div class="label">Priority</div>
-              <div class="value">Economy</div>
-              <div class="hint">Population + ressources de base</div>
+              <div class="value">Industry</div>
+              <div class="hint">Mine · adjacence · /admin</div>
             </article>
             <article class="card stat-card">
               <div class="label">Status</div>
@@ -124,7 +126,7 @@
           <div class="grid grid-2" style="margin-top:14px">
             <article class="card">
               <h3>Stack en place</h3>
-              <p>Frontend Nuxt 4 / Vue / TypeScript / Three.js / Tailwind / Nuxt UI. Backend Fastify autoritaire. PostgreSQL + Drizzle (sessions, mondes, tuiles). Deploy Docker Compose + GitHub Actions SSH. Admin ops <code>/admin</code>. Contenu design dans <code>packages/content</code>.</p>
+              <p>Frontend Nuxt 4 / Vue / TypeScript / Three.js / Tailwind / Nuxt UI. Backend Fastify autoritaire. PostgreSQL + Drizzle (sessions, mondes, tuiles, inventaire, chantiers). Deploy Docker Compose + GitHub Actions SSH. Admin ops <code>/admin</code>. Contenu design dans <code>packages/content</code>.</p>
               <div class="chip-row">
                 <span class="badge badge-accent">Nuxt 4</span>
                 <span class="badge badge-accent">Three.js</span>
@@ -134,12 +136,13 @@
                 <span class="badge badge-accent">Admin</span>
                 <span class="badge badge-neutral">ads.txt</span>
                 <span class="badge badge-neutral">Wiki contenu</span>
+                <span class="badge badge-neutral">UI nuages</span>
               </div>
             </article>
             <article class="card">
               <h3>Dernière décision importante</h3>
-              <p><span class="badge badge-accent">DEC-015</span> Coût d’expansion région v1 : base bois × hop depuis le village, remise bâtiments proches (d1 −20&nbsp;% / d2 −5&nbsp;%, cap 50&nbsp;%).</p>
-              <p>Phase 3 : sécuriser <code>/admin</code>, bonus d’adjacence prod.</p>
+              <p><span class="badge badge-accent">DEC-020</span> Expansion payée en <strong>éclats de monde</strong> (<code>worldshard</code>) : coût = hop ; prod HDV 1 / 15&nbsp;min.</p>
+              <p>Aussi live : bonus fusion +20&nbsp;% extracteurs (DEC-019), food + barre pop (DEC-016–017), extracteurs posables (DEC-018).</p>
             </article>
           </div>
 
@@ -147,11 +150,11 @@
             <article class="card">
               <h3>Prochaines étapes</h3>
               <ol class="next-list">
-                <li><span>01</span> Pop + workers + bois lazy — fait</li>
-                <li><span>02</span> Extracteurs posés (bois / farm / carrière) — fait</li>
-                <li><span>03</span> Coût d’expansion région (DEC-015) — fait</li>
-                <li><span>04</span> Sécuriser <code>/admin</code></li>
-                <li><span>05</span> Bonus d’adjacence Civ</li>
+                <li><span>01</span> Extracteurs + construction + expansion éclats — fait</li>
+                <li><span>02</span> Food settle + UI barre pop (DEC-016–017) — fait</li>
+                <li><span>03</span> Bonus fusion + éclats de monde — fait</li>
+                <li><span>04</span> Bonus d’adjacence Civ (voisins)</li>
+                <li><span>05</span> Mine (fer) · sécuriser <code>/admin</code></li>
               </ol>
             </article>
             <article class="card notes-card">
@@ -230,7 +233,7 @@
             </div>
             <div class="loop-step">
               <div class="loop-rail"><div class="loop-num">2</div><div class="loop-line"></div></div>
-              <div class="loop-body"><strong>Générer une région</strong><p>Un hexagone central et ses six voisins, influencés par les frontières.</p></div>
+              <div class="loop-body"><strong>Générer une région</strong><p>Un hexagone central et ses six voisins — coût en éclats de monde.</p></div>
             </div>
             <div class="loop-step">
               <div class="loop-rail"><div class="loop-num">3</div><div class="loop-line"></div></div>
@@ -258,7 +261,7 @@
             </div>
             <div class="loop-step">
               <div class="loop-rail"><div class="loop-num">9</div></div>
-              <div class="loop-body"><strong>Créer une nouvelle région</strong><p>La boucle recommence. Le monde s’étend, les nouvelles tuiles arrivent depuis le bas.</p></div>
+              <div class="loop-body"><strong>Créer une nouvelle région</strong><p>La boucle recommence. Éclats → révélation ; les tuiles arrivent depuis le bas.</p></div>
             </div>
           </div>
         </section>
@@ -352,6 +355,7 @@
             <article class="card">
               <h3>Population</h3>
               <p>Les habitants sont une ressource de gestion. Ils peuvent être assignés : bûcherons, mineurs, agriculteurs, ouvriers, artisans, constructeurs, puis d’autres métiers.</p>
+              <p>Chaque habitant <strong>consomme de la nourriture</strong> à un taux fixe. L’hôtel de ville assure une prod alimentaire de base au moins égale à la pop de départ (équilibre, pas de croissance sans surplus). Croissance : <strong>DEC-017</strong> (Civ-light + Travian).</p>
               <div class="bar-list">
                 <div class="bar-row"><span>Disponibles</span><div class="bar-track"><div class="bar-fill muted" style="width:15%"></div></div><span>15</span></div>
                 <div class="bar-row"><span>Agriculture</span><div class="bar-track"><div class="bar-fill" style="width:25%"></div></div><span>25</span></div>
@@ -360,13 +364,13 @@
                 <div class="bar-row"><span>Industrie</span><div class="bar-track"><div class="bar-fill info" style="width:10%"></div></div><span>10</span></div>
                 <div class="bar-row"><span>Construction</span><div class="bar-track"><div class="bar-fill" style="width:10%"></div></div><span>10</span></div>
               </div>
-              <p class="notes-hint">Exemple : population totale 100.</p>
+              <p class="notes-hint">Exemple : population totale 100. Cible départ : pop&nbsp;4 (DEC-013 / DEC-016 / DEC-017).</p>
             </article>
             <article class="card">
-              <h3>Villages</h3>
-              <p>Un monde peut contenir une capitale, un village forestier, un village minier, un village agricole, un centre industriel. Chaque village a sa population, ses bâtiments, ses zones exploitées, ses spécialisations et ses besoins.</p>
-              <h3 style="margin-top:18px">Routes et logistique</h3>
-              <p>Les routes relient les zones. Plus tard : accélérer le transport, améliorer la productivité, connecter villages et exploitations, créer un réseau. Niveaux : sentier → route → route pavée → infrastructure avancée.</p>
+              <h3>Hôtel de ville (village)</h3>
+              <p>Le bâtiment central du monde de départ. Comme il donne une <strong>pop de base (4)</strong>, il donne aussi une <strong>capacité de stockage de base</strong>, une <strong>production de nourriture de subsistance</strong>, le <strong>plafond de population</strong> de départ, et une prod lente d’<strong>éclats de monde</strong> (révélation de régions — DEC-020). Agrandir cap pop / stock / food rentable / éclats passe par niveaux et autres bâtiments (maisons, entrepôts, ferme → chaîne pain, futurs sanctuaires d’ancrage).</p>
+              <h3 style="margin-top:18px">Villages &amp; logistique</h3>
+              <p>Plus tard : plusieurs villages spécialisés, routes, besoins locaux. Niveaux de routes : sentier → route → route pavée → infrastructure avancée.</p>
             </article>
           </div>
 
@@ -375,9 +379,117 @@
             <p>Il ne faut pas simuler chaque mine chaque seconde. On stocke un taux et un timestamp, puis on rattrape le temps à la reconnexion. C’est essentiel pour une simulation persistante avec beaucoup de joueurs.</p>
             <div class="formula">
               <div class="formula-box"><b>État stocké</b>stock = 500<br>productionRate = 100/h<br>lastCalculatedAt = 08:00</div>
-              <div class="formula-box"><b>Retour à 14:00</b>elapsed = 6h<br>production = 6 × 100<br>stock = 1100</div>
+              <div class="formula-box"><b>Retour à 14:00</b>elapsed = 6h<br>production = 6 × 100<br>stock = min(cap, 1100)</div>
               <div class="formula-box"><b>Décision</b>DEC-006<br>Pas de tick permanent<br>Calcul lazy à la requête</div>
             </div>
+          </article>
+
+          <article class="card" style="margin-top:14px">
+            <h3>Plafonds de stock &amp; sinks <span class="status status-progress">In progress</span></h3>
+            <p>Il faut un moyen de <strong>contrôler la quantité maximum</strong> de chaque ressource du joueur. Les réserves doivent pouvoir se remplir — et une fois pleines, la production « pour rien » (ou ralentie) doit <strong>inciter à dépenser</strong> plutôt qu’à accumuler une richesse énorme d’un coup.</p>
+            <div class="grid grid-2" style="margin-top:12px">
+              <div>
+                <h4 style="margin:0 0 8px">Pourquoi</h4>
+                <ul class="tech-list">
+                  <li>Éviter le stockpile infini hors ligne (AFK = jackpot)</li>
+                  <li>Rendre le plein de réserves un objectif clair et lisible</li>
+                  <li>Pousser le joueur vers les sinks : expansion, bâtiments, upgrades, chaînes aval</li>
+                  <li>Limiter les pics de richesse qui cassent le pacing</li>
+                </ul>
+              </div>
+              <div>
+                <h4 style="margin:0 0 8px">Leviers de design</h4>
+                <ul class="tech-list">
+                  <li><strong>Cap de base = hôtel de ville</strong> (DEC-016) — ex. 80 par ressource ; les entrepôts / niveaux augmentent plus tard</li>
+                  <li><strong>Cap hard actuel (placeholders)</strong> bois/blé 200, pierre 150 — à rattacher au stockage village</li>
+                  <li><strong>Feedback UI</strong> <span class="status status-done">Live</span> — <code>stock/cap</code>, état near/full, rate <code>0/min</code> au cap, hint soft bois plein</li>
+                  <li><strong>Sinks réguliers</strong> — coûts d’expansion en <strong>éclats</strong> (DEC-020), construction bois, upgrades, transformateurs, <strong>consommation food/pop</strong></li>
+                </ul>
+              </div>
+            </div>
+            <p class="notes-hint" style="margin-top:12px">Règle produit : le joueur doit souvent vouloir vider ses stocks pour avancer. Un cap rempli = signal de « dépense maintenant », pas une fin de run.</p>
+          </article>
+
+          <article class="card" style="margin-top:14px">
+            <h3>Nourriture &amp; blé <span class="status status-done">Live</span> <span class="badge badge-neutral">DEC-016</span></h3>
+            <p>Le <strong>blé n’est pas de la nourriture</strong> en soi : c’est une récolte brute. La chaîne cible reste <code>blé → farine → pain (food)</code>. En attendant moulin / boulangerie, le blé peut servir de <strong>nourriture de secours peu rentable</strong> (mauvais ratio) pour ne pas laisser la ferme inutile.</p>
+            <div class="grid grid-2" style="margin-top:12px">
+              <div>
+                <h4 style="margin:0 0 8px">Consommation</h4>
+                <ul class="tech-list">
+                  <li>Taux fixe entier : <strong>1 food / pop / minute</strong></li>
+                  <li>Hôtel de ville : prod food de base = <strong>exactement</strong> pop de départ × conso → <strong>4 food/min</strong> à l’équilibre pour 4 pop</li>
+                  <li>Croître la pop exige un surplus food net (DEC-017) — hôtel de ville seul = équilibre, pas de +pop</li>
+                </ul>
+              </div>
+              <div>
+                <h4 style="margin:0 0 8px">Chaîne</h4>
+                <ul class="tech-list">
+                  <li><strong>Cible</strong> — ferme → blé → moulin → farine → boulangerie → food</li>
+                  <li><strong>Secours</strong> — 5 blé ≈ 1 food si pas encore de boulangerie</li>
+                  <li>Le pain reste la voie efficace ; le blé brut = filet de sécurité, pas la meta</li>
+                  <li>Balance : le worker mange aussi — une ferme qui nourrit juste son fermier = 0 surplus</li>
+                </ul>
+              </div>
+            </div>
+          </article>
+
+          <article class="card" style="margin-top:14px">
+            <h3>Croissance de population <span class="status status-done">Live</span> <span class="badge badge-neutral">DEC-017</span></h3>
+            <p>Modèle <strong>Civ-light + Travian</strong> : pas de bouton « +1 habitant » au MVP. La pop croît seule si surplus food, dans la limite du cap logements / hôtel de ville. Settle lazy (DEC-006) — <strong>backend + UI barre live</strong> sur le header nuage.</p>
+            <div class="grid grid-2" style="margin-top:12px">
+              <div>
+                <h4 style="margin:0 0 8px">Règles</h4>
+                <ul class="tech-list">
+                  <li><code>netFood = prod − conso</code> (entiers / min)</li>
+                  <li>Si <code>netFood &gt; 0</code> et <code>pop &lt; cap</code> : remplir une <strong>barre entière</strong> « prochain habitant »</li>
+                  <li>Cible : <strong>60 food de surplus cumulé</strong> → +1 pop (tunable)</li>
+                  <li>Le surplus alimente la barre (pas un spawn instantané depuis le stockpile)</li>
+                  <li>Si <code>netFood ≤ 0</code> : barre gelée ; pas de mort au MVP</li>
+                  <li><strong>Plus tard</strong> : famine (perte pop) si déficit prolongé</li>
+                </ul>
+              </div>
+              <div>
+                <h4 style="margin:0 0 8px">Plafond</h4>
+                <ul class="tech-list">
+                  <li>Cap départ = pop hôtel de ville : <strong>4</strong></li>
+                  <li>Monter le cap via <strong>niveaux d’hôtel de ville / maisons</strong> (pas de pop magique)</li>
+                  <li>UI : « 28 / 60 food → prochain habitant » + pop / cap</li>
+                  <li>Hors scope MVP : immigration payante, events attractivité</li>
+                </ul>
+              </div>
+            </div>
+            <p class="notes-hint" style="margin-top:12px">Conséquence design : sans ferme / chaîne (ou blé secours), netFood = 0 → aucune croissance. Volontaire.</p>
+          </article>
+
+          <article class="card" style="margin-top:14px">
+            <h3>Éclats de monde <span class="status status-done">Live</span> <span class="badge badge-neutral">DEC-020</span></h3>
+            <p>Ressource dédiée à la <strong>révélation de région</strong> — pas un mana libre : l’hôtel de ville ancre lentement de nouveaux hex dans la grille.</p>
+            <div class="grid grid-2" style="margin-top:12px">
+              <div>
+                <h4 style="margin:0 0 8px">Production (MVP)</h4>
+                <ul class="tech-list">
+                  <li>Hôtel de ville seul : <strong>+1 éclat / 15&nbsp;min</strong> (lazy settle)</li>
+                  <li>Cap stock bas : <strong>5</strong></li>
+                  <li>Départ : <strong>1</strong> éclat (première région voisine)</li>
+                  <li>Plus tard : bâtiments dédiés (observatoire / sanctuaire)</li>
+                </ul>
+              </div>
+              <div>
+                <h4 style="margin:0 0 8px">Coût d’expansion</h4>
+                <ul class="tech-list">
+                  <li><code>coût = hop</code> (hop = distance cube au village / 3)</li>
+                  <li>Voisin du départ : <strong>1</strong> · rang suivant : <strong>2</strong> · etc.</li>
+                  <li>Plus de paiement en bois (DEC-015 supersédé)</li>
+                  <li>UI : badge coût sur la roue biomes + stock ✨ header</li>
+                </ul>
+              </div>
+            </div>
+          </article>
+
+          <article class="card" style="margin-top:14px">
+            <h3>Bonus biomes de fusion <span class="status status-done">Live</span> <span class="badge badge-neutral">DEC-019</span></h3>
+            <p>Les tuiles fusion terre↔terre (lisière, piémont, haute forêt) sont plus rares. Un extracteur posé dessus produit <strong>+20&nbsp;%</strong>. Badge vert <code>+20%</code> sur la carte (tuile vide ou extracteur ; pas si un autre bâtiment occupe la case).</p>
           </article>
 
           <article class="card" style="margin-top:14px">
@@ -493,7 +605,7 @@
                   <td>Workers</td>
                   <td>Wood</td>
                   <td>1 hex</td>
-                  <td><span class="status status-mvp">MVP</span></td>
+                  <td><span class="status status-done">Live</span></td>
                 </tr>
                 <tr>
                   <td>Sawmill</td>
@@ -517,7 +629,7 @@
                   <td>Workers</td>
                   <td>Food / Wheat</td>
                   <td>1 hex</td>
-                  <td><span class="status status-mvp">MVP</span></td>
+                  <td><span class="status status-done">Live</span></td>
                 </tr>
                 <tr>
                   <td>Mill</td>
@@ -541,7 +653,7 @@
                   <td>Workers</td>
                   <td>Stone</td>
                   <td>1 hex</td>
-                  <td><span class="status status-mvp">MVP</span></td>
+                  <td><span class="status status-done">Live</span></td>
                 </tr>
                 <tr>
                   <td>Smelter</td>
@@ -565,6 +677,14 @@
                   <td>Advanced</td>
                   <td>Prestige</td>
                   <td>Multi-hex</td>
+                  <td><span class="status status-planned">Later</span></td>
+                </tr>
+                <tr>
+                  <td>Caserne</td>
+                  <td>Any</td>
+                  <td>Workers + tools?</td>
+                  <td>Soldiers (PvM)</td>
+                  <td>1 hex</td>
                   <td><span class="status status-planned">Later</span></td>
                 </tr>
               </tbody>
@@ -614,7 +734,7 @@
             </article>
             <article class="card">
               <h3>Client jouable</h3>
-              <p>Landing <code>/</code> (pseudo + CTA). Carte Three.js dans <code>/play</code> : roue biomes + roue build (camp), pop / bois / workers. Dev <code>/poc</code>. Admin <code>/admin</code>. <code>ads.txt</code> AdSense en public.</p>
+              <p>Landing <code>/</code> (pseudo + CTA). Carte Three.js dans <code>/play</code> : header / bottom sheet nuage, food + barre croissance, <strong>éclats de monde</strong>, roue biomes (coût en éclats), roue build (camp / ferme / carrière / maison), stocks bois·blé·pierre·food, workers /tuile, badges +20&nbsp;% fusion. Dev <code>/poc</code> + reset/grant. Admin <code>/admin</code>. <code>ads.txt</code> AdSense en public.</p>
             </article>
           </div>
 
@@ -650,11 +770,11 @@
               </div>
               <div class="panel-back card">
                 <h3>Node.js · TypeScript · Fastify</h3>
-                <p>Session cookie <code>tw_sid</code>, mondes, régions, <code>POST …/buildings</code>, <code>POST …/workers</code>, content, admin. Présence en mémoire (TTL 5&nbsp;min).</p>
+                <p>Session cookie <code>tw_sid</code>, mondes, régions, bâtiments (chantiers), workers/tuile, settle lazy (extracteurs + food/croissance + <strong>éclats</strong>), content, admin. Dev : reset / grant / set-biome. Présence en mémoire (TTL 5&nbsp;min).</p>
               </div>
               <div class="panel-data card">
                 <h3>PostgreSQL · Drizzle ORM</h3>
-                <p>Schéma : <code>players</code>, <code>worlds</code> (éco pop/bois), tuiles (<code>building_id</code>) / régions. Contenu design dans <code>packages/content</code>.</p>
+                <p>Schéma : <code>players</code>, <code>worlds</code> (pop + surplus food), <code>world_inventory</code>, tuiles (<code>building_id</code>, <code>construction_completes_at</code>, <code>assigned_workers</code>) / régions. Contenu design dans <code>packages/content</code>.</p>
               </div>
               <div class="panel-arch">
                 <pre class="mono"><span class="tree-key">hexald/</span>
@@ -728,7 +848,7 @@
         <section id="decisions">
           <p class="section-kicker">Decision log</p>
           <h2>Technical Decisions</h2>
-          <p>Dupliquer le bloc en pointillés en bas de liste pour ajouter une décision. Incrémenter l’ID (DEC-015, etc.).</p>
+          <p>Dupliquer le bloc en pointillés en bas de liste pour ajouter une décision. Incrémenter l’ID (DEC-019, etc.).</p>
 
           <div class="decision-grid">
             <article class="decision">
@@ -920,9 +1040,9 @@
               <h3>Population v0 — pop fixe + camp bois implicite</h3>
               <dl>
                 <dt>Contexte</dt><dd>Phase 3 doit valider assignation → production hors ligne sans poser encore tout le système de bâtiments.</dd>
-                <dt>Décision</dt><dd>Pop fixe <strong>4</strong> (cap 12 affiché). Extracteurs niveau 1 : <strong>1 worker max</strong> chacun. Rate 12 bois/worker/h, cap stock 200, départ 30. <code>POST /v1/worlds/:id/workers</code>. Settle lazy au load / assign (DEC-006).</dd>
+                <dt>Décision</dt><dd>Pop fixe <strong>4</strong> (cap 12 affiché). Extracteurs niveau 1 : <strong>1 worker max</strong> chacun. Rate 12 bois/worker/h, cap stock 200, départ 30. Assignation via <code>POST /v1/worlds/:id/actions</code> (<code>assign_workers</code>). Settle lazy au load / assign (DEC-006).</dd>
                 <dt>Raison</dt><dd>Prouve la boucle navigateur (Travian-like + idle) avec un scope minimal. Pas de croissance / food / pathfinding au v0.</dd>
-                <dt>Conséquences</dt><dd>Colonnes économie sur <code>worlds</code>. UI <code>/play</code> : panneau workers ± et stocks. Remplacé en partie par DEC-014 (camp posé sur carte).</dd>
+                <dt>Conséquences</dt><dd>Colonnes économie sur <code>worlds</code> (legacy). Stocks génériques dans <code>world_inventory</code> (migration 0011). UI <code>/play</code> : panneau workers ± et stocks. Remplacé en partie par DEC-014 (camp posé sur carte).</dd>
               </dl>
             </article>
 
@@ -935,24 +1055,136 @@
               <h3>Pose du camp de bûcherons (roue build)</h3>
               <dl>
                 <dt>Contexte</dt><dd>Le camp implicite ne collait pas au fantasme « poser sur le diorama ». Il faut le même geste UX que le choix de biome.</dd>
-                <dt>Décision</dt><dd>Sélection tuile sans village / sans bâtiment → roue build (comme biomes). <code>lumber_camp</code> uniquement, terrain forêt (ou influence forêt), max 1 par monde. <code>POST /v1/worlds/:id/buildings</code>. Colonne <code>world_tiles.building_id</code>. Mesh low-poly + workers seulement si camp posé.</dd>
+                <dt>Décision</dt><dd>Sélection tuile sans village / sans bâtiment → roue build (comme biomes). <code>lumber_camp</code> uniquement, terrain forêt (ou influence forêt), max 1 par monde. Pose via <code>POST /v1/worlds/:id/actions</code> (<code>build</code>). Colonne <code>world_tiles.building_id</code>. Mesh low-poly + workers seulement si camp posé.</dd>
                 <dt>Raison</dt><dd>Lisibilité carte + même pattern d’interaction. Prod bois conditionnée à un bâtiment réel.</dd>
-                <dt>Conséquences</dt><dd>Plus de camp implicite. Suite : farm / mine / carrière sur le même modèle. <code>ads.txt</code> AdSense ajouté en <code>apps/web/public/ads.txt</code>.</dd>
+                <dt>Conséquences</dt><dd>Plus de camp implicite. Étendu par DEC-018 (farm / carrière, chantiers, multi-sites). <code>ads.txt</code> AdSense ajouté en <code>apps/web/public/ads.txt</code>.</dd>
               </dl>
             </article>
 
             <article class="decision">
               <header>
                 <span class="id">DEC-015</span>
-                <span class="status status-accepted">Accepted</span>
+                <span class="status status-accepted">Superseded</span>
                 <span class="badge badge-neutral">2026-08-25</span>
               </header>
-              <h3>Coût d’expansion de région v1</h3>
+              <h3>Coût d’expansion de région v1 (bois)</h3>
               <dl>
                 <dt>Contexte</dt><dd>L’extension était gratuite : pas de tension économique ni d’incitation à densifier le front.</dd>
                 <dt>Décision</dt><dd>Coût en <strong>bois</strong> : <code>base = 30 × hop</code> (hop = distance cube au village / 3). Remise civilisation : −20&nbsp;% par site à d=1, −5&nbsp;% à d=2 (village + bâtiments achevés), cap 50&nbsp;%. Settle lazy puis débit. <code>409 insufficient_resources</code>. UI : badge coût sur la roue biomes.</dd>
                 <dt>Raison</dt><dd>Taxe le sprawl distant ; récompense un front développé. Boucle produire → dépenser → s’étendre.</dd>
-                <dt>Conséquences</dt><dd>Constantes dans <code>packages/content</code>, calcul <code>game-core/regionCost</code>, débit dans <code>expandRegionService</code>. Suite possible : multi-ressources, routes comme sites de développement.</dd>
+                <dt>Conséquences</dt><dd><strong>Supersédé par DEC-020</strong> (éclats de monde). Le bois reste le sink construction ; l’expansion a sa ressource dédiée.</dd>
+              </dl>
+            </article>
+
+            <article class="decision">
+              <header>
+                <span class="id">DEC-016</span>
+                <span class="status status-accepted">Accepted</span>
+                <span class="badge badge-neutral">2026-08-26</span>
+              </header>
+              <h3>Hôtel de ville — stockage, food &amp; rôle du blé</h3>
+              <dl>
+                <dt>Contexte</dt><dd>Les caps de stock étaient des constantes magiques. La pop n’avait ni conso ni prod food. Le blé de ferme ressemblait à de la nourriture alors que la chaîne cible est pain.</dd>
+                <dt>Décision</dt><dd>
+                  <ul style="margin:0;padding-left:1.1em">
+                    <li>L’hôtel de ville (<code>village</code>) donne, au même titre que la <strong>pop de base 4</strong> : une <strong>capacité de stockage de base</strong> (cible : 80 / ressource) et une <strong>prod food de subsistance</strong> = pop départ × conso (<strong>4 food/min</strong>).</li>
+                    <li>Consommation fixe entière : <strong>1 food / pop / minute</strong> (tous les rates en minutes, pas de fractions).</li>
+                    <li>Le <strong>blé brut compte</strong> pour la barre de croissance (5 blé ≈ 1 food) tant que moulin/boulangerie absents ; même ratio en secours si déficit food. Chaîne <code>wheat → flour → food</code> pour une conversion plus rentable plus tard.</li>
+                  </ul>
+                </dt>
+                <dt>Raison</dt><dd>Ancre stockage + survie sur le bâtiment central. Force un surplus food pour croître. Garde la profondeur de chaîne sans rendre la ferme morte avant les transformateurs.</dd>
+                <dt>Conséquences</dt><dd>Branché dans <code>settleEconomy</code> (stock food, conso, prod hôtel de ville, conversion blé d’urgence). Caps content. UI /play : food + rate net sur le header nuage. Croissance pop : DEC-017.</dd>
+              </dl>
+            </article>
+
+            <article class="decision">
+              <header>
+                <span class="id">DEC-017</span>
+                <span class="status status-accepted">Accepted</span>
+                <span class="badge badge-neutral">2026-08-26</span>
+              </header>
+              <h3>Croissance de population — Civ-light + Travian</h3>
+              <dl>
+                <dt>Contexte</dt><dd>La pop est fixe (4). Il faut une règle de croissance cohérente avec food/conso (DEC-016), le settle lazy, et les rates entiers / minute — sans micro-gestion d’un bouton « recruter ».</dd>
+                <dt>Décision</dt><dd>
+                  <ul style="margin:0;padding-left:1.1em">
+                    <li><strong>Croissance auto</strong> si <code>netFood = prod − conso &gt; 0</code> et <code>pop &lt; cap</code>.</li>
+                    <li>Barre entière « prochain habitant » : <strong>60</strong> points de surplus cumulé → +1 pop (tunable content).</li>
+                    <li>Le surplus remplit la barre au fil du temps (lazy) ; pas de conversion instantanée du stockpile food en pop.</li>
+                    <li><strong>Cap</strong> = logements / niveau hôtel de ville (départ 4). Monter le cap = upgrade / maisons.</li>
+                    <li><code>netFood ≤ 0</code> : freeze (pas de mort au MVP). Famine / perte pop = plus tard.</li>
+                    <li>Pas d’immigration payante ni d’events au MVP.</li>
+                  </ul>
+                </dt>
+                <dt>Raison</dt><dd>Lisible (UI barre), idle-friendly, force la boucle food avant de croître. Aligné Travian (surplus → croît) + Civ (seuil pour +1 citoyen). Le worker qui mange évite « 1 ferme = +1 pop libre » trop gratuit.</dd>
+                <dt>Conséquences</dt><dd>Constantes content + colonne <code>food_surplus_accumulated</code>. Settle lazy avance la barre. UI /play : barre « prochain habitant » + food net sur le header nuage — <strong>live</strong>.</dd>
+              </dl>
+            </article>
+
+            <article class="decision">
+              <header>
+                <span class="id">DEC-018</span>
+                <span class="status status-accepted">Accepted</span>
+                <span class="badge badge-neutral">2026-08-26</span>
+              </header>
+              <h3>Extracteurs multiples + chantiers + workers par tuile</h3>
+              <dl>
+                <dt>Contexte</dt><dd>Après le camp unique (DEC-014), il faut le même pattern pour blé / pierre, une vraie pose payante, et des workers rattachés au site.</dd>
+                <dt>Décision</dt><dd>
+                  <ul style="margin:0;padding-left:1.1em">
+                    <li><code>PLACEABLE_EXTRACTORS</code> = <code>lumber_camp</code>, <code>farm</code>, <code>quarry</code> (terrain via influences biome).</li>
+                    <li>Coût bois fixe + <strong>1 pop idle</strong> réservée sur le chantier ; durée 60&nbsp;s (5&nbsp;s en dev).</li>
+                    <li><code>construction_completes_at</code> + <code>assigned_workers</code> sur <code>world_tiles</code>.</li>
+                    <li>1 worker max / site niveau 1 ; métiers woodcutter / farmer / quarrier.</li>
+                    <li>Rates : <strong>5 / worker / min</strong> (bois, blé, pierre). Caps stock legacy 200 / 200 / 150.</li>
+                    <li>UI : header nuage (pop + 3 stocks), roue build, bottom sheet nuage, badges carte, overlay (pas de décalage des FAB).</li>
+                  </ul>
+                </dt>
+                <dt>Raison</dt><dd>Valide la boucle poser → attendre → assigner → produire → dépenser (build / expand) avant les chaînes craft.</dd>
+                <dt>Conséquences</dt><dd>Mine / scierie / forge restent catalogue jusqu’à Phase 4. Plus de limite « 1 camp par monde ». Expansion : DEC-020 (éclats). Bonus fusion : DEC-019.</dd>
+              </dl>
+            </article>
+
+            <article class="decision">
+              <header>
+                <span class="id">DEC-019</span>
+                <span class="status status-accepted">Accepted</span>
+                <span class="badge badge-neutral">2026-08-26</span>
+              </header>
+              <h3>Bonus +20&nbsp;% extracteurs sur biomes de fusion</h3>
+              <dl>
+                <dt>Contexte</dt><dd>Les fusions terre↔terre sont plus rares (tirage 20&nbsp;% aux bordures) mais n’avaient pas d’intérêt économique au-delà du look.</dd>
+                <dt>Décision</dt><dd>
+                  <ul style="margin:0;padding-left:1.1em">
+                    <li>Extracteur achevé sur <code>forest_plains</code> / <code>plains_mountain</code> / <code>forest_mountain</code> : rate × <strong>1,2</strong> (<code>FUSION_TILE_PRODUCTION_BONUS = 0.2</code>).</li>
+                    <li>Settle lazy via <code>extractorSites</code> (biome + workers par tuile).</li>
+                    <li>UI : badge vert <code>+20%</code> au-dessus de la tuile (vide ou extracteur ; masqué si bâtiment non-prod).</li>
+                  </ul>
+                </dt>
+                <dt>Raison</dt><dd>Récompense le placement sur les lisières rares sans ajouter un système d’adjacence complet (restera DEC séparée).</dd>
+                <dt>Conséquences</dt><dd>Content + <code>game-core</code> rates ; API branche <code>extractorSitesFromTiles</code> ; badges carte /play.</dd>
+              </dl>
+            </article>
+
+            <article class="decision">
+              <header>
+                <span class="id">DEC-020</span>
+                <span class="status status-accepted">Accepted</span>
+                <span class="badge badge-neutral">2026-08-26</span>
+              </header>
+              <h3>Éclats de monde — coût d’expansion v2</h3>
+              <dl>
+                <dt>Contexte</dt><dd>Payer une région en bois (DEC-015) était thème-incohérent : le bois construit, il n’ancre pas un territoire. Besoin d’une ressource dédiée, produite lentement.</dd>
+                <dt>Décision</dt><dd>
+                  <ul style="margin:0;padding-left:1.1em">
+                    <li>Ressource <code>worldshard</code> (« Éclat de monde ») — lore soft : ancrage hexadique du monde.</li>
+                    <li>Prod MVP : hôtel de ville seul, <strong>+1 / 15&nbsp;min</strong>, cap <strong>5</strong>, départ <strong>1</strong>.</li>
+                    <li>Coût expansion : <code>worldshards = hop</code> (1 voisin, 2 au rang suivant, …). Plus de bois ni remises civilisation.</li>
+                    <li>Settle lazy <code>settleWorldshard</code> ; débit via <code>spendResource</code> à l’expand.</li>
+                  </ul>
+                </dt>
+                <dt>Raison</dt><dd>Sépare construction (bois) et révélation (éclats). Rythme volontairement lent ; futurs bâtiments accéléreront la prod.</dd>
+                <dt>Conséquences</dt><dd>DEC-015 supersédé. Content / shared / game-core / API / UI header + roue biomes. Soft-migration : mondes sans stock reçoivent 1 éclat.</dd>
               </dl>
             </article>
 
@@ -994,7 +1226,7 @@
             </a>
             <a class="card wiki-nav-card" href="#wiki-chains">
               <h3>Chaînes</h3>
-              <p>Fer, bois, nourriture, pierre — étapes de production.</p>
+              <p>Fer, bois, nourriture, pierre, éclats de monde — étapes de production.</p>
             </a>
             <a class="card wiki-nav-card" href="#wiki-world">
               <h3>Monde</h3>
@@ -1079,10 +1311,10 @@
                   <h3>Lisière</h3>
                   <code class="wiki-id">forest_plains</code>
                 </div>
-                <span class="status status-planned">Fusion</span>
+                <span class="status status-mvp">Fusion</span>
               </header>
-              <p>Fusion forêt ↔ plaine. Apparaît aux bordures (poids 20&nbsp;% fusion).</p>
-              <p class="wiki-meta">Kind · <strong>land</strong> · Parents · forest + plains</p>
+              <p>Fusion forêt ↔ plaine. Apparaît aux bordures (poids 20&nbsp;% fusion). Extracteurs : <strong>+20&nbsp;% prod</strong> (DEC-019).</p>
+              <p class="wiki-meta">Kind · <strong>land</strong> · Parents · forest + plains · Bonus · +20&nbsp;% extracteur</p>
             </article>
             <article class="card wiki-entry" data-wiki-kind="fusion">
               <header class="wiki-entry-head">
@@ -1091,10 +1323,10 @@
                   <h3>Piémont</h3>
                   <code class="wiki-id">plains_mountain</code>
                 </div>
-                <span class="status status-planned">Fusion</span>
+                <span class="status status-mvp">Fusion</span>
               </header>
-              <p>Fusion plaine ↔ montagne.</p>
-              <p class="wiki-meta">Kind · <strong>land</strong> · Parents · plains + mountain</p>
+              <p>Fusion plaine ↔ montagne. Extracteurs : <strong>+20&nbsp;% prod</strong> (DEC-019).</p>
+              <p class="wiki-meta">Kind · <strong>land</strong> · Parents · plains + mountain · Bonus · +20&nbsp;% extracteur</p>
             </article>
             <article class="card wiki-entry" data-wiki-kind="fusion">
               <header class="wiki-entry-head">
@@ -1103,10 +1335,10 @@
                   <h3>Haute forêt</h3>
                   <code class="wiki-id">forest_mountain</code>
                 </div>
-                <span class="status status-planned">Fusion</span>
+                <span class="status status-mvp">Fusion</span>
               </header>
-              <p>Fusion forêt ↔ montagne.</p>
-              <p class="wiki-meta">Kind · <strong>land</strong> · Parents · forest + mountain</p>
+              <p>Fusion forêt ↔ montagne. Extracteurs : <strong>+20&nbsp;% prod</strong> (DEC-019).</p>
+              <p class="wiki-meta">Kind · <strong>land</strong> · Parents · forest + mountain · Bonus · +20&nbsp;% extracteur</p>
             </article>
             <article class="card wiki-entry" data-wiki-kind="coast">
               <header class="wiki-entry-head">
@@ -1151,6 +1383,7 @@
           <p class="section-kicker">Wiki · Ressources</p>
           <h2>Ressources</h2>
           <p>Inventaire économique. Les IDs suivent <code>packages/content/src/resources.ts</code>.</p>
+          <p><span class="badge badge-accent">Design</span> Chaque ressource a un <strong>plafond de stock</strong> ; une fois plein, le joueur est poussé à dépenser (expansion, construction, upgrades). Voir <a href="#economy">Economy — Plafonds &amp; sinks</a>.</p>
           <div class="table-wrap">
             <table>
               <thead>
@@ -1163,14 +1396,15 @@
               <tbody>
                 <tr><td><code>wood</code></td><td>Bois</td><td>Récolte forêt → entrée scierie</td></tr>
                 <tr><td><code>planks</code></td><td>Planches</td><td>Transformé du bois</td></tr>
-                <tr><td><code>wheat</code></td><td>Blé</td><td>Récolte plaine (ferme)</td></tr>
+                <tr><td><code>wheat</code></td><td>Blé</td><td>Récolte plaine — pas food (DEC-016) ; entrée moulin / secours peu rentable</td></tr>
                 <tr><td><code>flour</code></td><td>Farine</td><td>Transformé du blé (moulin)</td></tr>
-                <tr><td><code>food</code></td><td>Nourriture</td><td>Transformé de la farine (boulangerie)</td></tr>
+                <tr><td><code>food</code></td><td>Nourriture</td><td>Pain (boulangerie) + subsistance hôtel de ville ; conso / pop (DEC-016)</td></tr>
                 <tr><td><code>stone</code></td><td>Pierre</td><td>Récolte montagne (carrière)</td></tr>
                 <tr><td><code>stone_blocks</code></td><td>Blocs</td><td>Pierre travaillée (prévu)</td></tr>
                 <tr><td><code>iron_ore</code></td><td>Minerai de fer</td><td>Récolte montagne (mine)</td></tr>
                 <tr><td><code>iron_ingot</code></td><td>Lingot de fer</td><td>Fonderie</td></tr>
                 <tr><td><code>tools</code></td><td>Outils</td><td>Forge — bout de chaîne fer</td></tr>
+                <tr><td><code>worldshard</code></td><td>Éclat de monde</td><td>Ancrage / révélation de région (DEC-020) ; prod HDV 1/15&nbsp;min, cap 5</td></tr>
               </tbody>
             </table>
           </div>
@@ -1205,12 +1439,12 @@
               </thead>
               <tbody>
                 <tr data-wiki-kind="planned">
-                  <td>Village</td><td><code>village</code></td><td>any</td><td>—</td><td>population</td><td>multi</td>
+                  <td>Village</td><td><code>village</code></td><td>any</td><td>—</td><td>population + food + stock + worldshard</td><td>multi</td>
                   <td><span class="status status-planned">Planned</span></td>
                 </tr>
                 <tr data-wiki-kind="mvp">
                   <td>Camp de bûcherons</td><td><code>lumber_camp</code></td><td>forest</td><td>workers</td><td>wood</td><td>1</td>
-                  <td><span class="status status-mvp">MVP</span></td>
+                  <td><span class="status status-done">Live</span></td>
                 </tr>
                 <tr data-wiki-kind="mvp">
                   <td>Scierie</td><td><code>sawmill</code></td><td>any</td><td>wood</td><td>planks</td><td>1</td>
@@ -1222,7 +1456,7 @@
                 </tr>
                 <tr data-wiki-kind="mvp">
                   <td>Ferme</td><td><code>farm</code></td><td>plains</td><td>workers</td><td>wheat</td><td>1</td>
-                  <td><span class="status status-mvp">MVP</span></td>
+                  <td><span class="status status-done">Live</span></td>
                 </tr>
                 <tr data-wiki-kind="planned">
                   <td>Moulin</td><td><code>mill</code></td><td>any</td><td>wheat</td><td>flour</td><td>1</td>
@@ -1234,7 +1468,7 @@
                 </tr>
                 <tr data-wiki-kind="mvp">
                   <td>Carrière</td><td><code>quarry</code></td><td>mountain</td><td>workers</td><td>stone</td><td>1</td>
-                  <td><span class="status status-mvp">MVP</span></td>
+                  <td><span class="status status-done">Live</span></td>
                 </tr>
                 <tr data-wiki-kind="mvp">
                   <td>Fonderie</td><td><code>smelter</code></td><td>any</td><td>iron_ore</td><td>iron_ingot</td><td>multi</td>
@@ -1246,6 +1480,10 @@
                 </tr>
                 <tr data-wiki-kind="later">
                   <td>Monument</td><td><code>monument</code></td><td>any</td><td>—</td><td>prestige</td><td>multi</td>
+                  <td><span class="status status-planned">Later</span></td>
+                </tr>
+                <tr data-wiki-kind="later">
+                  <td>Caserne</td><td><code>barracks</code></td><td>any</td><td>workers (+ outils ?)</td><td>soldiers (PvM)</td><td>1</td>
                   <td><span class="status status-planned">Later</span></td>
                 </tr>
               </tbody>
@@ -1277,10 +1515,20 @@
             <article class="card wiki-entry">
               <h3>Nourriture <code class="wiki-id">food</code></h3>
               <div class="wiki-chain">
-                <span>Ferme → <code>wheat</code></span>
+                <span>Hôtel de ville → food (subsistance)</span>
+                <span>Ferme → <code>wheat</code> (récolte, pas food)</span>
                 <span>Moulin → <code>flour</code></span>
                 <span>Boulangerie → <code>food</code></span>
               </div>
+              <p class="wiki-meta">DEC-016 / DEC-017 · Conso 1 food/pop/min · Hôtel de ville 4 food/min · Croissance si surplus (barre 60) · Blé secours 5→1 · settle + UI header live</p>
+            </article>
+            <article class="card wiki-entry">
+              <h3>Éclat de monde <code class="wiki-id">worldshard</code></h3>
+              <div class="wiki-chain">
+                <span>Hôtel de ville → <code>worldshard</code> (1 / 15&nbsp;min)</span>
+                <span>Dépenser → révéler une région (coût = hop)</span>
+              </div>
+              <p class="wiki-meta">DEC-020 · Cap 5 · Départ 1 · Futurs bâtiments prod. dédiés</p>
             </article>
             <article class="card wiki-entry">
               <h3>Pierre <code class="wiki-id">stone</code></h3>
@@ -1304,6 +1552,7 @@
                 <li>Rayon <strong>1</strong> → centre + 6 voisins (7 hex)</li>
                 <li>Biome primaire choisi par le joueur</li>
                 <li>Les hex déjà créés dans l’empreinte ne sont <strong>jamais</strong> écrasés</li>
+                <li>Coût : <strong>éclats de monde</strong> = hop (DEC-020)</li>
               </ul>
             </article>
             <article class="card wiki-entry">
@@ -1343,6 +1592,14 @@
               <ul class="tech-list">
                 <li>Chance rare à la révélation d’une région (ou claim plus tard)</li>
                 <li>Pas un biome : couche sur une tuile (voir <a href="#wiki-pois">Wiki · POI</a>)</li>
+              </ul>
+            </article>
+            <article class="card wiki-entry">
+              <h3>Sites hostiles (PvM)</h3>
+              <ul class="tech-list">
+                <li>À la génération d’une région : chance d’ennemis ou d’un <strong>village hostile</strong></li>
+                <li>Contenu post-MVP — voir <a href="#pvm">PvM</a></li>
+                <li>Ne remplace pas le village de départ ; jamais sur la région initiale</li>
               </ul>
             </article>
           </div>
@@ -1572,12 +1829,20 @@
                 <li>Landing + session + claim pseudo — fait</li>
                 <li>Admin ops (<code>/admin</code>, overview API) — fait</li>
                 <li>Pop + workers + bois lazy — fait</li>
-                <li>Pose <code>lumber_camp</code> (roue build, 1 max) — fait</li>
+                <li>Pose extracteurs <code>lumber_camp</code> / <code>farm</code> / <code>quarry</code> + chantiers — fait</li>
+                <li>Workers par tuile (1 max / site) — fait</li>
+                <li>Coût d’expansion — éclats de monde (hop) — fait</li>
+                <li>UI play : header / bottom sheet nuage — fait</li>
                 <li><code>ads.txt</code> AdSense — fait</li>
-                <li>Farm / carrière (même pattern) — fait</li>
-                <li>Coût d’expansion (bois × hop, remise front) — fait</li>
+                <li>Settle food / croissance (DEC-016–017) — fait</li>
+                <li>UI food + barre « prochain habitant » — fait</li>
+                <li>Feedback caps stocks (plein) — fait</li>
+                <li>Bonus fusion +20&nbsp;% extracteurs (DEC-019) — fait</li>
+                <li>Éclats de monde / prod HDV (DEC-020) — fait</li>
                 <li>Bonus d’adjacence Civ (voisins → rate)</li>
-                <li>Croissance pop + food (plus tard)</li>
+                <li>Bâtiments producteurs d’éclats (post-MVP)</li>
+                <li>Mine (fer) — même pattern extracteur</li>
+                <li>Sécuriser <code>/admin</code></li>
               </ul>
             </article>
             <article class="roadmap-item">
@@ -1614,8 +1879,10 @@
               </ul>
             </article>
             <article class="roadmap-item">
-              <div class="roadmap-head"><h3>Phase 8 — PvP Experiment</h3><span class="status status-planned">Later</span></div>
+              <div class="roadmap-head"><h3>Phase 8 — PvM puis PvP</h3><span class="status status-planned">Later</span></div>
               <ul>
+                <li>PvM : ennemis / villages hostiles à la gen</li>
+                <li>Caserne + soldats (gestion, pas RTS)</li>
                 <li>PvP instancié</li>
                 <li>Classement</li>
                 <li>Équilibrage</li>
@@ -1638,16 +1905,20 @@
                 <li>Deploy Docker VPS — validé</li>
                 <li>Client → persistance monde — validé</li>
                 <li>Landing + pseudo + play — validé</li>
-                <li>Pop + bois v0 — validé</li>
-                <li>Pose lumber_camp — validé</li>
-                <li>Farm / mine / autres extracteurs</li>
+                <li>Extracteurs bois / blé / pierre + chantiers — validé</li>
+                <li>Coût expansion région (éclats) — validé</li>
+                <li>Food + barre croissance pop — validé</li>
+                <li>Feedback caps stocks (plein) — validé</li>
+                <li>Bonus fusion +20&nbsp;% — validé</li>
+                <li>Éclats de monde (prod HDV) — validé</li>
               </ul>
             </article>
             <article class="card priority-col">
               <h3><span class="priority priority-p1">P1</span> Important</h3>
               <ul>
-                <li>Chaînes industrielles</li>
+                <li>Mine (fer) + chaînes industrielles</li>
                 <li>Bonus d’adjacence (Civ-like)</li>
+                <li>Bâtiments prod. d’éclats</li>
                 <li>Sécuriser /admin</li>
                 <li>Routes</li>
                 <li>Villages additionnels</li>
@@ -1665,9 +1936,11 @@
             <article class="card priority-col">
               <h3><span class="priority priority-p3">P3</span> Ideas</h3>
               <ul>
+                <li>PvM — villages / ennemis à la gen</li>
+                <li>Caserne + soldats</li>
                 <li>PvP</li>
                 <li>Événements</li>
-                <li>Armées</li>
+                <li>Armées (expéditions)</li>
                 <li>Fonctionnalités sociales avancées</li>
               </ul>
             </article>
@@ -1698,16 +1971,20 @@
                 <strong>Visites de mondes</strong>
                 <p>Parcourir le diorama d’un autre joueur, sans le modifier.</p>
               </article>
+              <article class="task" draggable="true" data-id="task-pvm-hostile-regions">
+                <strong>PvM — régions hostiles</strong>
+                <p>Ennemis / villages ennemis à la génération. Caserne pour soldats. Voir section PvM.</p>
+              </article>
             </div>
             <div class="kanban-col" data-column="todo">
               <h3>Todo</h3>
               <article class="task" draggable="true" data-id="task-economy-resources">
-                <strong>Autres extracteurs MVP</strong>
-                <p>Mine (fer) — même roue build + workers (après carrière).</p>
+                <strong>Mine (fer)</strong>
+                <p>Même pattern extracteur + workers ; ouvre la chaîne forge (Phase 4).</p>
               </article>
               <article class="task" draggable="true" data-id="task-adjacency-after-extractors">
                 <strong>Adjacence après extracteurs</strong>
-                <p>Brancher les bonus voisins une fois farm/mine/camp en place.</p>
+                <p>Bonus voisins → rate une fois camp/ferme/carrière en place.</p>
               </article>
               <article class="task" draggable="true" data-id="task-admin-auth">
                 <strong>Sécuriser /admin</strong>
@@ -1719,9 +1996,41 @@
             </div>
             <div class="kanban-col" data-column="done">
               <h3>Done</h3>
+              <article class="task" draggable="true" data-id="task-stock-caps-feedback">
+                <strong>Feedback caps stocks</strong>
+                <p><code>stock/cap</code>, near/full, rate 0 au cap, hint soft bois plein (header + sheet).</p>
+              </article>
+              <article class="task" draggable="true" data-id="task-food-ui">
+                <strong>UI food + barre croissance</strong>
+                <p>Food net / stock + barre surplus 60 sur le header nuage (DEC-016–017).</p>
+              </article>
+              <article class="task" draggable="true" data-id="task-extractors-trio">
+                <strong>Extracteurs farm / carrière</strong>
+                <p>Roue build, meshes, chantiers timed, workers/tuile, stocks blé &amp; pierre (DEC-018).</p>
+              </article>
+              <article class="task" draggable="true" data-id="task-region-cost">
+                <strong>Coût expansion région</strong>
+                <p>DEC-015 bois (supersédé) → DEC-020 éclats = hop, badge roue biomes.</p>
+              </article>
+              <article class="task" draggable="true" data-id="task-worldshard">
+                <strong>Éclats de monde</strong>
+                <p>Ressource <code>worldshard</code>, prod HDV 1/15&nbsp;min, cap 5, UI header (DEC-020).</p>
+              </article>
+              <article class="task" draggable="true" data-id="task-fusion-bonus">
+                <strong>Bonus fusion +20&nbsp;%</strong>
+                <p>Extracteurs sur lisière / piémont / haute forêt + badge carte (DEC-019).</p>
+              </article>
+              <article class="task" draggable="true" data-id="task-food-settle">
+                <strong>Settle food / croissance</strong>
+                <p>DEC-016–017 dans <code>settleEconomy</code> + colonne surplus.</p>
+              </article>
+              <article class="task" draggable="true" data-id="task-play-cloud-ui">
+                <strong>UI play nuages</strong>
+                <p>Header + bottom sheet bâtiment, overlay sans décaler les FAB.</p>
+              </article>
               <article class="task" draggable="true" data-id="task-place-lumber">
                 <strong>Pose lumber_camp</strong>
-                <p>Roue build, mesh, <code>building_id</code>, <code>POST …/buildings</code>, prod liée au camp.</p>
+                <p>Roue build, mesh, <code>building_id</code>, <code>POST …/actions</code> (<code>build</code>), prod liée au camp.</p>
               </article>
               <article class="task" draggable="true" data-id="task-ads-txt">
                 <strong>ads.txt AdSense</strong>
@@ -1729,7 +2038,7 @@
               </article>
               <article class="task" draggable="true" data-id="task-economy-pop">
                 <strong>Population + travailleurs + bois</strong>
-                <p>Pop 4, max 1 worker/bâtiment (niv. 1), rate 12/h, cap 200, <code>POST …/workers</code>.</p>
+                <p>Pop 4, max 1 worker/bâtiment (niv. 1), rate historique 12/h → puis 5/min (DEC-018), <code>POST …/actions</code> (<code>assign_workers</code>).</p>
               </article>
               <article class="task" draggable="true" data-id="task-admin-ops">
                 <strong>Admin ops</strong>
@@ -1843,6 +2152,11 @@
               <h3>PvP instancié</h3>
               <p>Le joueur envoie ressources, unités, armées. Son monde principal reste protégé. V2, pas MVP.</p>
             </article>
+            <article class="card idea" data-status="experiment">
+              <span class="status status-experiment">Experiment</span>
+              <h3>PvM — villages hostiles</h3>
+              <p>À la génération d’une région : chance d’ennemis ou d’un village ennemi. Caserne pour former des soldats. Avant le PvP. Voir <a href="#pvm">PvM</a>.</p>
+            </article>
             <article class="card idea" data-status="idea">
               <span class="status status-idea">Idea</span>
               <h3>Commerce entre joueurs</h3>
@@ -1895,7 +2209,7 @@
         <section id="pvp">
           <p class="section-kicker">Évolution</p>
           <h2>PvP</h2>
-          <p>Le PvP n’est pas une priorité du MVP. Il est prévu comme une évolution, uniquement s’il s’intègre au fantasme de monde personnel.</p>
+          <p>Le PvP n’est pas une priorité du MVP. Il est prévu comme une évolution, uniquement s’il s’intègre au fantasme de monde personnel. Le <a href="#pvm">PvM</a> (ennemis / villages hostiles dans le monde perso) est l’étape intermédiaire naturelle avant d’ouvrir le conflit joueur contre joueur.</p>
           <div class="grid grid-3">
             <article class="card">
               <h3>V1 — Indirect</h3>
@@ -1908,6 +2222,66 @@
             <article class="card">
               <h3>Plus tard</h3>
               <p>Conflits plus avancés seulement si cela s’intègre correctement au jeu, sans détruire le diorama personnel.</p>
+            </article>
+          </div>
+        </section>
+
+        <!-- PvM -->
+        <section id="pvm">
+          <p class="section-kicker">Évolution</p>
+          <h2>PvM</h2>
+          <p class="lead">Conflit contre le monde, pas contre d’autres joueurs. Des menaces apparaissent dans le diorama personnel quand le joueur étend son territoire — sans envahir le monde d’autrui.</p>
+          <p>Hors scope MVP. Priorité <strong>P3</strong>, avant le PvP instancié : valider la caserne, les soldats et la résolution de menaces dans un espace solo persistant.</p>
+
+          <div class="grid grid-3" style="margin-top:14px">
+            <article class="card">
+              <h3>Apparition à la génération</h3>
+              <p>Lorsqu’une nouvelle région est révélée / générée, une chance (rare, paramétrable) de faire apparaître :</p>
+              <ul class="tech-list">
+                <li><strong>Ennemis</strong> — campement, bande, créature sur 1 hex (ou petit groupe)</li>
+                <li><strong>Village ennemi</strong> — occupation hostile d’un centre / d’une tuile clé de la région</li>
+              </ul>
+              <p style="margin-top:10px;color:var(--muted);font-size:0.92rem">Jamais sur la région de départ. Compatible avec le réseau de centres actuel (DEC-009) : le site hostile est une couche sur des tuiles déjà générées, pas un second système de biomes.</p>
+            </article>
+            <article class="card">
+              <h3>Caserne &amp; soldats</h3>
+              <p>Bâtiment <code>barracks</code> (Later) : convertit de la population / des workers (et éventuellement des outils) en <strong>soldats</strong>.</p>
+              <ul class="tech-list">
+                <li>Même philosophie que le reste : pas de micro-contrôle temps réel</li>
+                <li>Affectation / envoi d’une force vers un site hostile</li>
+                <li>Résolution plutôt « gestion » (préparation, coût, délai, résultat) que RTS</li>
+              </ul>
+            </article>
+            <article class="card">
+              <h3>Pourquoi avant le PvP</h3>
+              <ul class="tech-list">
+                <li>Donne un sink à la pop et aux outils sans ouvrir le multijoueur conflictuel</li>
+                <li>Rend l’expansion de carte plus tendue (risque à chaque « + »)</li>
+                <li>Réutilise l’UI bâtiment (bottom sheet) et la génération de région déjà en place</li>
+                <li>Prépare les concepts « unités / armées » pour un PvP instancié plus tard</li>
+              </ul>
+            </article>
+          </div>
+
+          <div class="grid grid-2" style="margin-top:14px">
+            <article class="card">
+              <h3>Boucle cible</h3>
+              <ol class="tech-list">
+                <li>Le joueur génère une région</li>
+                <li>Parfois : ennemis ou village hostile apparaissent sur la carte</li>
+                <li>Il prépare une force via la caserne (pop / ressources)</li>
+                <li>Il lance une action de clarification / conquête du site</li>
+                <li>Récompense : sécuriser la zone, loot, prestige, ou débloquer la tuile pour construire</li>
+              </ol>
+            </article>
+            <article class="card">
+              <h3>Garde-fous</h3>
+              <ul class="tech-list">
+                <li>Fréquence basse au début — l’expansion reste plaisante, pas une guerre permanente</li>
+                <li>Le monde principal reste un diorama : pas de vague infinie type tower defense</li>
+                <li>Pas de P2W sur la force militaire (aligné DEC monétisation cosmétique)</li>
+                <li>Distinct des <a href="#wiki-pois">POI</a> : un village hostile est une menace à résoudre, pas un bonus passif</li>
+              </ul>
             </article>
           </div>
         </section>
@@ -1927,7 +2301,7 @@
             </article>
             <article class="risk-card">
               <h3>Economy balance <span class="badge badge-warning">Medium</span></h3>
-              <p>Risque de chaînes trop compliquées ou trop lentes. Mitigation : valider fer → outils avant d’ajouter des branches.</p>
+              <p>Risque de chaînes trop compliquées, trop lentes, ou d’accumulation hors contrôle. Mitigation : valider fer → outils avant d’ajouter des branches ; <strong>caps de stock + sinks</strong> pour forcer la dépense (voir Economy).</p>
             </article>
             <article class="risk-card">
               <h3>World generation <span class="badge badge-warning">Medium</span></h3>
@@ -1935,7 +2309,7 @@
             </article>
             <article class="risk-card">
               <h3>Scope <span class="badge badge-danger">High</span></h3>
-              <p>Risque d’ajouter PvP, social ou commerce trop tôt. Mitigation : hors scope MVP explicite, P3 jusqu’à la boucle fun.</p>
+              <p>Risque d’ajouter PvP, PvM, social ou commerce trop tôt. Mitigation : hors scope MVP explicite, P3 jusqu’à la boucle fun ; PvM avant PvP.</p>
             </article>
             <article class="risk-card">
               <h3>Admin ouvert <span class="badge badge-warning">Medium</span></h3>
@@ -1954,12 +2328,15 @@
           <div class="check-grid">
             <div class="check-item is-done"><span class="check-box"></span>Carte hexagonale agréable</div>
             <div class="check-item is-done"><span class="check-box"></span>Biomes : forêt, plaine, montagne, eau (+ rivages d’arête)</div>
-            <div class="check-item is-done"><span class="check-box"></span>Génération d’une nouvelle région</div>
+            <div class="check-item is-done"><span class="check-box"></span>Génération d’une nouvelle région (+ coût éclats)</div>
             <div class="check-item is-done"><span class="check-box"></span>Village</div>
-            <div class="check-item is-done"><span class="check-box"></span>Population + affectation travailleurs (bois v0)</div>
-            <div class="check-item is-done"><span class="check-box"></span>Récolte bois (lazy offline + camp posé)</div>
-            <div class="check-item is-done"><span class="check-box"></span>Pose extracteurs (camp / ferme / carrière)</div>
-            <div class="check-item"><span class="check-box"></span>Autres ressources (blé, pierre, minerai)</div>
+            <div class="check-item is-done"><span class="check-box"></span>Population + affectation travailleurs</div>
+            <div class="check-item is-done"><span class="check-box"></span>Récolte bois / blé / pierre (lazy + extracteurs posés)</div>
+            <div class="check-item is-done"><span class="check-box"></span>Pose extracteurs + chantiers (camp / ferme / carrière)</div>
+            <div class="check-item is-done"><span class="check-box"></span>Autres ressources extracteurs (blé, pierre)</div>
+            <div class="check-item is-done"><span class="check-box"></span>UI food + croissance pop (barre)</div>
+            <div class="check-item is-done"><span class="check-box"></span>Éclats de monde (expansion)</div>
+            <div class="check-item is-done"><span class="check-box"></span>Bonus fusion +20&nbsp;% extracteurs</div>
             <div class="check-item"><span class="check-box"></span>Mine + minerai</div>
             <div class="check-item"><span class="check-box"></span>Fonderie + lingot</div>
             <div class="check-item"><span class="check-box"></span>Forge + outils</div>
@@ -1971,7 +2348,9 @@
           <h3 style="margin-top:32px">Out of Scope MVP</h3>
           <div class="out-scope">
             <span>PvP</span>
+            <span>PvM / villages hostiles</span>
             <span>Combat</span>
+            <span>Caserne / soldats</span>
             <span>Marché global</span>
             <span>Alliances</span>
             <span>Armées</span>
@@ -1984,7 +2363,7 @@
         </section>
 
         <footer class="page-foot">
-          Hexald — Project Hub. Site statique de documentation, pas le jeu. Ouvrir <code>docs/index.html</code> dans le navigateur. Dernière mise à jour du contenu : 25 août 2026 (bonus adjacence Civ · DEC-014 · Phase 3).
+          Hexald — Project Hub. Site statique de documentation, pas le jeu. Ouvrir <code>docs/index.html</code> dans le navigateur. Dernière mise à jour du contenu : 26 août 2026 (DEC-019 fusion · DEC-020 éclats · Phase 3).
         </footer>
       </div>
     </div>

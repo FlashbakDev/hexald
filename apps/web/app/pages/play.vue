@@ -1,30 +1,45 @@
 <script setup lang="ts">
 import type {
+  BiomeId,
   BuildingId,
   HexCoord,
   PrimaryBiomeId,
   WorldTileSnapshot
 } from "@hexald/shared";
 import {
+  biomes,
   buildings,
   BUILD_COST_WOOD,
   BUILD_IDLE_POP_REQUIREMENT,
   BUILD_DURATION_MS,
   DEV_BUILD_DURATION_MS,
+  getBuildingDefinition,
   primaryBiomes,
   STONE_RATE_PER_WORKER_PER_MINUTE,
   WHEAT_RATE_PER_WORKER_PER_MINUTE,
   WOOD_RATE_PER_WORKER_PER_MINUTE,
+  TOWN_HALL_WORLDSHARD_INTERVAL_MS,
+  type PlaceableBuildingId,
   type PlaceableExtractorId
 } from "@hexald/content";
 import {
   computeRegionExpansionCost,
   listBuildOptionsForTile,
   isBuildingUnderConstruction,
+  isFusionBiome,
   committedWorkersFromTiles,
+  tileProductionMultiplier,
+  woodRefundOnDestroy,
+  adjacentRegionCenters,
+  canPlaceRegion,
   WORKERS_PER_EXTRACTOR_L1
 } from "@hexald/game-core";
 import type { HexScreenPoint, SelectedTile } from "~/renderer/createHexScene";
+import type { TutorialHole } from "~/composables/usePlayTutorial";
+import {
+  PLAY_TUTORIAL_STEPS,
+  usePlayTutorial
+} from "~/composables/usePlayTutorial";
 
 definePageMeta({
   layout: "blank"
@@ -36,8 +51,10 @@ const {
   expandRegion,
   assignWorkers,
   buildBuilding,
+  destroyBuilding,
   resetWorld,
   grantDevResources,
+  setTileBiomeDev,
   refreshWorld,
   world,
   error: worldError
@@ -65,7 +82,10 @@ const preview = useTemplateRef<{
     tiles: readonly WorldTileSnapshot[]
   ) => boolean;
   applyBuilding: (q: number, r: number, buildingId: BuildingId) => boolean;
+  removeBuilding: (q: number, r: number) => boolean;
+  applyTileBiome: (q: number, r: number, biome: BiomeId) => boolean;
   projectTile: (q: number, r: number) => HexScreenPoint | null;
+  setTutorialHighlights: (coords: readonly HexCoord[]) => void;
 }>("preview");
 
 const stage = useTemplateRef<HTMLElement>("stage");
@@ -76,8 +96,30 @@ const expandError = ref<string | null>(null);
 const assigning = ref(false);
 const resetting = ref(false);
 const granting = ref(false);
+const debugBiomeOpen = ref(false);
+const settingBiome = ref(false);
+const destroyConfirm = ref(false);
+const destroying = ref(false);
 const nowTick = ref(Date.now());
 const isDevClient = import.meta.dev;
+const { hasNoAds, setDevNoAds } = useAds();
+
+const {
+  active: tutorialActive,
+  step: tutorialStep,
+  stepIndex: tutorialStepIndex,
+  start: startTutorial,
+  reset: resetTutorial,
+  skip: skipTutorial,
+  goNext: nextTutorialStep,
+  complete: completeTutorial,
+  onTileSelected: tutorialOnTileSelected,
+  onBuildingPlaced: tutorialOnBuildingPlaced,
+  onRegionCreated: tutorialOnRegionCreated
+} = usePlayTutorial();
+
+const tutorialHoleTick = ref(0);
+let tutorialHoleRaf: number | null = null;
 
 const wheelInteractive = ref(false);
 let wheelReadyTimer: ReturnType<typeof setTimeout> | null = null;
@@ -93,6 +135,22 @@ onMounted(() => {
     void refreshWorld();
   }, 30_000);
   startOverlayLoop();
+  if (world.value) {
+    window.setTimeout(() => startTutorial(), 700);
+  }
+});
+
+watch(tutorialActive, (on) => {
+  if (tutorialHoleRaf != null) {
+    cancelAnimationFrame(tutorialHoleRaf);
+    tutorialHoleRaf = null;
+  }
+  if (!on) return;
+  const holeLoop = () => {
+    tutorialHoleTick.value += 1;
+    tutorialHoleRaf = requestAnimationFrame(holeLoop);
+  };
+  tutorialHoleRaf = requestAnimationFrame(holeLoop);
 });
 
 onBeforeUnmount(() => {
@@ -103,19 +161,36 @@ onBeforeUnmount(() => {
     cancelAnimationFrame(overlayRaf);
     overlayRaf = null;
   }
+  if (tutorialHoleRaf != null) {
+    cancelAnimationFrame(tutorialHoleRaf);
+    tutorialHoleRaf = null;
+  }
+  for (const timer of destroyFloatTimers) clearTimeout(timer);
+  destroyFloatTimers.clear();
 });
 
 const economy = computed(() => world.value?.economy ?? null);
+const population = computed(() => economy.value?.population ?? 0);
 const populationCap = computed(() => economy.value?.populationCap ?? 0);
+const worldName = computed(() => "No Name");
 
-const buildingDefs: Record<
-  PlaceableExtractorId,
-  { label: string; icon: string; short: string }
-> = {
-  lumber_camp: { label: "Camp de bûcherons", icon: "i-lucide-trees", short: "Camp" },
-  farm: { label: "Ferme", icon: "i-lucide-wheat", short: "Ferme" },
-  quarry: { label: "Carrière", icon: "i-lucide-mountain", short: "Carrière" }
+/** Icônes UI — labels / coûts viennent du catalogue `buildings`. */
+const buildingIcons: Record<PlaceableBuildingId, { icon: string; short: string }> = {
+  lumber_camp: { icon: "i-lucide-trees", short: "Camp" },
+  farm: { icon: "i-lucide-wheat", short: "Ferme" },
+  quarry: { icon: "i-lucide-pickaxe", short: "Carrière" },
+  house: { icon: "i-lucide-home", short: "Maison" }
 };
+
+function buildingUi(id: PlaceableBuildingId) {
+  const definition = getBuildingDefinition(id);
+  const icons = buildingIcons[id];
+  return {
+    label: definition?.label ?? id,
+    icon: icons.icon,
+    short: icons.short
+  };
+}
 
 function projectedStock(
   stock: number,
@@ -129,29 +204,267 @@ function projectedStock(
   return Math.min(cap, stock + ratePerMinute * minutes);
 }
 
+function extractorRatePerMinute(
+  buildingId: PlaceableExtractorId,
+  baseRate: number
+): number {
+  const tiles = world.value?.tiles;
+  if (!tiles?.length) return 0;
+  const now = nowTick.value;
+  let total = 0;
+  for (const tile of tiles) {
+    if (tile.buildingId !== buildingId) continue;
+    if (isBuildingUnderConstruction(tile.constructionCompletesAt, now)) continue;
+    const workers = Math.max(0, Math.floor(tile.assignedWorkers ?? 0));
+    total += workers * baseRate * tileProductionMultiplier(tile.biome);
+  }
+  return total;
+}
+
+const liveWoodRate = computed(() =>
+  extractorRatePerMinute("lumber_camp", WOOD_RATE_PER_WORKER_PER_MINUTE)
+);
+const liveWheatRate = computed(() =>
+  extractorRatePerMinute("farm", WHEAT_RATE_PER_WORKER_PER_MINUTE)
+);
+const liveStoneRate = computed(() =>
+  extractorRatePerMinute("quarry", STONE_RATE_PER_WORKER_PER_MINUTE)
+);
+
 const displayedWood = computed(() => {
   const eco = economy.value;
   if (!eco) return 0;
-  const rate = eco.hasLumberCamp
-    ? eco.woodcutters * WOOD_RATE_PER_WORKER_PER_MINUTE
-    : 0;
-  return projectedStock(eco.wood, eco.woodCap, eco.woodLastCalculatedAt, rate);
+  const stock = eco.stocks?.find((s) => s.resourceId === "wood");
+  const amount = stock?.amount ?? eco.wood;
+  const cap = stock?.cap ?? eco.woodCap;
+  const last = stock?.lastCalculatedAt ?? eco.woodLastCalculatedAt;
+  return projectedStock(amount, cap, last, liveWoodRate.value);
+});
+
+const woodCap = computed(() => {
+  const eco = economy.value;
+  if (!eco) return 200;
+  return eco.stocks?.find((s) => s.resourceId === "wood")?.cap ?? eco.woodCap;
 });
 
 const displayedWheat = computed(() => {
   const eco = economy.value;
   if (!eco) return 0;
-  const rate = eco.hasFarm ? eco.farmers * WHEAT_RATE_PER_WORKER_PER_MINUTE : 0;
-  return projectedStock(eco.wheat, eco.wheatCap, eco.wheatLastCalculatedAt, rate);
+  const stock = eco.stocks?.find((s) => s.resourceId === "wheat");
+  const amount = stock?.amount ?? eco.wheat;
+  const cap = stock?.cap ?? eco.wheatCap;
+  const last = stock?.lastCalculatedAt ?? eco.wheatLastCalculatedAt;
+  return projectedStock(amount, cap, last, liveWheatRate.value);
+});
+
+const wheatCap = computed(() => {
+  const eco = economy.value;
+  if (!eco) return 200;
+  return eco.stocks?.find((s) => s.resourceId === "wheat")?.cap ?? eco.wheatCap;
 });
 
 const displayedStone = computed(() => {
   const eco = economy.value;
   if (!eco) return 0;
-  const rate = eco.hasQuarry
-    ? eco.quarriers * STONE_RATE_PER_WORKER_PER_MINUTE
-    : 0;
-  return projectedStock(eco.stone, eco.stoneCap, eco.stoneLastCalculatedAt, rate);
+  const stock = eco.stocks?.find((s) => s.resourceId === "stone");
+  const amount = stock?.amount ?? eco.stone;
+  const cap = stock?.cap ?? eco.stoneCap;
+  const last = stock?.lastCalculatedAt ?? eco.stoneLastCalculatedAt;
+  return projectedStock(amount, cap, last, liveStoneRate.value);
+});
+
+const stoneCap = computed(() => {
+  const eco = economy.value;
+  if (!eco) return 150;
+  return eco.stocks?.find((s) => s.resourceId === "stone")?.cap ?? eco.stoneCap;
+});
+
+const displayedFood = computed(() => {
+  const eco = economy.value;
+  if (!eco) return 0;
+  const stock = eco.stocks?.find((s) => s.resourceId === "food");
+  const amount = stock?.amount ?? eco.food ?? 0;
+  const cap = stock?.cap ?? eco.foodCap ?? 80;
+  const last = stock?.lastCalculatedAt ?? eco.foodLastCalculatedAt;
+  if (!last) return Math.floor(amount);
+  const rate = eco.foodNetPerMinute ?? 0;
+  if (rate >= 0) {
+    return projectedStock(amount, cap, last, rate);
+  }
+  const lastMs = Date.parse(last);
+  if (Number.isNaN(lastMs)) return Math.floor(amount);
+  const minutes = Math.max(0, (nowTick.value - lastMs) / 60_000);
+  return Math.max(0, amount + rate * minutes);
+});
+
+const foodCap = computed(() => {
+  const eco = economy.value;
+  if (!eco) return 80;
+  return eco.stocks?.find((s) => s.resourceId === "food")?.cap ?? eco.foodCap ?? 80;
+});
+
+const displayedWorldshard = computed(() => {
+  const eco = economy.value;
+  if (!eco) return 0;
+  const stock = eco.stocks?.find((s) => s.resourceId === "worldshard");
+  if (!stock) return 0;
+  const amount = stock.amount;
+  const cap = stock.cap;
+  if (amount >= cap - 1e-9) return Math.floor(cap);
+  const last = Date.parse(stock.lastCalculatedAt);
+  if (Number.isNaN(last) || TOWN_HALL_WORLDSHARD_INTERVAL_MS <= 0) {
+    return Math.floor(amount);
+  }
+  const elapsed = Math.max(0, nowTick.value - last);
+  const gained = Math.floor(elapsed / TOWN_HALL_WORLDSHARD_INTERVAL_MS);
+  return Math.min(cap, Math.floor(amount) + gained);
+});
+
+const worldshardCap = computed(() => {
+  const eco = economy.value;
+  if (!eco) return 5;
+  return eco.stocks?.find((s) => s.resourceId === "worldshard")?.cap ?? 5;
+});
+
+const worldshardRateLabel = computed(() => {
+  const minutes = Math.max(1, Math.round(TOWN_HALL_WORLDSHARD_INTERVAL_MS / 60_000));
+  return `1/${minutes}min`;
+});
+
+type StockFillLevel = "ok" | "near" | "full";
+
+function stockFillLevel(amount: number, cap: number): StockFillLevel {
+  if (cap <= 0) return "ok";
+  const ratio = amount / cap;
+  if (ratio >= 1 - 1e-9) return "full";
+  if (ratio >= 0.7) return "near";
+  return "ok";
+}
+
+function formatRatePerMinute(rate: number): string {
+  if (rate <= 0) return "0/min";
+  const rounded = Math.round(rate * 10) / 10;
+  return Number.isInteger(rounded) ? `${rounded}/min` : `${rounded.toFixed(1)}/min`;
+}
+
+const woodStockUi = computed(() => {
+  const amount = displayedWood.value;
+  const cap = woodCap.value;
+  const level = stockFillLevel(amount, cap);
+  const rate = level === "full" ? "0/min" : formatRatePerMinute(liveWoodRate.value);
+  return { amount, cap, level, rate };
+});
+
+const wheatStockUi = computed(() => {
+  const amount = displayedWheat.value;
+  const cap = wheatCap.value;
+  const level = stockFillLevel(amount, cap);
+  const rate = level === "full" ? "0/min" : formatRatePerMinute(liveWheatRate.value);
+  return { amount, cap, level, rate };
+});
+
+const stoneStockUi = computed(() => {
+  const amount = displayedStone.value;
+  const cap = stoneCap.value;
+  const level = stockFillLevel(amount, cap);
+  const rate = level === "full" ? "0/min" : formatRatePerMinute(liveStoneRate.value);
+  return { amount, cap, level, rate };
+});
+
+const foodStockUi = computed(() => {
+  const amount = displayedFood.value;
+  const cap = foodCap.value;
+  const level = stockFillLevel(amount, cap);
+  const eco = economy.value;
+  // Food net still drives growth even when stock is capped — keep net visible unless full stock + positive net.
+  let rate = "0/min";
+  if (eco) {
+    const net = eco.foodNetPerMinute ?? 0;
+    if (level === "full" && net > 0) {
+      rate = "0/min";
+    } else if (net !== 0) {
+      rate = formatRatePerMinute(net);
+    }
+  }
+  return { amount, cap, level, rate };
+});
+
+const worldshardStockUi = computed(() => {
+  const amount = displayedWorldshard.value;
+  const cap = worldshardCap.value;
+  const level = stockFillLevel(amount, cap);
+  const rate = level === "full" ? "plein" : worldshardRateLabel.value;
+  return { amount, cap, level, rate };
+});
+
+/** Un seul hint soft : priorité bois plein → dépenser (build). */
+const stockSinkHint = computed(() => {
+  if (woodStockUi.value.level !== "full") return null;
+  return "Stock bois plein — construis un bâtiment";
+});
+
+const popGrowthLabel = computed(() => {
+  const eco = economy.value;
+  if (!eco) return null;
+  const required = eco.popGrowthSurplusRequired ?? 60;
+  const base = eco.foodSurplusAccumulated ?? 0;
+  const net = eco.foodNetPerMinute ?? 0;
+  const last = eco.foodLastCalculatedAt;
+  const atCap = eco.population >= eco.populationCap;
+  let projected = base;
+  // Même au cap logements, on projette le remplissage (blé / surplus food).
+  if (net > 0 && last) {
+    const lastMs = Date.parse(last);
+    if (!Number.isNaN(lastMs)) {
+      const minutes = Math.max(0, (nowTick.value - lastMs) / 60_000);
+      projected = base + Math.floor(net * minutes);
+    }
+  }
+  projected = Math.min(required, Math.max(0, projected));
+  if (atCap && projected >= required) return `${required}/${required}`;
+  return `${projected}/${required}`;
+});
+
+const popGrowthPercent = computed(() => {
+  const eco = economy.value;
+  if (!eco) return 0;
+  const required = eco.popGrowthSurplusRequired ?? 60;
+  if (required <= 0) return 0;
+  const label = popGrowthLabel.value;
+  if (!label) return 0;
+  const [a] = label.split("/").map(Number);
+  return Math.min(100, Math.round(((a ?? 0) / required) * 100));
+});
+
+/**
+ * idle — pas de surplus food (barre grise / vide)
+ * growing — logements OK + food qui monte → vert
+ * housing — cap pop (manque de maisons) → orange + icône maison barrée
+ */
+type PopGrowthTone = "idle" | "growing" | "housing";
+
+const popGrowthTone = computed((): PopGrowthTone => {
+  const eco = economy.value;
+  if (!eco) return "idle";
+  if (eco.population >= eco.populationCap) return "housing";
+  const net = eco.foodNetPerMinute ?? 0;
+  if (net > 0 || popGrowthPercent.value > 0) return "growing";
+  return "idle";
+});
+
+const popGrowthTitle = computed(() => {
+  const eco = economy.value;
+  if (!eco) return "";
+  const label = popGrowthLabel.value;
+  if (popGrowthTone.value === "housing") {
+    return label
+      ? `Surplus nourriture · ${label} · besoin de logements pour +1`
+      : "Cap de population — construis des logements pour grandir";
+  }
+  if (popGrowthTone.value === "idle") {
+    return "Croissance à l’arrêt — besoin d’un surplus de nourriture";
+  }
+  return `Prochain habitant · ${label}`;
 });
 
 const idlePop = computed(() => {
@@ -159,29 +472,6 @@ const idlePop = computed(() => {
   const tiles = world.value?.tiles;
   if (!eco || !tiles) return 0;
   return Math.max(0, eco.population - committedWorkersFromTiles(tiles));
-});
-
-function rateLabel(count: number, rate: number, active: boolean) {
-  if (!active || count === 0) return "0/min";
-  return `${count * rate}/min`;
-}
-
-const woodRateLabel = computed(() => {
-  const eco = economy.value;
-  if (!eco) return "0/min";
-  return rateLabel(eco.woodcutters, WOOD_RATE_PER_WORKER_PER_MINUTE, eco.hasLumberCamp);
-});
-
-const wheatRateLabel = computed(() => {
-  const eco = economy.value;
-  if (!eco) return "0/min";
-  return rateLabel(eco.farmers, WHEAT_RATE_PER_WORKER_PER_MINUTE, eco.hasFarm);
-});
-
-const stoneRateLabel = computed(() => {
-  const eco = economy.value;
-  if (!eco) return "0/min";
-  return rateLabel(eco.quarriers, STONE_RATE_PER_WORKER_PER_MINUTE, eco.hasQuarry);
 });
 
 const selectedWorldTile = computed(() => {
@@ -199,7 +489,8 @@ const selectedConstruction = computed(() => {
   if (
     buildingId !== "lumber_camp" &&
     buildingId !== "farm" &&
-    buildingId !== "quarry"
+    buildingId !== "quarry" &&
+    buildingId !== "house"
   ) {
     return null;
   }
@@ -230,7 +521,7 @@ function formatRemaining(ms: number) {
   return `${min}:${sec.toString().padStart(2, "0")}`;
 }
 
-type MapBadgeKind = "pop" | "workers" | "timer";
+type MapBadgeKind = "pop" | "workers" | "timer" | "bonus";
 
 type MapBadge = {
   key: string;
@@ -238,13 +529,31 @@ type MapBadge = {
   r: number;
   kind: MapBadgeKind;
   label: string;
-  icon: string;
+  icon?: string;
   x: number;
   y: number;
   visible: boolean;
   /** Extracteur sans pop assignée. */
   needsWorkers?: boolean;
 };
+
+type DestroyFloatKind = "wood" | "workers";
+
+type DestroyFloat = {
+  id: number;
+  kind: DestroyFloatKind;
+  label: string;
+  icon: string;
+  x: number;
+  y: number;
+  /** Décalage horizontal relatif (stagger). */
+  offsetX: number;
+  delayMs: number;
+};
+
+const destroyFloats = ref<DestroyFloat[]>([]);
+let destroyFloatSeq = 0;
+const destroyFloatTimers = new Set<ReturnType<typeof setTimeout>>();
 
 const overlayPositions = ref(
   new Map<string, { x: number; y: number; visible: boolean }>()
@@ -281,7 +590,8 @@ const mapBadges = computed((): MapBadge[] => {
     q: START_VILLAGE.q,
     r: START_VILLAGE.r,
     kind: "pop",
-    label: `${idlePop.value}/${eco.populationCap}`,
+    /** Habitants libres / pop actuelle — pas le plafond de croissance (affiché dans le header). */
+    label: `${idlePop.value}/${eco.population}`,
     icon: "i-lucide-users",
     x: villagePos?.x ?? -9999,
     y: villagePos?.y ?? -9999,
@@ -289,9 +599,32 @@ const mapBadges = computed((): MapBadge[] => {
   });
 
   for (const tile of tiles) {
-    if (!tile.buildingId) continue;
     const key = `${tile.q},${tile.r}`;
     const pos = overlayPositions.value.get(key);
+
+    if (isFusionBiome(tile.biome)) {
+      const buildingId = tile.buildingId;
+      const isProductionBuilding =
+        buildingId == null ||
+        buildingId === "lumber_camp" ||
+        buildingId === "farm" ||
+        buildingId === "quarry";
+      if (isProductionBuilding) {
+        out.push({
+          key: `bonus:${key}`,
+          q: tile.q,
+          r: tile.r,
+          kind: "bonus",
+          label: "+20%",
+          x: pos?.x ?? -9999,
+          y: pos?.y ?? -9999,
+          visible: pos?.visible ?? false
+        });
+      }
+    }
+
+    if (!tile.buildingId) continue;
+
     const underConstruction = isBuildingUnderConstruction(
       tile.constructionCompletesAt,
       now
@@ -340,7 +673,7 @@ function collectOverlayTargets(): { q: number; r: number }[] {
   const targets: { q: number; r: number }[] = [{ ...START_VILLAGE }];
   const seen = new Set([`${START_VILLAGE.q},${START_VILLAGE.r}`]);
   for (const tile of tiles) {
-    if (!tile.buildingId) continue;
+    if (!tile.buildingId && !isFusionBiome(tile.biome)) continue;
     const key = `${tile.q},${tile.r}`;
     if (seen.has(key)) continue;
     seen.add(key);
@@ -387,31 +720,19 @@ const hasActiveConstruction = computed(
     }) ?? false
 );
 
+/** Un seul refresh quand le dernier chantier passe de « en cours » à « terminé ». */
 watch(hasActiveConstruction, (active, wasActive) => {
   if (wasActive && !active) void refreshWorld();
-});
-
-watch(nowTick, (now) => {
-  const tiles = world.value?.tiles;
-  if (!tiles?.length) return;
-  const due = tiles.some((tile) => {
-    const at = tile.constructionCompletesAt;
-    if (!at || !tile.buildingId) return false;
-    const ends = Date.parse(at);
-    return !Number.isNaN(ends) && ends <= now;
-  });
-  if (due) void refreshWorld();
 });
 
 const buildOptions = computed(() => {
   const tile = selected.value;
   const tiles = world.value?.tiles;
-  if (!tile?.biome || !tiles) return [] as PlaceableExtractorId[];
+  if (!tile?.biome || !tiles) return [] as PlaceableBuildingId[];
   return listBuildOptionsForTile({
     biome: tile.biome,
     hasVillage: tile.hasVillage,
-    existingBuildingId: tile.buildingId ?? null,
-    wood: displayedWood.value
+    existingBuildingId: tile.buildingId ?? null
   });
 });
 
@@ -420,13 +741,15 @@ const buildWheelSlots = computed(() => {
   const n = options.length;
   const hasWood = (cost: number) => displayedWood.value + 1e-9 >= cost;
   const hasIdlePop = idlePop.value + 1e-9 >= BUILD_IDLE_POP_REQUIREMENT;
+  // Arc supérieur (gauche → haut → droite) pour laisser le bas au debug.
+  const arcSpan = Math.PI * 0.85;
+  const arcStart = -Math.PI / 2 - arcSpan / 2;
   return options.map((id, index) => {
     const angle =
-      n === 1 ? -Math.PI / 2 : -Math.PI / 2 + (index * 2 * Math.PI) / n;
+      n <= 1 ? -Math.PI / 2 : arcStart + (index * arcSpan) / (n - 1);
     const radius = 56;
-    const def = buildingDefs[id];
-    const woodCost = BUILD_COST_WOOD[id];
-    const canAffordWood = hasWood(woodCost);
+    const def = buildingUi(id);
+    const woodCost = BUILD_COST_WOOD[id] ?? getBuildingDefinition(id)?.woodCost ?? 0;    const canAffordWood = hasWood(woodCost);
     return {
       id,
       woodCost,
@@ -459,44 +782,54 @@ const selectedWorkerPanel = computed((): WorkerPanel | null => {
 
   const assigned = tile.assignedWorkers ?? 0;
   const max = WORKERS_PER_EXTRACTOR_L1;
+  const mult = tileProductionMultiplier(tile.biome);
 
   if (tile.buildingId === "lumber_camp") {
+    const stockFull = woodStockUi.value.level === "full";
     return {
       title: "Bûcheron",
-      hint: "Assigne un habitant du village pour produire du bois sur ce camp.",
+      hint: stockFull
+        ? "Stock bois plein — construis pour libérer de la place."
+        : "Assigne un habitant du village pour produire du bois sur ce camp.",
       count: assigned,
       max,
       rateLabel:
-        assigned > 0
-          ? `${assigned * WOOD_RATE_PER_WORKER_PER_MINUTE}/min`
+        assigned > 0 && !stockFull
+          ? formatRatePerMinute(assigned * WOOD_RATE_PER_WORKER_PER_MINUTE * mult)
           : "0/min",
       canAdd: !assigning.value && assigned < max && idlePop.value > 0,
       canRemove: !assigning.value && assigned > 0
     };
   }
   if (tile.buildingId === "farm") {
+    const stockFull = wheatStockUi.value.level === "full";
     return {
       title: "Fermier",
-      hint: "Assigne un habitant du village pour produire du blé sur cette ferme.",
+      hint: stockFull
+        ? "Stock blé plein — transforme ou dépense pour libérer de la place."
+        : "Assigne un habitant du village pour produire du blé sur cette ferme.",
       count: assigned,
       max,
       rateLabel:
-        assigned > 0
-          ? `${assigned * WHEAT_RATE_PER_WORKER_PER_MINUTE}/min`
+        assigned > 0 && !stockFull
+          ? formatRatePerMinute(assigned * WHEAT_RATE_PER_WORKER_PER_MINUTE * mult)
           : "0/min",
       canAdd: !assigning.value && assigned < max && idlePop.value > 0,
       canRemove: !assigning.value && assigned > 0
     };
   }
   if (tile.buildingId === "quarry") {
+    const stockFull = stoneStockUi.value.level === "full";
     return {
       title: "Carrier",
-      hint: "Assigne un habitant du village pour produire de la pierre sur cette carrière.",
+      hint: stockFull
+        ? "Stock pierre plein — construis pour libérer de la place."
+        : "Assigne un habitant du village pour produire de la pierre sur cette carrière.",
       count: assigned,
       max,
       rateLabel:
-        assigned > 0
-          ? `${assigned * STONE_RATE_PER_WORKER_PER_MINUTE}/min`
+        assigned > 0 && !stockFull
+          ? formatRatePerMinute(assigned * STONE_RATE_PER_WORKER_PER_MINUTE * mult)
           : "0/min",
       canAdd: !assigning.value && assigned < max && idlePop.value > 0,
       canRemove: !assigning.value && assigned > 0
@@ -510,18 +843,24 @@ const buildingLabel = (id: BuildingId | null | undefined) => {
   return buildings.find((entry) => entry.id === id)?.label ?? id;
 };
 
-const biomeSwatch: Record<PrimaryBiomeId, string> = {
+const biomeSwatch: Record<BiomeId, string> = {
   forest: "#62c46f",
   plains: "#8fce6e",
   mountain: "#d0d7e2",
-  water: "#62bfe8"
+  water: "#62bfe8",
+  forest_plains: "#a8c45e",
+  plains_mountain: "#c4b894",
+  forest_mountain: "#7a9a7e"
 };
 
-const biomeIcon: Record<PrimaryBiomeId, string> = {
+const biomeIcon: Record<BiomeId, string> = {
   forest: "i-lucide-trees",
   plains: "i-lucide-sprout",
   mountain: "i-lucide-mountain",
-  water: "i-lucide-waves"
+  water: "i-lucide-waves",
+  forest_plains: "i-lucide-leaf",
+  plains_mountain: "i-lucide-mountain-snow",
+  forest_mountain: "i-lucide-tree-pine"
 };
 
 const showBiomeWheel = computed(
@@ -530,7 +869,8 @@ const showBiomeWheel = computed(
     selected.value.canGenerate &&
     selected.value.biome == null &&
     !expanding.value &&
-    !building.value
+    !building.value &&
+    !debugBiomeOpen.value
 );
 
 const regionExpansionCost = computed(() => {
@@ -547,21 +887,14 @@ const regionExpansionCost = computed(() => {
 const canAffordRegion = computed(() => {
   const cost = regionExpansionCost.value;
   if (!cost) return false;
-  return displayedWood.value + 1e-9 >= cost.wood;
-});
-
-const regionExpansionDiscountPct = computed(() => {
-  const cost = regionExpansionCost.value;
-  if (!cost || cost.discount <= 0) return 0;
-  return Math.round(cost.discount * 100);
+  return displayedWorldshard.value + 1e-9 >= cost.worldshards;
 });
 
 const regionCostLabel = computed(() => {
   const cost = regionExpansionCost.value;
   if (!cost) return "";
-  const wood = `${cost.wood} bois`;
-  if (cost.discount <= 0) return wood;
-  return `${wood} (−${regionExpansionDiscountPct.value}%)`;
+  const n = cost.worldshards;
+  return n === 1 ? "1 éclat" : `${n} éclats`;
 });
 
 const showBuildWheel = computed(
@@ -569,15 +902,47 @@ const showBuildWheel = computed(
     selected.value != null &&
     buildOptions.value.length > 0 &&
     !expanding.value &&
-    !building.value
+    !building.value &&
+    !debugBiomeOpen.value
 );
 
 /** Bottom sheet ouvert uniquement si la tuile porte un bâtiment. */
 const showBuildingSheet = computed(() => {
   const tile = selected.value;
-  if (!tile || showBuildWheel.value) return false;
+  if (!tile || showBuildWheel.value || debugBiomeOpen.value) return false;
   return tile.hasVillage || tile.buildingId != null;
 });
+
+/** Hub debug (bug) quand la tuile a un biome mais pas de roue build / sheet. */
+const showDebugHub = computed(
+  () =>
+    isDevClient &&
+    selected.value?.biome != null &&
+    !showBuildWheel.value &&
+    !showBuildingSheet.value &&
+    !showBiomeWheel.value &&
+    !debugBiomeOpen.value &&
+    !expanding.value &&
+    !building.value &&
+    !settingBiome.value
+);
+
+const showDebugBiomeWheel = computed(
+  () =>
+    isDevClient &&
+    debugBiomeOpen.value &&
+    selected.value?.biome != null &&
+    !expanding.value &&
+    !building.value
+);
+
+const showDebugBugOnBuildWheel = computed(
+  () => isDevClient && showBuildWheel.value
+);
+
+const showDebugBugOnSheet = computed(
+  () => isDevClient && showBuildingSheet.value
+);
 
 const selectedBuildingTitle = computed(() => {
   const tile = selected.value;
@@ -586,7 +951,88 @@ const selectedBuildingTitle = computed(() => {
   return buildingLabel(tile.buildingId) ?? "Bâtiment";
 });
 
-const anyWheelOpen = computed(() => showBiomeWheel.value || showBuildWheel.value);
+const canDestroySelectedBuilding = computed(() => {
+  const tile = selected.value;
+  return Boolean(tile?.buildingId && !tile.hasVillage);
+});
+
+/** Aperçu remboursement (avant appel API) pour le dialogue de confirmation. */
+const destroyRefundPreview = computed(() => {
+  const tile = selectedWorldTile.value;
+  if (!tile?.buildingId) return { wood: 0, workers: 0 };
+  const underConstruction = isBuildingUnderConstruction(
+    tile.constructionCompletesAt,
+    nowTick.value
+  );
+  return {
+    wood: woodRefundOnDestroy(tile.buildingId, underConstruction),
+    workers: tile.assignedWorkers ?? 0
+  };
+});
+
+function spawnDestroyFloats(
+  q: number,
+  r: number,
+  refunds: { wood: number; workers: number },
+  origin?: { x: number; y: number } | null
+) {
+  const point =
+    origin ??
+    preview.value?.projectTile(q, r) ??
+    overlayPositions.value.get(`${q},${r}`) ??
+    null;
+  if (!point) return;
+
+  const chips: Omit<DestroyFloat, "id">[] = [];
+  if (refunds.wood > 0) {
+    chips.push({
+      kind: "wood",
+      label: `+${Math.floor(refunds.wood)}`,
+      icon: "i-lucide-tree-pine",
+      x: point.x,
+      y: point.y,
+      offsetX: 0,
+      delayMs: 0
+    });
+  }
+  if (refunds.workers > 0) {
+    chips.push({
+      kind: "workers",
+      label: `+${refunds.workers}`,
+      icon: "i-lucide-users",
+      x: point.x,
+      y: point.y,
+      offsetX: chips.length === 0 ? 0 : 20,
+      delayMs: chips.length === 0 ? 0 : 90
+    });
+  }
+  if (chips.length === 0) return;
+
+  // Décale le premier chip si les deux sont présents.
+  if (chips.length === 2) chips[0]!.offsetX = -20;
+
+  const spawned: DestroyFloat[] = chips.map((chip) => ({
+    ...chip,
+    id: ++destroyFloatSeq
+  }));
+  destroyFloats.value = [...destroyFloats.value, ...spawned];
+
+  for (const chip of spawned) {
+    const timer = setTimeout(() => {
+      destroyFloats.value = destroyFloats.value.filter((f) => f.id !== chip.id);
+      destroyFloatTimers.delete(timer);
+    }, 1400 + chip.delayMs);
+    destroyFloatTimers.add(timer);
+  }
+}
+
+const anyWheelOpen = computed(
+  () =>
+    showBiomeWheel.value ||
+    showBuildWheel.value ||
+    showDebugHub.value ||
+    showDebugBiomeWheel.value
+);
 
 watch(anyWheelOpen, (show) => {
   if (wheelReadyTimer) {
@@ -617,6 +1063,7 @@ const wheelStyle = computed(() => {
 });
 
 const BIOME_WHEEL_RADIUS = 56;
+const DEBUG_BIOME_WHEEL_RADIUS = 72;
 
 const wheelSlots = computed(() => {
   const n = primaryBiomes.length;
@@ -633,6 +1080,35 @@ const wheelSlots = computed(() => {
     };
   });
 });
+
+const debugBiomeWheelSlots = computed(() => {
+  const n = biomes.length;
+  const radius = DEBUG_BIOME_WHEEL_RADIUS;
+  // Cercle avec trou en bas pour l’icône debug.
+  const gap = (2 * Math.PI) / (n + 1);
+  const start = Math.PI / 2 + gap;
+  return biomes.map((biome, index) => {
+    const angle = start + index * gap;
+    return {
+      biome,
+      active: selected.value?.biome === biome.id,
+      style: {
+        transform: `translate(-50%, -50%) translate(${Math.cos(angle) * radius}px, ${Math.sin(angle) * radius}px)`
+      }
+    };
+  });
+});
+
+/** Toujours en bas de la roue (hub, build, debug biomes). */
+const debugBugButtonStyle = {
+  transform: `translate(-50%, -50%) translate(0px, ${BIOME_WHEEL_RADIUS}px)`
+};
+
+const debugBugOnBuildStyle = debugBugButtonStyle;
+
+const debugBugOnBiomeStyle = {
+  transform: `translate(-50%, -50%) translate(0px, ${DEBUG_BIOME_WHEEL_RADIUS}px)`
+};
 
 const regionCostStyle = {
   transform: `translate(-50%, -50%) translate(0px, ${-BIOME_WHEEL_RADIUS}px)`
@@ -656,14 +1132,63 @@ function onStagePointerDown(event: PointerEvent) {
 }
 
 function onSelect(tile: SelectedTile | null) {
-  if ((expanding.value || building.value) && tile != null) return;
+  if (
+    (expanding.value || building.value || settingBiome.value || destroying.value) &&
+    tile != null
+  ) {
+    return;
+  }
+  debugBiomeOpen.value = false;
+  destroyConfirm.value = false;
   selected.value = tile;
   expandError.value = null;
+  if (tile) {
+    tutorialOnTileSelected({
+      biome: tile.biome,
+      canGenerate: tile.canGenerate
+    });
+  }
 }
 
 function clearSelection() {
   selected.value = null;
+  debugBiomeOpen.value = false;
+  destroyConfirm.value = false;
   preview.value?.clearSelection();
+}
+
+function openDebugBiomeWheel() {
+  if (!isDevClient || !selected.value?.biome) return;
+  debugBiomeOpen.value = true;
+}
+
+function closeDebugBiomeWheel() {
+  debugBiomeOpen.value = false;
+}
+
+async function applyDebugBiome(biome: BiomeId) {
+  const tile = selected.value;
+  const id = world.value?.id;
+  if (!tile?.biome || !id || settingBiome.value) return;
+  if (tile.biome === biome && !tile.buildingId) {
+    debugBiomeOpen.value = false;
+    return;
+  }
+
+  settingBiome.value = true;
+  expandError.value = null;
+  try {
+    const snapshot = await setTileBiomeDev(id, { q: tile.q, r: tile.r }, biome);
+    if (!snapshot) {
+      expandError.value = worldError.value ?? "Impossible de changer le biome.";
+      return;
+    }
+    preview.value?.applyTileBiome(tile.q, tile.r, biome);
+    debugBiomeOpen.value = false;
+    // Resync sélection depuis la scène (payload déjà émis par applyTileBiome).
+  } finally {
+    settingBiome.value = false;
+  }
 }
 
 async function generate(biome: PrimaryBiomeId) {
@@ -671,7 +1196,7 @@ async function generate(biome: PrimaryBiomeId) {
   const id = world.value?.id;
   if (!tile || tile.biome || !tile.canGenerate || !id || expanding.value) return;
   if (!canAffordRegion.value) {
-    expandError.value = "Pas assez de bois pour étendre.";
+    expandError.value = "Pas assez d’éclats de monde pour étendre.";
     return;
   }
 
@@ -686,13 +1211,14 @@ async function generate(biome: PrimaryBiomeId) {
       return;
     }
     preview.value?.applyRegion(result.center, result.biome, result.tiles);
+    tutorialOnRegionCreated(result.biome);
     clearSelection();
   } finally {
     expanding.value = false;
   }
 }
 
-async function placeBuilding(buildingId: PlaceableExtractorId) {
+async function placeBuilding(buildingId: PlaceableBuildingId) {
   const tile = selected.value;
   const id = world.value?.id;
   if (!tile?.biome || !id || building.value) return;
@@ -718,6 +1244,7 @@ async function placeBuilding(buildingId: PlaceableExtractorId) {
       return;
     }
     preview.value?.applyBuilding(result.tile.q, result.tile.r, buildingId);
+    tutorialOnBuildingPlaced(buildingId);
     selected.value = {
       ...tile,
       buildingId,
@@ -742,6 +1269,44 @@ async function setWorkers(count: number) {
     }
   } finally {
     assigning.value = false;
+  }
+}
+
+function askDestroyBuilding() {
+  if (!canDestroySelectedBuilding.value || destroying.value) return;
+  destroyConfirm.value = true;
+}
+
+function cancelDestroyBuilding() {
+  destroyConfirm.value = false;
+}
+
+async function confirmDestroyBuilding() {
+  const tile = selected.value;
+  const id = world.value?.id;
+  if (!tile?.buildingId || tile.hasVillage || !id || destroying.value) return;
+
+  const q = tile.q;
+  const r = tile.r;
+  const originPoint =
+    preview.value?.projectTile(q, r) ??
+    overlayPositions.value.get(`${q},${r}`) ??
+    null;
+
+  destroying.value = true;
+  expandError.value = null;
+  try {
+    const result = await destroyBuilding(id, { q, r });
+    if (!result) {
+      expandError.value = worldError.value ?? "Impossible de détruire le bâtiment.";
+      return;
+    }
+    spawnDestroyFloats(q, r, result.refunds ?? { wood: 0, workers: 0 }, originPoint);
+    preview.value?.removeBuilding(q, r);
+    destroyConfirm.value = false;
+    clearSelection();
+  } finally {
+    destroying.value = false;
   }
 }
 
@@ -780,28 +1345,179 @@ async function onGrantResources() {
 function formatStock(value: number) {
   return Math.floor(value).toLocaleString("fr-FR");
 }
+
+function stageRect(): DOMRect | null {
+  return stage.value?.getBoundingClientRect() ?? null;
+}
+
+function holeFromElement(
+  el: Element | null,
+  options?: {
+    visualPad?: number;
+    hitPad?: number;
+    radius?: number;
+    mode?: "spotlight" | "pulse";
+  }
+): TutorialHole | null {
+  const stageBox = stageRect();
+  if (!el || !stageBox) return null;
+  const box = el.getBoundingClientRect();
+  const visualPad = options?.visualPad ?? 10;
+  const hitPad = options?.hitPad ?? 2;
+  const vx = box.left - stageBox.left - visualPad;
+  const vy = box.top - stageBox.top - visualPad;
+  const vw = box.width + visualPad * 2;
+  const vh = box.height + visualPad * 2;
+  const hx = box.left - stageBox.left - hitPad;
+  const hy = box.top - stageBox.top - hitPad;
+  const hw = box.width + hitPad * 2;
+  const hh = box.height + hitPad * 2;
+  return {
+    x: vx,
+    y: vy,
+    w: vw,
+    h: vh,
+    radius:
+      options?.radius ??
+      Math.min(28, Math.max(14, Math.min(vw, vh) / 2)),
+    mode: options?.mode ?? "spotlight",
+    hit: { x: hx, y: hy, w: hw, h: hh }
+  };
+}
+
+const tutorialForestTargets = computed(() => {
+  const tiles = world.value?.tiles;
+  if (!tiles) return [] as { q: number; r: number }[];
+  const free = tiles.filter((t) => t.biome === "forest" && !t.buildingId);
+  if (free.length) return free.map((t) => ({ q: t.q, r: t.r }));
+  return tiles
+    .filter((t) => t.biome === "forest")
+    .map((t) => ({ q: t.q, r: t.r }));
+});
+
+const tutorialExpandTargets = computed(() => {
+  const snap = world.value;
+  if (!snap) return [] as { q: number; r: number }[];
+  const centers = snap.regions.map((region) => ({
+    q: region.center.q,
+    r: region.center.r
+  }));
+  const biomesMap = new Map(
+    snap.tiles.map((tile) => [`${tile.q},${tile.r}`, tile.biome] as const)
+  );
+  return adjacentRegionCenters(centers).filter((center) =>
+    canPlaceRegion(biomesMap, center, centers)
+  );
+});
+
+const tutorialStageSize = computed(() => {
+  void tutorialHoleTick.value;
+  const box = stageRect();
+  return {
+    width: box?.width ?? 0,
+    height: box?.height ?? 0
+  };
+});
+
+/** Spotlight UI uniquement (header / boutons roue). Null = étape carte libre. */
+const tutorialHole = computed((): TutorialHole | null => {
+  void tutorialHoleTick.value;
+  if (!tutorialActive.value || !tutorialStep.value) return null;
+  const target = tutorialStep.value.target;
+
+  if (target === "header") {
+    return holeFromElement(
+      stage.value?.querySelector('[data-tutorial="header"]') ?? null,
+      { visualPad: 14, hitPad: 14, radius: 24, mode: "spotlight" }
+    );
+  }
+  if (target === "build-lumber") {
+    const btn = stage.value?.querySelector(
+      '[data-tutorial="build-lumber_camp"]'
+    );
+    if (!btn) return null;
+    return holeFromElement(btn, {
+      visualPad: 4,
+      hitPad: 2,
+      radius: 999,
+      mode: "spotlight"
+    });
+  }
+  if (target === "biome-plains") {
+    const btn = stage.value?.querySelector('[data-tutorial="biome-plains"]');
+    if (!btn) return null;
+    return holeFromElement(btn, {
+      visualPad: 4,
+      hitPad: 2,
+      radius: 999,
+      mode: "spotlight"
+    });
+  }
+  return null;
+});
+
+/** Coords tuiles à surligner dans la scène 3D (pas de cercle DOM). */
+const tutorialHighlightCoords = computed(() => {
+  if (!tutorialActive.value || !tutorialStep.value) return [] as HexCoord[];
+  const target = tutorialStep.value.target;
+
+  if (target === "map-forest") return tutorialForestTargets.value;
+  if (target === "build-lumber" && !tutorialHole.value) {
+    return tutorialForestTargets.value;
+  }
+  if (target === "map-expand") return tutorialExpandTargets.value;
+  if (target === "biome-plains" && !tutorialHole.value) {
+    return tutorialExpandTargets.value;
+  }
+  return [];
+});
+
+/** Étape carte : pas de blockers (caméra libre). */
+const tutorialLockMap = computed(() => Boolean(tutorialHole.value));
+
+watch(
+  tutorialHighlightCoords,
+  (coords) => {
+    preview.value?.setTutorialHighlights(coords);
+  },
+  { flush: "post" }
+);
+
+watch(tutorialActive, (on) => {
+  if (!on) preview.value?.setTutorialHighlights([]);
+});
+
+watch(
+  () => world.value?.id,
+  (id) => {
+    if (id) window.setTimeout(() => startTutorial(), 700);
+  }
+);
 </script>
 
 <template>
+  <AdsDevSideRails v-if="isDevClient" />
+  <AdsDevMobileAnchor v-if="isDevClient" />
   <div
     ref="stage"
-    class="relative h-dvh overflow-hidden bg-[#0a1512]"
+    class="game-shell relative h-dvh overflow-hidden bg-[#dfe8e4]"
+    :class="{ 'game-shell--full': hasNoAds }"
     @pointerdown.capture="onStagePointerDown"
   >
     <div
       v-if="!world"
-      class="absolute inset-0 z-50 flex items-center justify-center bg-[#0a1512] p-6 text-center"
+      class="absolute inset-0 z-50 flex items-center justify-center bg-[#dfe8e4] p-6 text-center"
     >
-      <div class="max-w-sm rounded-xl border border-white/10 bg-[#0e1f1a]/95 p-6 text-[#f2f6ee] shadow-xl">
-        <p class="font-display text-sm font-semibold tracking-[0.2em] text-[#e8a54b] uppercase">
+      <div class="max-w-sm rounded-2xl border border-[#1c2b28]/10 bg-white/75 p-6 text-[#1c2b28] shadow-[0_12px_40px_rgb(28_43_40_/_0.08)] backdrop-blur-md">
+        <p class="font-display text-sm font-medium tracking-[0.18em] text-[#4a7c6f] uppercase">
           Hexald
         </p>
-        <p class="mt-3 text-sm text-[#c8d5c0]">
+        <p class="mt-3 text-sm text-[#3d524c]">
           {{ worldError ?? "Impossible de charger ton monde." }}
         </p>
         <NuxtLink
           to="/"
-          class="mt-5 inline-flex rounded-lg border border-white/10 px-3 py-2 text-sm text-[#c8d5c0] transition hover:text-[#e8a54b]"
+          class="mt-5 inline-flex rounded-full border border-[#1c2b28]/12 bg-white/70 px-4 py-2 text-sm text-[#2d5248] transition hover:border-[#4a7c6f]/40 hover:text-[#1c2b28]"
         >
           Retour
         </NuxtLink>
@@ -831,14 +1547,34 @@ function formatStock(value: number) {
       aria-hidden="true"
     >
       <span class="map-badge__chip">
-        <UIcon :name="badge.icon" class="map-badge__icon" />
+        <UIcon v-if="badge.icon" :name="badge.icon" class="map-badge__icon" />
         {{ badge.label }}
         <span v-if="badge.needsWorkers" class="map-badge__alert">!</span>
       </span>
     </div>
 
+    <div
+      v-for="floater in destroyFloats"
+      :key="floater.id"
+      class="destroy-float pointer-events-none absolute z-40"
+      :class="`destroy-float--${floater.kind}`"
+      :style="{
+        left: `${floater.x}px`,
+        top: `${floater.y}px`,
+        '--float-x': `${floater.offsetX}px`,
+        animationDelay: `${floater.delayMs}ms`
+      }"
+      aria-hidden="true"
+    >
+      <span class="destroy-float__chip">
+        <UIcon :name="floater.icon" class="destroy-float__icon" />
+        {{ floater.label }}
+      </span>
+    </div>
+
     <header
       v-if="world"
+      data-tutorial="header"
       class="play-cloud-header pointer-events-none absolute inset-x-0 top-0 z-50"
     >
       <div class="play-cloud-header__sky" aria-hidden="true">
@@ -877,72 +1613,192 @@ function formatStock(value: number) {
       </div>
 
       <div class="play-cloud-header__content pointer-events-auto">
-        <p class="play-cloud-header__name truncate">
-          {{ pseudo ?? "…" }}
-        </p>
-        <div class="play-cloud-header__stats">
-          <div class="play-cloud-header__stats-row">
-            <p class="play-cloud-header__stat" title="Population">
+        <div class="play-cloud-header__identity">
+          <div class="play-cloud-header__identity-top">
+            <div
+              class="play-cloud-header__avatar"
+              aria-hidden="true"
+              title="Avatar"
+            />
+            <div class="play-cloud-header__identity-text min-w-0">
+              <p class="play-cloud-header__name truncate">
+                {{ pseudo ?? "…" }}
+              </p>
+              <p class="play-cloud-header__world truncate">
+                {{ worldName }}
+              </p>
+            </div>
+          </div>
+          <div
+            v-if="economy"
+            class="play-cloud-header__pop-row"
+            :title="`Population ${population}/${populationCap}`"
+          >
+            <p class="play-cloud-header__stat play-cloud-header__stat--pop">
               <UIcon name="i-lucide-users" class="play-cloud-header__stat-icon" aria-hidden="true" />
-              <span class="sr-only">Pop</span>
-              {{ idlePop }}/{{ populationCap }}
+              <span class="sr-only">Population</span>
+              {{ population }}/{{ populationCap }}
             </p>
-            <p v-if="economy" class="play-cloud-header__stat" title="Bois">
+            <div
+              class="play-cloud-header__growth"
+              :class="`play-cloud-header__growth--${popGrowthTone}`"
+              :title="popGrowthTitle"
+            >
+              <div class="play-cloud-header__growth-track">
+                <div
+                  class="play-cloud-header__growth-fill"
+                  :style="{ width: `${popGrowthPercent}%` }"
+                />
+              </div>
+              <span class="play-cloud-header__growth-next">
+                +1
+                <UIcon name="i-lucide-users" class="play-cloud-header__growth-next-icon" aria-hidden="true" />
+                <span
+                  v-if="popGrowthTone === 'housing'"
+                  class="play-cloud-header__growth-housing"
+                  aria-label="Manque de logements"
+                >
+                  <UIcon name="i-lucide-house" class="play-cloud-header__growth-housing-icon" aria-hidden="true" />
+                </span>
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div class="play-cloud-header__end">
+          <nav class="play-top-actions" aria-label="Raccourcis">
+            <NuxtLink
+              to="/news"
+              class="play-top-actions__btn"
+              title="Actualités"
+              aria-label="Actualités"
+            >
+              <UIcon name="i-lucide-newspaper" class="play-top-actions__icon" />
+            </NuxtLink>
+            <button
+              type="button"
+              class="play-top-actions__btn play-top-actions__btn--disabled"
+              title="Réglages — bientôt"
+              aria-label="Réglages (indisponible)"
+              disabled
+            >
+              <UIcon name="i-lucide-settings" class="play-top-actions__icon" />
+            </button>
+          </nav>
+
+          <div
+            v-if="economy"
+            class="play-cloud-header__resources"
+            aria-label="Ressources de base"
+          >
+            <p
+              class="play-cloud-header__stat"
+              :class="`play-cloud-header__stat--${worldshardStockUi.level}`"
+              :title="`Éclat de monde ${formatStock(worldshardStockUi.amount)}/${formatStock(worldshardStockUi.cap)} · hôtel de ville`"
+            >
+              <UIcon name="i-lucide-sparkles" class="play-cloud-header__stat-icon" aria-hidden="true" />
+              <span class="sr-only">Éclat de monde</span>
+              <span class="play-cloud-header__stock">
+                {{ formatStock(worldshardStockUi.amount) }}<span class="play-cloud-header__cap">/{{ formatStock(worldshardStockUi.cap) }}</span>
+              </span>
+              <span class="play-cloud-header__rate">· {{ worldshardStockUi.rate }}</span>
+            </p>
+            <p
+              class="play-cloud-header__stat"
+              :class="`play-cloud-header__stat--${woodStockUi.level}`"
+              :title="`Bois ${formatStock(woodStockUi.amount)}/${formatStock(woodStockUi.cap)}`"
+            >
               <UIcon name="i-lucide-tree-pine" class="play-cloud-header__stat-icon" aria-hidden="true" />
               <span class="sr-only">Bois</span>
-              {{ formatStock(displayedWood) }}
-              <span class="opacity-70">· {{ woodRateLabel }}</span>
+              <span class="play-cloud-header__stock">
+                {{ formatStock(woodStockUi.amount) }}<span class="play-cloud-header__cap">/{{ formatStock(woodStockUi.cap) }}</span>
+              </span>
+              <span class="play-cloud-header__rate">· {{ woodStockUi.rate }}</span>
             </p>
-          </div>
-          <div v-if="economy" class="play-cloud-header__stats-row">
-            <p class="play-cloud-header__stat" title="Blé">
+            <p
+              class="play-cloud-header__stat"
+              :class="`play-cloud-header__stat--${foodStockUi.level}`"
+              :title="`Nourriture ${formatStock(foodStockUi.amount)}/${formatStock(foodStockUi.cap)}`"
+            >
+              <UIcon name="i-lucide-beef" class="play-cloud-header__stat-icon" aria-hidden="true" />
+              <span class="sr-only">Food</span>
+              <span class="play-cloud-header__stock">
+                {{ formatStock(foodStockUi.amount) }}<span class="play-cloud-header__cap">/{{ formatStock(foodStockUi.cap) }}</span>
+              </span>
+              <span class="play-cloud-header__rate">· {{ foodStockUi.rate }}</span>
+            </p>
+            <p
+              class="play-cloud-header__stat"
+              :class="`play-cloud-header__stat--${wheatStockUi.level}`"
+              :title="`Blé ${formatStock(wheatStockUi.amount)}/${formatStock(wheatStockUi.cap)}`"
+            >
               <UIcon name="i-lucide-wheat" class="play-cloud-header__stat-icon" aria-hidden="true" />
               <span class="sr-only">Blé</span>
-              {{ formatStock(displayedWheat) }}
-              <span class="opacity-70">· {{ wheatRateLabel }}</span>
+              <span class="play-cloud-header__stock">
+                {{ formatStock(wheatStockUi.amount) }}<span class="play-cloud-header__cap">/{{ formatStock(wheatStockUi.cap) }}</span>
+              </span>
+              <span class="play-cloud-header__rate">· {{ wheatStockUi.rate }}</span>
             </p>
-            <p class="play-cloud-header__stat" title="Pierre">
-              <UIcon name="i-lucide-gem" class="play-cloud-header__stat-icon" aria-hidden="true" />
+            <p
+              class="play-cloud-header__stat"
+              :class="`play-cloud-header__stat--${stoneStockUi.level}`"
+              :title="`Pierre ${formatStock(stoneStockUi.amount)}/${formatStock(stoneStockUi.cap)}`"
+            >
+              <UIcon name="i-lucide-stone" class="play-cloud-header__stat-icon" aria-hidden="true" />
               <span class="sr-only">Pierre</span>
-              {{ formatStock(displayedStone) }}
-              <span class="opacity-70">· {{ stoneRateLabel }}</span>
+              <span class="play-cloud-header__stock">
+                {{ formatStock(stoneStockUi.amount) }}<span class="play-cloud-header__cap">/{{ formatStock(stoneStockUi.cap) }}</span>
+              </span>
+              <span class="play-cloud-header__rate">· {{ stoneStockUi.rate }}</span>
             </p>
           </div>
         </div>
       </div>
 
       <p
+        v-if="stockSinkHint && !expandError"
+        class="pointer-events-none absolute inset-x-0 top-full z-10 flex justify-center px-3"
+      >
+        <span class="mt-1 rounded-full bg-white/85 px-3 py-1 text-xs font-medium text-[#6b5a2e] shadow-md ring-1 ring-[#c4a35a]/35 backdrop-blur-sm">
+          {{ stockSinkHint }}
+        </span>
+      </p>
+
+      <p
         v-if="expandError"
         class="pointer-events-none absolute inset-x-0 top-full z-10 flex justify-center px-3"
       >
-        <span class="mt-1 rounded-full bg-[#2a1212]/85 px-3 py-1 text-xs text-red-200 shadow-md backdrop-blur-sm">
+        <span class="mt-1 rounded-full bg-white/80 px-3 py-1 text-xs text-[#9b4a4a] shadow-md ring-1 ring-[#9b4a4a]/20 backdrop-blur-sm">
           {{ expandError }}
         </span>
       </p>
     </header>
 
     <div
-      v-if="expanding || building"
+      v-if="expanding || building || settingBiome || destroying"
       class="pointer-events-none absolute inset-x-0 top-24 z-40 flex justify-center"
     >
-      <p class="rounded-full border border-white/10 bg-[#0e1f1a]/90 px-3 py-1.5 text-xs text-[#c8d5c0] shadow-lg backdrop-blur-md">
-        {{ building ? "Construction…" : "Extension du monde…" }}
+      <p class="rounded-full border border-[#1c2b28]/10 bg-white/80 px-3 py-1.5 text-xs text-[#3d524c] shadow-[0_8px_24px_rgb(28_43_40_/_0.08)] backdrop-blur-md">
+        {{
+          destroying
+            ? "Destruction…"
+            : settingBiome
+              ? "Changement de biome…"
+              : building
+                ? "Construction…"
+                : "Extension du monde…"
+        }}
       </p>
     </div>
 
     <div
       v-if="world && isDevClient"
-      class="pointer-events-auto absolute left-3 z-30 flex items-center gap-2"
-      :class="
-        showBuildingSheet
-          ? 'bottom-[calc(13.5rem+env(safe-area-inset-bottom))]'
-          : 'bottom-[max(0.85rem,env(safe-area-inset-bottom))]'
-      "
+      class="play-bottom-chrome pointer-events-auto absolute left-3 z-30 flex max-w-[calc(100%-5.5rem)] flex-wrap items-center gap-2"
     >
       <button
         type="button"
-        class="flex h-11 items-center gap-1.5 rounded-full border border-amber-500/40 bg-[#2a1a0e]/90 px-3 text-xs font-semibold tracking-wide text-[#f0d2a0] shadow-lg backdrop-blur-md transition hover:border-amber-400/70 hover:text-[#ffe4b8] active:scale-95 disabled:opacity-50"
-        :disabled="resetting || granting || expanding || building"
+        class="flex h-11 items-center gap-1.5 rounded-full border border-[#1c2b28]/12 bg-white/75 px-3 text-xs font-semibold tracking-wide text-[#3d524c] shadow-[0_8px_24px_rgb(28_43_40_/_0.08)] backdrop-blur-md transition hover:border-[#4a7c6f]/45 hover:text-[#1c2b28] active:scale-95 disabled:opacity-50"
+        :disabled="resetting || granting || expanding || building || settingBiome"
         @click="onResetWorld"
       >
         <UIcon name="i-lucide-rotate-ccw" class="size-4" />
@@ -950,25 +1806,59 @@ function formatStock(value: number) {
       </button>
       <button
         type="button"
-        class="flex h-11 items-center gap-1.5 rounded-full border border-emerald-500/40 bg-[#0e2a1a]/90 px-3 text-xs font-semibold tracking-wide text-[#b8f0d0] shadow-lg backdrop-blur-md transition hover:border-emerald-400/70 hover:text-[#d8ffe8] active:scale-95 disabled:opacity-50"
-        :disabled="resetting || granting || expanding || building"
-        title="+100 bois / blé / pierre"
+        class="flex h-11 items-center gap-1.5 rounded-full border border-[#1c2b28]/12 bg-white/75 px-3 text-xs font-semibold tracking-wide text-[#3d524c] shadow-[0_8px_24px_rgb(28_43_40_/_0.08)] backdrop-blur-md transition hover:border-[#4a7c6f]/45 hover:text-[#1c2b28] active:scale-95"
+        title="Relancer le tutoriel FTUE"
+        @click="resetTutorial"
+      >
+        <UIcon name="i-lucide-graduation-cap" class="size-4" />
+        Reset tuto
+      </button>
+      <button
+        type="button"
+        class="flex h-11 items-center gap-1.5 rounded-full border border-[#4a7c6f]/35 bg-[#2d5248] px-3 text-xs font-semibold tracking-wide text-[#f2f7f4] shadow-[0_8px_24px_rgb(45_82_72_/_0.18)] backdrop-blur-md transition hover:bg-[#243f38] active:scale-95 disabled:opacity-50"
+        :disabled="resetting || granting || expanding || building || settingBiome"
+        title="+ressources (+ éclats)"
         @click="onGrantResources"
       >
         <UIcon name="i-lucide-package-plus" class="size-4" />
         {{ granting ? "…" : "+ Ressources" }}
       </button>
+      <div
+        class="flex h-11 items-center gap-1 rounded-full border border-[#1c2b28]/12 bg-white/75 px-2 text-[11px] font-semibold tracking-wide text-[#3d524c] shadow-[0_8px_24px_rgb(28_43_40_/_0.08)] backdrop-blur-md"
+        title="Ads simulation (dev)"
+      >
+        <span class="px-1 opacity-60">Ads</span>
+        <button
+          type="button"
+          class="rounded-full px-2.5 py-1 transition"
+          :class="
+            !hasNoAds
+              ? 'bg-[#2d5248] text-[#f2f7f4]'
+              : 'text-[#3d524c] hover:bg-[#1c2b28]/06'
+          "
+          @click="setDevNoAds(false)"
+        >
+          Free
+        </button>
+        <button
+          type="button"
+          class="rounded-full px-2.5 py-1 transition"
+          :class="
+            hasNoAds
+              ? 'bg-[#2d5248] text-[#f2f7f4]'
+              : 'text-[#3d524c] hover:bg-[#1c2b28]/06'
+          "
+          @click="setDevNoAds(true)"
+        >
+          No Ads
+        </button>
+      </div>
     </div>
 
     <button
       v-if="world"
       type="button"
-      class="pointer-events-auto absolute right-3 z-30 flex size-11 items-center justify-center rounded-full border border-white/15 bg-[#0e1f1a]/88 text-[#c8d5c0] shadow-lg backdrop-blur-md transition hover:border-[#e8a54b]/50 hover:text-[#e8a54b] active:scale-95"
-      :class="
-        showBuildingSheet
-          ? 'bottom-[calc(13.5rem+env(safe-area-inset-bottom))]'
-          : 'bottom-[max(0.85rem,env(safe-area-inset-bottom))]'
-      "
+      class="play-bottom-chrome pointer-events-auto absolute right-3 z-30 flex size-11 items-center justify-center rounded-full border border-[#1c2b28]/12 bg-white/80 text-[#2d5248] shadow-[0_8px_24px_rgb(28_43_40_/_0.1)] backdrop-blur-md transition hover:border-[#4a7c6f]/45 hover:text-[#1c2b28] active:scale-95"
       aria-label="Recentrer la caméra"
       @click="preview?.recenter()"
     >
@@ -991,22 +1881,16 @@ function formatStock(value: number) {
             class="absolute left-0 top-0 z-10 whitespace-nowrap rounded-full border px-2.5 py-1 text-[11px] font-semibold shadow-md backdrop-blur-sm"
             :class="
               canAffordRegion
-                ? 'border-white/20 bg-[#0e1f1a]/92 text-[#e8a54b]'
-                : 'border-red-400/40 bg-[#1a0e0e]/92 text-red-300'
+                ? 'border-[#1c2b28]/12 bg-white/85 text-[#2d5248]'
+                : 'border-[#9b4a4a]/30 bg-white/85 text-[#9b4a4a]'
             "
             :style="regionCostStyle"
           >
-            {{ regionExpansionCost.wood }} bois
-            <span
-              v-if="regionExpansionDiscountPct > 0"
-              class="text-[#6ecf7a]"
-            >
-              (−{{ regionExpansionDiscountPct }}%)
-            </span>
+            {{ regionCostLabel }}
           </p>
           <button
             type="button"
-            class="absolute left-0 top-0 flex size-9 items-center justify-center rounded-full border border-white/20 bg-[#0e1f1a]/95 text-[#c8d5c0] shadow-md backdrop-blur-sm"
+            class="absolute left-0 top-0 flex size-9 items-center justify-center rounded-full border border-[#1c2b28]/12 bg-white/85 text-[#3d524c] shadow-md backdrop-blur-sm"
             :style="cancelButtonStyle"
             aria-label="Annuler"
             @click="clearSelection"
@@ -1017,17 +1901,18 @@ function formatStock(value: number) {
             v-for="slot in wheelSlots"
             :key="slot.biome.id"
             type="button"
-            class="absolute left-0 top-0 flex size-11 items-center justify-center rounded-full border-2 shadow-md transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e8a54b]"
+            :data-tutorial="slot.biome.id === 'plains' ? 'biome-plains' : undefined"
+            class="absolute left-0 top-0 flex size-11 items-center justify-center rounded-full border-2 shadow-md transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4a7c6f]"
             :class="
               canAffordRegion
-                ? 'border-white/70 hover:scale-110'
-                : 'border-white/30 opacity-45'
+                ? 'border-white/80 hover:scale-110'
+                : 'border-white/40 opacity-45'
             "
             :style="[slot.style, { backgroundColor: biomeSwatch[slot.biome.id] }]"
             :title="
               canAffordRegion
                 ? `${slot.biome.label} · ${regionCostLabel}`
-                : `${slot.biome.label} · pas assez de bois`
+                : `${slot.biome.label} · pas assez d’éclats`
             "
             :aria-label="slot.biome.label"
             :disabled="!canAffordRegion"
@@ -1036,7 +1921,7 @@ function formatStock(value: number) {
             <UIcon
               :name="biomeIcon[slot.biome.id]"
               class="size-5"
-              :class="slot.biome.id === 'mountain' ? 'text-stone-800' : 'text-white'"
+              :class="slot.biome.id === 'mountain' ? 'text-stone-700' : 'text-white'"
             />
           </button>
         </div>
@@ -1056,7 +1941,7 @@ function formatStock(value: number) {
         >
           <button
             type="button"
-            class="absolute left-0 top-0 flex size-9 items-center justify-center rounded-full border border-white/20 bg-[#0e1f1a]/95 text-[#c8d5c0] shadow-md backdrop-blur-sm"
+            class="absolute left-0 top-0 flex size-9 items-center justify-center rounded-full border border-[#1c2b28]/12 bg-white/85 text-[#3d524c] shadow-md backdrop-blur-sm"
             :style="cancelButtonStyle"
             aria-label="Annuler"
             @click="clearSelection"
@@ -1064,14 +1949,26 @@ function formatStock(value: number) {
             <UIcon name="i-lucide-x" class="size-3.5" />
           </button>
           <button
+            v-if="showDebugBugOnBuildWheel"
+            type="button"
+            class="absolute left-0 top-0 flex size-9 items-center justify-center rounded-full border border-[#9b4a4a]/35 bg-[#fff5f3] text-[#9b4a4a] shadow-md backdrop-blur-sm transition hover:scale-110"
+            :style="debugBugOnBuildStyle"
+            title="Debug biome"
+            aria-label="Debug biome"
+            @click="openDebugBiomeWheel"
+          >
+            <UIcon name="i-lucide-bug" class="size-3.5" />
+          </button>
+          <button
             v-for="slot in buildWheelSlots"
             :key="slot.id"
             type="button"
-            class="absolute left-0 top-0 flex size-12 flex-col items-center justify-center rounded-full border-2 bg-[#2d5248] text-[#f2f6ee] shadow-md transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e8a54b]"
+            :data-tutorial="slot.id === 'lumber_camp' ? 'build-lumber_camp' : undefined"
+            class="absolute left-0 top-0 flex size-12 flex-col items-center justify-center rounded-full border-2 bg-[#2d5248] text-[#f2f7f4] shadow-md transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4a7c6f]"
             :class="
               slot.canAfford
-                ? 'border-[#e8a54b]/80 hover:scale-110'
-                : 'border-white/30 opacity-45'
+                ? 'border-[#4a7c6f]/80 hover:scale-110'
+                : 'border-white/40 opacity-45'
             "
             :style="slot.style"
             :title="
@@ -1093,16 +1990,112 @@ function formatStock(value: number) {
             </span>
             <span
               class="text-[8px] font-medium"
-              :class="slot.canAffordWood ? 'opacity-80' : 'text-red-300'"
+              :class="slot.canAffordWood ? 'opacity-80' : 'text-[#f5b4b4]'"
             >
               {{ slot.woodCost }} bois
             </span>
             <span
               class="text-[8px] font-medium"
-              :class="slot.hasIdlePop ? 'text-[#6ecf7a]' : 'text-red-300'"
+              :class="slot.hasIdlePop ? 'text-[#a8e0c0]' : 'text-[#f5b4b4]'"
             >
               {{ BUILD_IDLE_POP_REQUIREMENT }} pop
             </span>
+          </button>
+        </div>
+      </div>
+    </Transition>
+
+    <Transition name="biome-wheel">
+      <div
+        v-if="showDebugHub"
+        class="pointer-events-none absolute inset-0 z-40"
+      >
+        <div
+          ref="wheelRoot"
+          class="biome-wheel__ring absolute"
+          :class="wheelInteractive ? 'pointer-events-auto' : 'pointer-events-none'"
+          :style="wheelStyle"
+        >
+          <button
+            type="button"
+            class="absolute left-0 top-0 flex size-9 items-center justify-center rounded-full border border-[#1c2b28]/12 bg-white/85 text-[#3d524c] shadow-md backdrop-blur-sm"
+            :style="cancelButtonStyle"
+            aria-label="Annuler"
+            @click="clearSelection"
+          >
+            <UIcon name="i-lucide-x" class="size-3.5" />
+          </button>
+          <button
+            type="button"
+            class="absolute left-0 top-0 flex size-11 items-center justify-center rounded-full border-2 border-[#9b4a4a]/40 bg-[#fff5f3] text-[#9b4a4a] shadow-md transition hover:scale-110"
+            :style="debugBugButtonStyle"
+            title="Debug biome"
+            aria-label="Debug biome"
+            @click="openDebugBiomeWheel"
+          >
+            <UIcon name="i-lucide-bug" class="size-5" />
+          </button>
+        </div>
+      </div>
+    </Transition>
+
+    <Transition name="biome-wheel">
+      <div
+        v-if="showDebugBiomeWheel"
+        class="pointer-events-none absolute inset-0 z-40"
+      >
+        <div
+          ref="wheelRoot"
+          class="biome-wheel__ring absolute"
+          :class="wheelInteractive ? 'pointer-events-auto' : 'pointer-events-none'"
+          :style="wheelStyle"
+        >
+          <button
+            type="button"
+            class="absolute left-0 top-0 flex size-9 items-center justify-center rounded-full border border-[#1c2b28]/12 bg-white/85 text-[#3d524c] shadow-md backdrop-blur-sm"
+            :style="cancelButtonStyle"
+            aria-label="Retour"
+            :disabled="settingBiome"
+            @click="closeDebugBiomeWheel"
+          >
+            <UIcon name="i-lucide-x" class="size-3.5" />
+          </button>
+          <button
+            type="button"
+            class="absolute left-0 top-0 flex size-9 items-center justify-center rounded-full border border-[#9b4a4a]/35 bg-[#fff5f3] text-[#9b4a4a] shadow-md backdrop-blur-sm transition hover:scale-110"
+            :style="debugBugOnBiomeStyle"
+            title="Fermer debug biome"
+            aria-label="Fermer debug biome"
+            :disabled="settingBiome"
+            @click="closeDebugBiomeWheel"
+          >
+            <UIcon name="i-lucide-bug" class="size-3.5" />
+          </button>
+          <button
+            v-for="slot in debugBiomeWheelSlots"
+            :key="slot.biome.id"
+            type="button"
+            class="absolute left-0 top-0 flex size-11 items-center justify-center rounded-full border-2 shadow-md transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4a7c6f] hover:scale-110 disabled:opacity-50"
+            :class="
+              slot.active
+                ? 'border-[#2d5248] ring-2 ring-[#4a7c6f]/50'
+                : 'border-white/80'
+            "
+            :style="[slot.style, { backgroundColor: biomeSwatch[slot.biome.id] }]"
+            :title="slot.biome.label"
+            :aria-label="slot.biome.label"
+            :disabled="settingBiome"
+            @click="applyDebugBiome(slot.biome.id)"
+          >
+            <UIcon
+              :name="biomeIcon[slot.biome.id]"
+              class="size-5"
+              :class="
+                slot.biome.id === 'mountain' || slot.biome.id === 'plains_mountain'
+                  ? 'text-stone-700'
+                  : 'text-white'
+              "
+            />
           </button>
         </div>
       </div>
@@ -1154,40 +2147,111 @@ function formatStock(value: number) {
               <p class="building-sheet__title truncate">
                 {{ selectedBuildingTitle }}
               </p>
-              <p v-if="selectedConstruction" class="building-sheet__hint">
+              <p v-if="selectedConstruction && !destroyConfirm" class="building-sheet__hint">
                 En construction · {{ selectedConstruction.label }} · 1 habitant réservé
               </p>
-              <p v-else-if="selectedWorkerPanel" class="building-sheet__hint">
+              <p v-else-if="selectedWorkerPanel && !destroyConfirm" class="building-sheet__hint">
                 {{ selectedWorkerPanel.hint }}
               </p>
               <p v-else-if="selected.hasVillage" class="building-sheet__hint">
                 Cœur de ton territoire.
               </p>
+              <p v-else-if="destroyConfirm" class="building-sheet__hint">
+                Confirmation requise
+              </p>
             </div>
-            <button
-              type="button"
-              class="building-sheet__close"
-              aria-label="Fermer"
-              @click="clearSelection"
-            >
-              <UIcon name="i-lucide-x" class="size-4" />
-            </button>
+            <div class="flex shrink-0 items-center gap-1.5">
+              <button
+                v-if="canDestroySelectedBuilding && !destroyConfirm"
+                type="button"
+                class="building-sheet__close"
+                title="Détruire le bâtiment"
+                aria-label="Détruire le bâtiment"
+                :disabled="destroying"
+                @click="askDestroyBuilding"
+              >
+                <UIcon name="i-lucide-trash-2" class="size-4 text-[#9b4a4a]" />
+              </button>
+              <button
+                v-if="showDebugBugOnSheet"
+                type="button"
+                class="building-sheet__close"
+                title="Debug biome"
+                aria-label="Debug biome"
+                @click="openDebugBiomeWheel"
+              >
+                <UIcon name="i-lucide-bug" class="size-4 text-[#9b4a4a]" />
+              </button>
+              <button
+                type="button"
+                class="building-sheet__close"
+                aria-label="Fermer"
+                @click="clearSelection"
+              >
+                <UIcon name="i-lucide-x" class="size-4" />
+              </button>
+            </div>
           </div>
 
           <div
-            v-if="selectedConstruction"
+            v-if="destroyConfirm"
+            class="mt-3 rounded-2xl border border-[#9b4a4a]/25 bg-[#fff5f3]/90 px-3 py-3"
+          >
+            <p class="text-sm font-medium text-[#7a3535]">
+              Détruire {{ selectedBuildingTitle }} ?
+            </p>
+            <p class="mt-1 text-xs text-[#9b4a4a]/90">
+              <template v-if="destroyRefundPreview.wood > 0 || destroyRefundPreview.workers > 0">
+                Récupère
+                <template v-if="destroyRefundPreview.wood > 0">
+                  {{ destroyRefundPreview.wood }} bois
+                </template>
+                <template v-if="destroyRefundPreview.wood > 0 && destroyRefundPreview.workers > 0">
+                  ·
+                </template>
+                <template v-if="destroyRefundPreview.workers > 0">
+                  {{ destroyRefundPreview.workers }} habitant{{ destroyRefundPreview.workers > 1 ? "s" : "" }} libre{{ destroyRefundPreview.workers > 1 ? "s" : "" }}
+                </template>
+              </template>
+              <template v-else>
+                Les habitants redeviennent libres.
+              </template>
+            </p>
+            <div class="mt-3 flex items-center gap-2">
+              <button
+                type="button"
+                class="flex h-9 flex-1 items-center justify-center rounded-full border border-[#1c2b28]/12 bg-white/80 text-xs font-semibold text-[#3d524c] transition hover:bg-white disabled:opacity-50"
+                :disabled="destroying"
+                @click="cancelDestroyBuilding"
+              >
+                Annuler
+              </button>
+              <button
+                type="button"
+                class="flex h-9 flex-1 items-center justify-center gap-1.5 rounded-full bg-[#9b4a4a] text-xs font-semibold text-white transition hover:bg-[#823c3c] disabled:opacity-50"
+                :disabled="destroying"
+                @click="confirmDestroyBuilding"
+              >
+                <UIcon name="i-lucide-trash-2" class="size-3.5" />
+                {{ destroying ? "…" : "Détruire" }}
+              </button>
+            </div>
+          </div>
+
+          <div
+            v-if="selectedConstruction && !destroyConfirm"
             class="mt-3"
           >
-            <div class="h-1.5 overflow-hidden rounded-full bg-black/10">
+            <div class="h-1.5 overflow-hidden rounded-full bg-[#1c2b28]/10">
               <div
-                class="h-full rounded-full bg-[#e8a54b] transition-[width] duration-1000 linear"
+                class="h-full rounded-full bg-[#4a7c6f] transition-[width] duration-1000 linear"
                 :style="{ width: `${Math.round(selectedConstruction.progress * 100)}%` }"
               />
             </div>
           </div>
 
           <div
-            v-if="selectedWorkerPanel"
+            v-if="selectedWorkerPanel && !destroyConfirm"
             class="mt-3 flex items-center justify-between gap-3"
           >
             <div>
@@ -1225,5 +2289,19 @@ function formatStock(value: number) {
         </div>
       </aside>
     </Transition>
+
+    <PlayTutorialCoach
+      v-if="tutorialActive && tutorialStep && world"
+      :step="tutorialStep"
+      :step-index="tutorialStepIndex"
+      :step-count="PLAY_TUTORIAL_STEPS.length"
+      :hole="tutorialHole"
+      :lock-map="tutorialLockMap"
+      :stage-width="tutorialStageSize.width"
+      :stage-height="tutorialStageSize.height"
+      @next="nextTutorialStep"
+      @skip="skipTutorial"
+      @finish="completeTutorial"
+    />
   </div>
 </template>

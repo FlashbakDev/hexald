@@ -1,12 +1,10 @@
 import {
-  FARM_MAX_WORKERS,
-  LUMBER_CAMP_MAX_WORKERS,
-  QUARRY_MAX_WORKERS,
+  buildingMaxWorkersFromCatalog,
   type PlaceableExtractorId
 } from "@hexald/content";
 import type { BuildingId, HexCoord } from "@hexald/shared";
 import { isBuildingComplete } from "./construction.ts";
-import { isPlaceableExtractor } from "./build.ts";
+import { isPlaceableBuilding, isPlaceableExtractor } from "./build.ts";
 
 export type TileWorkerState = {
   q: number;
@@ -20,10 +18,7 @@ export type TileWorkerState = {
 export const WORKERS_PER_EXTRACTOR_L1 = 1 as const;
 
 export function maxWorkersForBuilding(buildingId: BuildingId): number {
-  if (buildingId === "lumber_camp") return LUMBER_CAMP_MAX_WORKERS;
-  if (buildingId === "farm") return FARM_MAX_WORKERS;
-  if (buildingId === "quarry") return QUARRY_MAX_WORKERS;
-  return 0;
+  return buildingMaxWorkersFromCatalog(buildingId);
 }
 
 export function workerTotalsFromTiles(
@@ -50,10 +45,38 @@ export function workerTotalsFromTiles(
 export function committedWorkersFromTiles(tiles: readonly TileWorkerState[]): number {
   let total = 0;
   for (const tile of tiles) {
-    if (!tile.buildingId || !isPlaceableExtractor(tile.buildingId)) continue;
-    total += clampTileWorkers(tile.assignedWorkers ?? 0, tile.buildingId);
+    if (!tile.buildingId || !isPlaceableBuilding(tile.buildingId)) continue;
+    if (isPlaceableExtractor(tile.buildingId)) {
+      total += clampTileWorkers(tile.assignedWorkers ?? 0, tile.buildingId);
+      continue;
+    }
+    // Maisons / logements : 1 ouvrier réservé pendant le chantier uniquement.
+    total += Math.max(0, Math.floor(tile.assignedWorkers ?? 0));
   }
   return total;
+}
+
+/**
+ * Libère l’ouvrier de chantier sur les logements achevés (pas d’affectation permanente).
+ */
+export function releaseHousingConstructionWorkers<T extends TileWorkerState>(
+  tiles: readonly T[],
+  now: number
+): { tiles: T[]; changed: boolean } {
+  let changed = false;
+  const next = tiles.map((tile) => {
+    if (!tile.buildingId || !isPlaceableBuilding(tile.buildingId)) return tile;
+    if (isPlaceableExtractor(tile.buildingId)) return tile;
+    if (!isBuildingComplete(tile.constructionCompletesAt, now)) return tile;
+    if ((tile.assignedWorkers ?? 0) <= 0 && tile.defaultWorkerSeeded) return tile;
+    changed = true;
+    return {
+      ...tile,
+      assignedWorkers: 0,
+      defaultWorkerSeeded: true
+    };
+  });
+  return { tiles: next, changed };
 }
 
 export function totalAssignedWorkers(

@@ -1,7 +1,12 @@
-import { and, desc, eq } from "drizzle-orm";
-import type { BiomeId, BuildingId } from "@hexald/shared";
-import type { Database } from "./client.ts";
-import { worldRegions, worldTiles, worlds } from "./schema/index.ts";
+import { and, desc, eq, sql } from "drizzle-orm";
+import type { BiomeId, BuildingId, ResourceId } from "@hexald/shared";
+import type { Database, WorldDb } from "./client.ts";
+import {
+  worldInventory,
+  worldRegions,
+  worldTiles,
+  worlds
+} from "./schema/index.ts";
 
 export type WorldTileRow = {
   q: number;
@@ -19,18 +24,20 @@ export type WorldRegionRow = {
   biome: BiomeId;
 };
 
+export type WorldInventoryRow = {
+  resourceId: ResourceId;
+  amount: number;
+  lastCalculatedAt: Date;
+};
+
 export type WorldEconomyRow = {
   populationTotal: number;
   populationCap: number;
+  foodSurplusAccumulated: number;
   woodcutters: number;
   farmers: number;
   quarriers: number;
-  woodStock: number;
-  woodLastCalculatedAt: Date;
-  wheatStock: number;
-  wheatLastCalculatedAt: Date;
-  stoneStock: number;
-  stoneLastCalculatedAt: Date;
+  inventory: WorldInventoryRow[];
 };
 
 export type PersistedWorld = {
@@ -50,20 +57,129 @@ export type PersistedWorldSummary = {
   updatedAt: Date;
 };
 
-function economyFromRow(world: WorldEconomyRow): WorldEconomyRow {
+/** Attente max avant `world_busy` (multi-onglets / bots). */
+export const WORLD_LOCK_TIMEOUT_MS = 3_000;
+
+export type WorldLockFailure = "world_not_found" | "world_busy";
+
+export type WorldLockResult<T> =
+  | { ok: true; value: T }
+  | { ok: false; error: WorldLockFailure };
+
+function economyFromWorld(
+  world: {
+    populationTotal: number;
+    populationCap: number;
+    foodSurplusAccumulated: number;
+    woodcutters: number;
+    farmers: number;
+    quarriers: number;
+  },
+  inventory: WorldInventoryRow[]
+): WorldEconomyRow {
   return {
     populationTotal: world.populationTotal,
     populationCap: world.populationCap,
+    foodSurplusAccumulated: world.foodSurplusAccumulated ?? 0,
     woodcutters: world.woodcutters,
     farmers: world.farmers,
     quarriers: world.quarriers,
-    woodStock: world.woodStock,
-    woodLastCalculatedAt: world.woodLastCalculatedAt,
-    wheatStock: world.wheatStock,
-    wheatLastCalculatedAt: world.wheatLastCalculatedAt,
-    stoneStock: world.stoneStock,
-    stoneLastCalculatedAt: world.stoneLastCalculatedAt
+    inventory
   };
+}
+
+function isLockTimeoutError(err: unknown): boolean {
+  if (!err || typeof err !== "object") return false;
+  const code = (err as { code?: string }).code;
+  // 55P03 = lock_not_available ; 57014 = query_canceled (statement/lock timeout)
+  return code === "55P03" || code === "57014";
+}
+
+async function loadInventory(
+  db: WorldDb,
+  worldId: string
+): Promise<WorldInventoryRow[]> {
+  const rows = await db
+    .select({
+      resourceId: worldInventory.resourceId,
+      amount: worldInventory.amount,
+      lastCalculatedAt: worldInventory.lastCalculatedAt
+    })
+    .from(worldInventory)
+    .where(eq(worldInventory.worldId, worldId));
+
+  return rows.map((row) => ({
+    resourceId: row.resourceId as ResourceId,
+    amount: row.amount,
+    lastCalculatedAt: row.lastCalculatedAt
+  }));
+}
+
+async function upsertInventory(
+  tx: WorldDb,
+  worldId: string,
+  inventory: WorldInventoryRow[]
+): Promise<void> {
+  if (inventory.length === 0) return;
+
+  for (const entry of inventory) {
+    await tx
+      .insert(worldInventory)
+      .values({
+        worldId,
+        resourceId: entry.resourceId,
+        amount: entry.amount,
+        lastCalculatedAt: entry.lastCalculatedAt
+      })
+      .onConflictDoUpdate({
+        target: [worldInventory.worldId, worldInventory.resourceId],
+        set: {
+          amount: entry.amount,
+          lastCalculatedAt: entry.lastCalculatedAt
+        }
+      });
+  }
+}
+
+/**
+ * Sérialise les mutations d’un monde : `SELECT … FOR UPDATE` + transaction unique.
+ * Évite double-spend / lost update entre onglets ou bots.
+ */
+export async function withWorldLock<T>(
+  db: Database["db"],
+  worldId: string,
+  ownerId: string,
+  fn: (tx: WorldDb, world: PersistedWorld) => Promise<T>
+): Promise<WorldLockResult<T>> {
+  try {
+    return await db.transaction(async (tx) => {
+      await tx.execute(sql`select set_config('lock_timeout', '3s', true)`);
+
+      const [locked] = await tx
+        .select({ id: worlds.id })
+        .from(worlds)
+        .where(and(eq(worlds.id, worldId), eq(worlds.ownerId, ownerId)))
+        .for("update")
+        .limit(1);
+
+      if (!locked) {
+        return { ok: false, error: "world_not_found" as const };
+      }
+
+      const world = await fetchWorld(tx, worldId);
+      if (!world) {
+        return { ok: false, error: "world_not_found" as const };
+      }
+
+      const value = await fn(tx, world);
+      return { ok: true as const, value };
+    });
+  } catch (err) {
+    if (isLockTimeoutError(err)) {
+      return { ok: false, error: "world_busy" };
+    }
+    throw err;
+  }
 }
 
 export async function insertWorldWithTerrain(
@@ -86,6 +202,9 @@ export async function insertWorldWithTerrain(
         ...(input.economy?.populationCap !== undefined
           ? { populationCap: input.economy.populationCap }
           : {}),
+        ...(input.economy?.foodSurplusAccumulated !== undefined
+          ? { foodSurplusAccumulated: input.economy.foodSurplusAccumulated }
+          : {}),
         ...(input.economy?.woodcutters !== undefined
           ? { woodcutters: input.economy.woodcutters }
           : {}),
@@ -94,24 +213,6 @@ export async function insertWorldWithTerrain(
           : {}),
         ...(input.economy?.quarriers !== undefined
           ? { quarriers: input.economy.quarriers }
-          : {}),
-        ...(input.economy?.woodStock !== undefined
-          ? { woodStock: input.economy.woodStock }
-          : {}),
-        ...(input.economy?.woodLastCalculatedAt !== undefined
-          ? { woodLastCalculatedAt: input.economy.woodLastCalculatedAt }
-          : {}),
-        ...(input.economy?.wheatStock !== undefined
-          ? { wheatStock: input.economy.wheatStock }
-          : {}),
-        ...(input.economy?.wheatLastCalculatedAt !== undefined
-          ? { wheatLastCalculatedAt: input.economy.wheatLastCalculatedAt }
-          : {}),
-        ...(input.economy?.stoneStock !== undefined
-          ? { stoneStock: input.economy.stoneStock }
-          : {}),
-        ...(input.economy?.stoneLastCalculatedAt !== undefined
-          ? { stoneLastCalculatedAt: input.economy.stoneLastCalculatedAt }
           : {})
       })
       .returning();
@@ -143,12 +244,15 @@ export async function insertWorldWithTerrain(
       );
     }
 
+    const inventory = input.economy?.inventory ?? [];
+    await upsertInventory(tx, world.id, inventory);
+
     return {
       id: world.id,
       ownerId: world.ownerId,
       createdAt: world.createdAt,
       updatedAt: world.updatedAt,
-      economy: economyFromRow(world),
+      economy: economyFromWorld(world, inventory),
       tiles: input.tiles,
       regions: input.regions
     };
@@ -156,40 +260,42 @@ export async function insertWorldWithTerrain(
 }
 
 export async function fetchWorld(
-  db: Database["db"],
+  db: WorldDb,
   worldId: string
 ): Promise<PersistedWorld | null> {
   const [world] = await db.select().from(worlds).where(eq(worlds.id, worldId)).limit(1);
   if (!world) return null;
 
-  const tiles = await db
-    .select({
-      q: worldTiles.q,
-      r: worldTiles.r,
-      biome: worldTiles.biome,
-      buildingId: worldTiles.buildingId,
-      constructionCompletesAt: worldTiles.constructionCompletesAt,
-      assignedWorkers: worldTiles.assignedWorkers,
-      defaultWorkerSeeded: worldTiles.defaultWorkerSeeded
-    })
-    .from(worldTiles)
-    .where(eq(worldTiles.worldId, worldId));
-
-  const regions = await db
-    .select({
-      centerQ: worldRegions.centerQ,
-      centerR: worldRegions.centerR,
-      biome: worldRegions.biome
-    })
-    .from(worldRegions)
-    .where(eq(worldRegions.worldId, worldId));
+  const [tiles, regions, inventory] = await Promise.all([
+    db
+      .select({
+        q: worldTiles.q,
+        r: worldTiles.r,
+        biome: worldTiles.biome,
+        buildingId: worldTiles.buildingId,
+        constructionCompletesAt: worldTiles.constructionCompletesAt,
+        assignedWorkers: worldTiles.assignedWorkers,
+        defaultWorkerSeeded: worldTiles.defaultWorkerSeeded
+      })
+      .from(worldTiles)
+      .where(eq(worldTiles.worldId, worldId)),
+    db
+      .select({
+        centerQ: worldRegions.centerQ,
+        centerR: worldRegions.centerR,
+        biome: worldRegions.biome
+      })
+      .from(worldRegions)
+      .where(eq(worldRegions.worldId, worldId)),
+    loadInventory(db, worldId)
+  ]);
 
   return {
     id: world.id,
     ownerId: world.ownerId,
     createdAt: world.createdAt,
     updatedAt: world.updatedAt,
-    economy: economyFromRow(world),
+    economy: economyFromWorld(world, inventory),
     tiles: tiles.map((tile) => ({
       q: tile.q,
       r: tile.r,
@@ -226,7 +332,7 @@ export async function listWorldsByOwner(
 }
 
 export async function fetchWorldForOwner(
-  db: Database["db"],
+  db: WorldDb,
   worldId: string,
   ownerId: string
 ): Promise<PersistedWorld | null> {
@@ -252,7 +358,7 @@ export async function deleteWorldForOwner(
 }
 
 export async function updateWorldEconomy(
-  db: Database["db"],
+  db: WorldDb,
   worldId: string,
   economy: WorldEconomyRow
 ): Promise<void> {
@@ -261,51 +367,46 @@ export async function updateWorldEconomy(
     .set({
       populationTotal: economy.populationTotal,
       populationCap: economy.populationCap,
+      foodSurplusAccumulated: economy.foodSurplusAccumulated,
       woodcutters: economy.woodcutters,
       farmers: economy.farmers,
       quarriers: economy.quarriers,
-      woodStock: economy.woodStock,
-      woodLastCalculatedAt: economy.woodLastCalculatedAt,
-      wheatStock: economy.wheatStock,
-      wheatLastCalculatedAt: economy.wheatLastCalculatedAt,
-      stoneStock: economy.stoneStock,
-      stoneLastCalculatedAt: economy.stoneLastCalculatedAt,
       updatedAt: new Date()
     })
     .where(eq(worlds.id, worldId));
+
+  await upsertInventory(db, worldId, economy.inventory);
 }
 
 export async function setTileWorkerState(
-  db: Database["db"],
+  db: WorldDb,
   worldId: string,
   origin: { q: number; r: number },
   state: { assignedWorkers: number; defaultWorkerSeeded: boolean }
 ): Promise<void> {
-  await db.transaction(async (tx) => {
-    await tx
-      .update(worldTiles)
-      .set({
-        assignedWorkers: state.assignedWorkers,
-        defaultWorkerSeeded: state.defaultWorkerSeeded
-      })
-      .where(
-        and(
-          eq(worldTiles.worldId, worldId),
-          eq(worldTiles.q, origin.q),
-          eq(worldTiles.r, origin.r)
-        )
-      );
+  await db
+    .update(worldTiles)
+    .set({
+      assignedWorkers: state.assignedWorkers,
+      defaultWorkerSeeded: state.defaultWorkerSeeded
+    })
+    .where(
+      and(
+        eq(worldTiles.worldId, worldId),
+        eq(worldTiles.q, origin.q),
+        eq(worldTiles.r, origin.r)
+      )
+    );
 
-    await tx
-      .update(worlds)
-      .set({ updatedAt: new Date() })
-      .where(eq(worlds.id, worldId));
-  });
+  await db
+    .update(worlds)
+    .set({ updatedAt: new Date() })
+    .where(eq(worlds.id, worldId));
 }
 
 /** @deprecated Prefer setTileWorkerState */
 export async function setTileAssignedWorkers(
-  db: Database["db"],
+  db: WorldDb,
   worldId: string,
   origin: { q: number; r: number },
   assignedWorkers: number
@@ -317,7 +418,7 @@ export async function setTileAssignedWorkers(
 }
 
 export async function setTileBuilding(
-  db: Database["db"],
+  db: WorldDb,
   worldId: string,
   tile: {
     q: number;
@@ -328,32 +429,87 @@ export async function setTileBuilding(
     defaultWorkerSeeded?: boolean;
   }
 ): Promise<void> {
-  await db.transaction(async (tx) => {
-    await tx
-      .update(worldTiles)
-      .set({
-        buildingId: tile.buildingId,
-        constructionCompletesAt: tile.constructionCompletesAt,
-        assignedWorkers: tile.assignedWorkers ?? 0,
-        defaultWorkerSeeded: tile.defaultWorkerSeeded ?? false
-      })
-      .where(
-        and(
-          eq(worldTiles.worldId, worldId),
-          eq(worldTiles.q, tile.q),
-          eq(worldTiles.r, tile.r)
-        )
-      );
+  await db
+    .update(worldTiles)
+    .set({
+      buildingId: tile.buildingId,
+      constructionCompletesAt: tile.constructionCompletesAt,
+      assignedWorkers: tile.assignedWorkers ?? 0,
+      defaultWorkerSeeded: tile.defaultWorkerSeeded ?? false
+    })
+    .where(
+      and(
+        eq(worldTiles.worldId, worldId),
+        eq(worldTiles.q, tile.q),
+        eq(worldTiles.r, tile.r)
+      )
+    );
 
-    await tx
-      .update(worlds)
-      .set({ updatedAt: new Date() })
-      .where(eq(worlds.id, worldId));
-  });
+  await db
+    .update(worlds)
+    .set({ updatedAt: new Date() })
+    .where(eq(worlds.id, worldId));
+}
+
+/** Retire le bâtiment (et workers) d’une tuile. */
+export async function clearTileBuilding(
+  db: WorldDb,
+  worldId: string,
+  origin: { q: number; r: number }
+): Promise<void> {
+  await db
+    .update(worldTiles)
+    .set({
+      buildingId: null,
+      constructionCompletesAt: null,
+      assignedWorkers: 0,
+      defaultWorkerSeeded: false
+    })
+    .where(
+      and(
+        eq(worldTiles.worldId, worldId),
+        eq(worldTiles.q, origin.q),
+        eq(worldTiles.r, origin.r)
+      )
+    );
+
+  await db
+    .update(worlds)
+    .set({ updatedAt: new Date() })
+    .where(eq(worlds.id, worldId));
+}
+
+/** Dev — change le biome et retire bâtiment / workers de la tuile. */
+export async function setTileBiomeDev(
+  db: WorldDb,
+  worldId: string,
+  tile: { q: number; r: number; biome: BiomeId }
+): Promise<void> {
+  await db
+    .update(worldTiles)
+    .set({
+      biome: tile.biome,
+      buildingId: null,
+      constructionCompletesAt: null,
+      assignedWorkers: 0,
+      defaultWorkerSeeded: false
+    })
+    .where(
+      and(
+        eq(worldTiles.worldId, worldId),
+        eq(worldTiles.q, tile.q),
+        eq(worldTiles.r, tile.r)
+      )
+    );
+
+  await db
+    .update(worlds)
+    .set({ updatedAt: new Date() })
+    .where(eq(worlds.id, worldId));
 }
 
 export async function appendRegion(
-  db: Database["db"],
+  db: WorldDb,
   worldId: string,
   input: {
     center: { q: number; r: number };
@@ -361,32 +517,42 @@ export async function appendRegion(
     tiles: WorldTileRow[];
   }
 ): Promise<void> {
-  await db.transaction(async (tx) => {
-    await tx.insert(worldRegions).values({
-      worldId,
-      centerQ: input.center.q,
-      centerR: input.center.r,
-      biome: input.biome
-    });
-
-    if (input.tiles.length > 0) {
-      await tx.insert(worldTiles).values(
-        input.tiles.map((tile) => ({
-          worldId,
-          q: tile.q,
-          r: tile.r,
-          biome: tile.biome,
-          buildingId: tile.buildingId,
-          constructionCompletesAt: tile.constructionCompletesAt,
-          assignedWorkers: tile.assignedWorkers ?? 0,
-          defaultWorkerSeeded: tile.defaultWorkerSeeded ?? false
-        }))
-      );
-    }
-
-    await tx
-      .update(worlds)
-      .set({ updatedAt: new Date() })
-      .where(eq(worlds.id, worldId));
+  await db.insert(worldRegions).values({
+    worldId,
+    centerQ: input.center.q,
+    centerR: input.center.r,
+    biome: input.biome
   });
+
+  if (input.tiles.length > 0) {
+    await db.insert(worldTiles).values(
+      input.tiles.map((tile) => ({
+        worldId,
+        q: tile.q,
+        r: tile.r,
+        biome: tile.biome,
+        buildingId: tile.buildingId,
+        constructionCompletesAt: tile.constructionCompletesAt,
+        assignedWorkers: tile.assignedWorkers ?? 0,
+        defaultWorkerSeeded: tile.defaultWorkerSeeded ?? false
+      }))
+    );
+  }
+
+  await db
+    .update(worlds)
+    .set({ updatedAt: new Date() })
+    .where(eq(worlds.id, worldId));
+}
+
+/** Utilitaire tests / debug — compte les lignes inventaire. */
+export async function countInventoryRows(
+  db: WorldDb,
+  worldId: string
+): Promise<number> {
+  const [row] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(worldInventory)
+    .where(eq(worldInventory.worldId, worldId));
+  return row?.count ?? 0;
 }

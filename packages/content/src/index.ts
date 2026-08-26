@@ -1,10 +1,48 @@
 export { biomes, primaryBiomes, type BiomeDefinition, type BiomeKind } from "./biomes.ts";
 export { resources, type ResourceDefinition } from "./resources.ts";
-export { buildings, type BuildingDefinition } from "./buildings.ts";
-export { chains, type ProductionChain, type RecipeStep } from "./recipes.ts";
+export {
+  buildings,
+  getBuildingDefinition,
+  listPlaceableBuildings,
+  isPlaceableBuildingId,
+  isPlaceableExtractorId,
+  buildingWoodCostFromCatalog,
+  buildingDurationMsFromCatalog,
+  buildingMaxWorkersFromCatalog,
+  buildingRateFromCatalog,
+  buildingPopulationCapBonus,
+  PLACEABLE_BUILDINGS,
+  PLACEABLE_EXTRACTORS,
+  BUILD_COST_WOOD,
+  BUILD_DURATION_MS,
+  type BuildingDefinition,
+  type BuildingStatus,
+  type BuildingRole,
+  type PlaceableBuildingId,
+  type PlaceableExtractorId
+} from "./buildings.ts";
+export {
+  chains,
+  getChain,
+  getRecipeStepForBuilding,
+  getExtractorStepForBuilding,
+  getProcessorStepForBuilding,
+  listProcessorRecipes,
+  resourceOutputForBuilding,
+  type ProductionChain,
+  type RecipeStep
+} from "./recipes.ts";
 export {
   STARTING_POPULATION,
   POPULATION_CAP,
+  TOWN_HALL_BASE_STORAGE,
+  FOOD_CONSUMPTION_PER_POP_PER_MINUTE,
+  TOWN_HALL_FOOD_PRODUCTION_PER_MINUTE,
+  WHEAT_TO_FOOD_EMERGENCY_RATIO,
+  POP_GROWTH_SURPLUS_FOOD_REQUIRED,
+  FUSION_TILE_PRODUCTION_BONUS,
+  TOWN_HALL_POPULATION_CAP,
+  HOUSE_POPULATION_CAP_BONUS,
   LUMBER_CAMP_MAX_WORKERS,
   FARM_MAX_WORKERS,
   QUARRY_MAX_WORKERS,
@@ -14,18 +52,22 @@ export {
   WOOD_STOCK_CAP,
   WHEAT_STOCK_CAP,
   STONE_STOCK_CAP,
+  FOOD_STOCK_CAP,
+  STOCK_CAP_BY_RESOURCE,
+  stockCapFor,
   STARTING_WOOD,
   STARTING_WHEAT,
   STARTING_STONE,
-  PLACEABLE_EXTRACTORS,
-  BUILD_COST_WOOD,
+  STARTING_FOOD,
+  STARTING_WORLDSHARD,
   BUILD_IDLE_POP_REQUIREMENT,
-  BUILD_DURATION_MS,
+  BUILD_DESTROY_COMPLETED_REFUND_RATIO,
   DEV_BUILD_DURATION_MS,
+  WORLDSHARD_STOCK_CAP,
+  TOWN_HALL_WORLDSHARD_INTERVAL_MS,
   REGION_EXPANSION_BASE_WOOD,
   REGION_EXPANSION_DISTANCE_EXPONENT,
   REGION_EXPANSION_DISCOUNT_D1,
   REGION_EXPANSION_DISCOUNT_D2,
-  REGION_EXPANSION_DISCOUNT_CAP,
-  type PlaceableExtractorId
+  REGION_EXPANSION_DISCOUNT_CAP
 } from "./economy.ts";

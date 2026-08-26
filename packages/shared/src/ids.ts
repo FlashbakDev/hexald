@@ -18,7 +18,9 @@ export type ResourceId =
   | "stone_blocks"
   | "iron_ore"
   | "iron_ingot"
-  | "tools";
+  | "tools"
+  /** Éclat de monde — ancrage / révélation de région. */
+  | "worldshard";
 
 export type BuildingId =
   | "village"
@@ -31,7 +33,8 @@ export type BuildingId =
   | "quarry"
   | "smelter"
   | "forge"
-  | "monument";
+  | "monument"
+  | "house";
 
 export type WorkerJob =
   | "idle"

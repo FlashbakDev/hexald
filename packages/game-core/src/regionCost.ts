@@ -1,10 +1,3 @@
-import {
-  REGION_EXPANSION_BASE_WOOD,
-  REGION_EXPANSION_DISCOUNT_CAP,
-  REGION_EXPANSION_DISCOUNT_D1,
-  REGION_EXPANSION_DISCOUNT_D2,
-  REGION_EXPANSION_DISTANCE_EXPONENT
-} from "@hexald/content";
 import type { BuildingId, HexCoord } from "@hexald/shared";
 import { cubeDistance } from "@hexald/shared";
 import { isBuildingComplete } from "./construction.ts";
@@ -13,14 +6,8 @@ import { REGION_STEP, START_REGION_CENTER } from "./world.ts";
 export type RegionExpansionCost = {
   /** Distance en « hops » de régions depuis le centre (0,0). */
   hop: number;
-  /** Coût avant remise. */
-  baseWood: number;
-  buildingsAtDistance1: number;
-  buildingsAtDistance2: number;
-  /** Remise appliquée (0…cap). */
-  discount: number;
-  /** Bois à payer. */
-  wood: number;
+  /** Éclats de monde à payer (= hop au MVP). */
+  worldshards: number;
 };
 
 export type DevelopmentSite = {
@@ -29,7 +16,7 @@ export type DevelopmentSite = {
 };
 
 /**
- * Sites qui comptent pour la remise « civilisation ».
+ * Sites qui comptent pour la remise « civilisation » (future).
  * Village de départ (0,0) + bâtiments achevé sur la carte.
  */
 export function listDevelopmentSites(
@@ -64,9 +51,10 @@ export function regionHopFromOrigin(
   return Math.max(1, Math.round(hop));
 }
 
+/** Coût d’expansion : 1 éclat pour hop 1, 2 pour hop 2, etc. */
 export function computeRegionExpansionCost(input: {
   center: HexCoord;
-  tiles: readonly {
+  tiles?: readonly {
     q: number;
     r: number;
     buildingId?: BuildingId | null;
@@ -75,34 +63,10 @@ export function computeRegionExpansionCost(input: {
   now?: number;
   origin?: HexCoord;
 }): RegionExpansionCost {
-  const now = input.now ?? Date.now();
   const origin = input.origin ?? START_REGION_CENTER;
   const hop = regionHopFromOrigin(input.center, origin);
-  const baseWood = Math.floor(
-    REGION_EXPANSION_BASE_WOOD *
-      Math.pow(hop, REGION_EXPANSION_DISTANCE_EXPONENT)
-  );
-
-  let buildingsAtDistance1 = 0;
-  let buildingsAtDistance2 = 0;
-  for (const site of listDevelopmentSites(input.tiles, now, origin)) {
-    const d = cubeDistance(site, input.center);
-    if (d === 1) buildingsAtDistance1 += 1;
-    else if (d === 2) buildingsAtDistance2 += 1;
-  }
-
-  const rawDiscount =
-    buildingsAtDistance1 * REGION_EXPANSION_DISCOUNT_D1 +
-    buildingsAtDistance2 * REGION_EXPANSION_DISCOUNT_D2;
-  const discount = Math.min(REGION_EXPANSION_DISCOUNT_CAP, Math.max(0, rawDiscount));
-  const wood = Math.max(0, Math.floor(baseWood * (1 - discount)));
-
   return {
     hop,
-    baseWood,
-    buildingsAtDistance1,
-    buildingsAtDistance2,
-    discount,
-    wood
+    worldshards: hop
   };
 }

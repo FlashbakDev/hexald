@@ -1,8 +1,13 @@
 import {
   BUILD_COST_WOOD,
+  BUILD_DESTROY_COMPLETED_REFUND_RATIO,
   PLACEABLE_EXTRACTORS,
-  buildings,
+  getBuildingDefinition,
+  isPlaceableBuildingId,
+  isPlaceableExtractorId,
+  listPlaceableBuildings,
   type BuildingDefinition,
+  type PlaceableBuildingId,
   type PlaceableExtractorId
 } from "@hexald/content";
 import type { BiomeId, BuildingId, HexCoord, PrimaryBiomeId } from "@hexald/shared";
@@ -17,7 +22,7 @@ export type BuildPlacementInput = {
 };
 
 export type BuildPlacementResult =
-  | { ok: true; buildingId: PlaceableExtractorId; origin: HexCoord }
+  | { ok: true; buildingId: PlaceableBuildingId; origin: HexCoord }
   | {
       ok: false;
       reason:
@@ -28,20 +33,36 @@ export type BuildPlacementResult =
         | "has_village";
     };
 
-export function getBuildingDefinition(
-  id: BuildingId
-): BuildingDefinition | undefined {
-  return buildings.find((building) => building.id === id);
+export { getBuildingDefinition };
+
+export function isPlaceableBuilding(id: BuildingId): id is PlaceableBuildingId {
+  return isPlaceableBuildingId(id);
 }
 
 export function isPlaceableExtractor(
   id: BuildingId
 ): id is PlaceableExtractorId {
-  return (PLACEABLE_EXTRACTORS as readonly string[]).includes(id);
+  return isPlaceableExtractorId(id);
 }
 
-export function buildingWoodCost(buildingId: PlaceableExtractorId): number {
-  return BUILD_COST_WOOD[buildingId];
+export function buildingWoodCost(buildingId: PlaceableBuildingId): number {
+  return BUILD_COST_WOOD[buildingId] ?? getBuildingDefinition(buildingId)?.woodCost ?? 0;
+}
+
+/**
+ * Bois récupéré à la démolition.
+ * Chantier en cours → coût plein ; achevé → ratio content (50 %).
+ */
+export function woodRefundOnDestroy(
+  buildingId: BuildingId,
+  underConstruction: boolean
+): number {
+  const cost = isPlaceableBuildingId(buildingId)
+    ? buildingWoodCost(buildingId)
+    : (getBuildingDefinition(buildingId)?.woodCost ?? 0);
+  if (cost <= 0) return 0;
+  if (underConstruction) return cost;
+  return Math.floor(cost * BUILD_DESTROY_COMPLETED_REFUND_RATIO);
 }
 
 export function terrainAllowsBuilding(
@@ -54,33 +75,32 @@ export function terrainAllowsBuilding(
   return biomeInfluences(biome).includes(terrain as PrimaryBiomeId);
 }
 
-/** Extracteurs posables sur ce biome (le bois / pop libre sont vérifiés à part). */
+/** Bâtiments posables sur ce biome (bois / pop libre : UI + spend côté API). */
 export function listBuildOptionsForTile(input: {
   biome: BiomeId;
   hasVillage: boolean;
   existingBuildingId: BuildingId | null;
-  wood: number;
-}): PlaceableExtractorId[] {
+}): PlaceableBuildingId[] {
   if (input.hasVillage || input.existingBuildingId) return [];
   if (!isBuildableBiome(input.biome)) return [];
 
-  return PLACEABLE_EXTRACTORS.filter((id) => {
-    if (input.wood + 1e-9 < BUILD_COST_WOOD[id]) return false;
-    const definition = getBuildingDefinition(id);
-    if (!definition) return false;
-    return terrainAllowsBuilding(definition.terrain, input.biome);
-  });
+  return listPlaceableBuildings()
+    .filter((definition) => {
+      if (!isPlaceableBuildingId(definition.id)) return false;
+      return terrainAllowsBuilding(definition.terrain, input.biome);
+    })
+    .map((definition) => definition.id as PlaceableBuildingId);
 }
 
 export function validateBuildPlacement(
   input: BuildPlacementInput
 ): BuildPlacementResult {
-  if (!isPlaceableExtractor(input.buildingId)) {
+  if (!isPlaceableBuilding(input.buildingId)) {
     return { ok: false, reason: "unknown_building" };
   }
 
   const definition = getBuildingDefinition(input.buildingId);
-  if (!definition || definition.status === "later") {
+  if (!definition || !definition.placeable || definition.status === "later") {
     return { ok: false, reason: "unknown_building" };
   }
 
@@ -113,3 +133,6 @@ export function countBuildings(
 ): number {
   return tiles.filter((tile) => tile.buildingId === buildingId).length;
 }
+
+/** @deprecated Prefer listPlaceableBuildings from content */
+export { PLACEABLE_EXTRACTORS };

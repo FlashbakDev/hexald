@@ -23,6 +23,7 @@ import {
 import type {
   BiomeId,
   BuildingId,
+  FusionBiomeId,
   HexCoord,
   PrimaryBiomeId,
   WorldRegionSnapshot,
@@ -36,8 +37,10 @@ import {
   generateRegionTiles
 } from "@hexald/game-core";
 import { createForestDecorKit } from "./createForestDecor";
+import { createFusionDecorKit } from "./createFusionDecor";
 import { createFogCloudKit, FOG_CLOUD_LIFT } from "./createFogCloudKit";
 import { createFarmMesh } from "./createFarmMesh";
+import { createHouseMesh } from "./createHouseMesh";
 import { createLumberCampMesh } from "./createLumberCampMesh";
 import { createQuarryMesh } from "./createQuarryMesh";
 import {
@@ -86,8 +89,8 @@ const biomePalette: Record<BiomeId, { top: number; side: number }> = {
   forest_mountain: { top: 0x7a9a7e, side: 0x4a6050 }
 };
 
-const emptyPalette = { top: 0xd8e2da, side: 0x66756c };
-const revealFootprintPalette = { top: 0xc5d4a8, side: 0x6a7a55 };
+const emptyPalette = { top: 0xe4ece6, side: 0x7a8a82 };
+const revealFootprintPalette = { top: 0xd0decc, side: 0x6a7a55 };
 
 type HexSpawnAnim = {
   /** `performance.now()` au début de la génération de région. */
@@ -113,6 +116,21 @@ type HexTile = {
   /** Tuile vierge conservée sous l’anim jusqu’à la fin du spawn. */
   pendingEmpty: Mesh | null;
 };
+
+/** État logique permanent — le mesh GPU peut être streamé (chargé / déchargé). */
+type TileState = {
+  q: number;
+  r: number;
+  biome: BiomeId;
+  buildingId: BuildingId | null;
+  isRegionCenter: boolean;
+  hasVillage: boolean;
+};
+
+/** Marge de chargement biome (monde) autour du viewport. */
+const BIOME_LOAD_PAD = HEX_SIZE * 3.5;
+/** Marge de déchargement plus large (hystérésis anti-flicker au pan). */
+const BIOME_UNLOAD_PAD = HEX_SIZE * 8;
 
 function easeOutQuint(t: number) {
   return 1 - (1 - t) ** 5;
@@ -164,7 +182,7 @@ function spawnDelaysForRegion(
 }
 
 function isForestDecorBiome(biome: BiomeId) {
-  return biome === "forest" || biome === "forest_mountain";
+  return biome === "forest";
 }
 
 function isPlainsDecorBiome(biome: BiomeId) {
@@ -172,7 +190,15 @@ function isPlainsDecorBiome(biome: BiomeId) {
 }
 
 function isMountainDecorBiome(biome: BiomeId) {
-  return biome === "mountain" || biome === "plains_mountain";
+  return biome === "mountain";
+}
+
+function isFusionDecorBiome(biome: BiomeId): biome is FusionBiomeId {
+  return (
+    biome === "forest_plains" ||
+    biome === "plains_mountain" ||
+    biome === "forest_mountain"
+  );
 }
 
 function tileMeshHeight(biome: BiomeId) {
@@ -220,8 +246,14 @@ export type HexSceneApi = {
     tiles: readonly WorldTileSnapshot[]
   ) => boolean;
   applyBuilding: (q: number, r: number, buildingId: BuildingId) => boolean;
+  /** Retire le bâtiment et restaure le décor de biome. */
+  removeBuilding: (q: number, r: number) => boolean;
+  /** Dev — change le biome et retire le bâtiment affiché. */
+  applyTileBiome: (q: number, r: number, biome: BiomeId) => boolean;
   /** Projette le centre d’une tuile (au-dessus du bâtiment) en coords canvas. */
   projectTile: (q: number, r: number) => HexScreenPoint | null;
+  /** Surbrillance tutoriel (tuiles cliquables) — emissive pulsante. */
+  setTutorialHighlights: (coords: readonly HexCoord[]) => void;
 };
 
 export type HexSceneFraming = {
@@ -373,7 +405,7 @@ function hexesCoveringAabb(bounds: Aabb): HexCoord[] {
   return cells;
 }
 
-const EMPTY_GROUND = 0x8a9890;
+const EMPTY_GROUND = 0xb8c9c0;
 const ORIGIN = new Vector3();
 
 export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptions = {}): HexSceneApi {
@@ -561,14 +593,40 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
   farmKit.group.position.y = HEX_HEIGHT / 2;
   const quarryKit = createQuarryMesh();
   quarryKit.group.position.y = HEX_HEIGHT / 2;
+  const houseKit = createHouseMesh();
+  houseKit.group.position.y = HEX_HEIGHT / 2;
   const forestDecor = createForestDecorKit();
   const plainsDecor = createPlainsDecorKit();
   const mountainDecor = createMountainDecorKit();
+  const fusionDecor = createFusionDecorKit();
   const shoreEdges = createShoreEdgeDecorKit();
   const waterDecor = createWaterDecorKit();
   const deepWaterTexture = createDeepWaterSurfaceTexture();
   const plainsGrassTexture = createPlainsGrassTexture();
   const tilesByKey = new Map<string, HexTile>();
+  /** Source de vérité gameplay côté scène (indépendant du streaming GPU). */
+  const tileStatesByKey = new Map<string, TileState>();
+
+  const registerTileState = (
+    q: number,
+    r: number,
+    biome: BiomeId,
+    isRegionCenter: boolean,
+    buildingId: BuildingId | null = null
+  ): TileState => {
+    const key = hexKey(q, r);
+    const state: TileState = {
+      q,
+      r,
+      biome,
+      buildingId: q === 0 && r === 0 ? null : buildingId,
+      isRegionCenter,
+      hasVillage: q === 0 && r === 0
+    };
+    tileStatesByKey.set(key, state);
+    biomesByKey.set(key, biome);
+    return state;
+  };
 
   const clearBiomeDecor = (tile: HexTile) => {
     if (!tile.decor) return;
@@ -671,8 +729,7 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
     let hasContent = false;
 
     if (isForestDecorBiome(tile.biome)) {
-      const density = tile.biome === "forest_mountain" ? "high" : "normal";
-      group.add(forestDecor.createForTile(tile.q, tile.r, density));
+      group.add(forestDecor.createForTile(tile.q, tile.r, "normal"));
       hasContent = true;
     } else if (isPlainsDecorBiome(tile.biome)) {
       group.add(plainsDecor.createForTile(tile.q, tile.r));
@@ -683,6 +740,9 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
         return neighbor != null && isMountainDecorBiome(neighbor);
       });
       group.add(mountainDecor.createForTile({ q: tile.q, r: tile.r, chainDirs }));
+      hasContent = true;
+    } else if (isFusionDecorBiome(tile.biome)) {
+      group.add(fusionDecor.createForTile(tile.q, tile.r, tile.biome));
       hasContent = true;
     }
 
@@ -737,7 +797,9 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
           ? farmKit
           : buildingId === "quarry"
             ? quarryKit
-            : null;
+            : buildingId === "house"
+              ? houseKit
+              : null;
     if (!kit) return;
     const instance = kit.group.clone(true);
     instance.position.y = tileMeshHeight(tile.biome) / 2;
@@ -806,7 +868,7 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
     biomeTiles.push(tile);
     tilesByMesh.set(mesh, tile);
     tilesByKey.set(key, tile);
-    biomesByKey.set(key, biome);
+    registerTileState(q, r, biome, isRegionCenter, buildingId);
 
     if (tile.hasVillage) {
       clearBiomeDecor(tile);
@@ -851,9 +913,15 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
   );
   for (const [key, entry] of world.tiles) {
     const [q, r] = key.split(",").map(Number);
-    spawnBiomeTile(q!, r!, entry.biome, regionCenterKeys.has(key), null, entry.buildingId);
+    registerTileState(
+      q!,
+      r!,
+      entry.biome,
+      regionCenterKeys.has(key),
+      entry.buildingId
+    );
   }
-  refreshAllWaterLooks();
+  // GPU streamé au premier `syncBiomeTiles` (viewDirty) — pas tout le monde d’un coup.
 
   const placeEmpty = (mesh: Mesh, q: number, r: number) => {
     const { x, z } = axialToWorld(q, r);
@@ -951,6 +1019,7 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
   const grabWorld = new Vector3();
   let hoveredMesh: Mesh | null = null;
   let selectedMesh: Mesh | null = null;
+  let tutorialHighlightKeys = new Set<string>();
   let previewCenter: HexCoord | null = null;
   let hoverPreviewCenter: HexCoord | null = null;
   let frame = 0;
@@ -1024,12 +1093,21 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
   };
 
   const canvasSize = () => {
+    // Prefer the laid-out container (e.g. .game-shell) over window size so
+    // Side Rail margins / max-width reflows keep the orthographic frustum sharp.
+    const container = canvas.parentElement ?? canvas;
+    const width = Math.max(
+      1,
+      Math.round(container.clientWidth || canvas.clientWidth || canvas.getBoundingClientRect().width)
+    );
+    const height = Math.max(
+      1,
+      Math.round(
+        container.clientHeight || canvas.clientHeight || canvas.getBoundingClientRect().height
+      )
+    );
     const rect = canvas.getBoundingClientRect();
-    return {
-      rect,
-      width: Math.max(1, Math.round(rect.width)),
-      height: Math.max(1, Math.round(rect.height))
-    };
+    return { rect, width, height };
   };
 
   const clientToGround = (clientX: number, clientY: number, target: Vector3) => {
@@ -1097,12 +1175,11 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
     for (const p of revealableCenterWorld) {
       if (pointInAabb(p.x, p.z, bounds)) return true;
     }
-    for (const tile of biomeTiles) {
-      if (pointInAabb(tile.mesh.position.x, tile.mesh.position.z, bounds)) {
-        return true;
-      }
+    for (const state of tileStatesByKey.values()) {
+      const { x, z } = axialToWorld(state.q, state.r);
+      if (pointInAabb(x, z, bounds)) return true;
     }
-    return biomeTiles.length === 0 && revealableCenterWorld.length === 0;
+    return tileStatesByKey.size === 0 && revealableCenterWorld.length === 0;
   };
 
   /**
@@ -1130,6 +1207,80 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
 
   const pointInAabb = (x: number, z: number, bounds: Aabb) =>
     x >= bounds.minX && x <= bounds.maxX && z >= bounds.minZ && z <= bounds.maxZ;
+
+  /** Retire le mesh GPU ; conserve `tileStatesByKey` / `biomesByKey`. */
+  const detachBiomeGpu = (key: string) => {
+    const tile = tilesByKey.get(key);
+    if (!tile) return;
+    if (tile.spawn) return;
+    if (tile.mesh === selectedMesh || tile.mesh === hoveredMesh) return;
+
+    clearBiomeDecor(tile);
+    if (tile.buildingMesh) {
+      tile.mesh.remove(tile.buildingMesh);
+      tile.buildingMesh = null;
+    }
+    if (tile.hasVillage) {
+      tile.mesh.remove(village.group);
+    }
+    if (tile.pendingEmpty) {
+      releasePendingEmpty(tile);
+    }
+    scene.remove(tile.mesh);
+    for (const material of tile.materials) material.dispose();
+    tilesByMesh.delete(tile.mesh);
+    tilesByKey.delete(key);
+    const index = biomeTiles.indexOf(tile);
+    if (index >= 0) biomeTiles.splice(index, 1);
+  };
+
+  const ensureBiomeGpu = (
+    state: TileState,
+    spawn: HexSpawnAnim | null = null
+  ): HexTile => {
+    const key = hexKey(state.q, state.r);
+    const existing = tilesByKey.get(key);
+    if (existing) return existing;
+    const tile = spawnBiomeTile(
+      state.q,
+      state.r,
+      state.biome,
+      state.isRegionCenter,
+      spawn,
+      state.buildingId
+    );
+    refreshDecorAround(state.q, state.r);
+    return tile;
+  };
+
+  /**
+   * Streaming GPU des biomes : charge autour du viewport, décharge au-delà
+   * d’une hystérésis. L’état logique (`tileStatesByKey`) reste complet.
+   */
+  const syncBiomeTiles = () => {
+    const loadBounds = visibleGroundAabb(BIOME_LOAD_PAD);
+    const unloadBounds = visibleGroundAabb(BIOME_UNLOAD_PAD);
+    let loadedAny = false;
+
+    for (const state of tileStatesByKey.values()) {
+      const { x, z } = axialToWorld(state.q, state.r);
+      if (!pointInAabb(x, z, loadBounds)) continue;
+      const key = hexKey(state.q, state.r);
+      if (tilesByKey.has(key)) continue;
+      ensureBiomeGpu(state, null);
+      loadedAny = true;
+    }
+
+    for (const tile of [...biomeTiles]) {
+      const { x, z } = axialToWorld(tile.q, tile.r);
+      if (pointInAabb(x, z, unloadBounds)) continue;
+      detachBiomeGpu(hexKey(tile.q, tile.r));
+    }
+
+    if (loadedAny) {
+      refreshAllWaterLooks();
+    }
+  };
 
   const syncEmptyTiles = () => {
     const bounds = visibleGroundAabb();
@@ -1306,6 +1457,7 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.setSize(width, height, false);
     applyCamera();
+    syncBiomeTiles();
     syncEmptyTiles();
     viewDirty = false;
     hoverDirty = true;
@@ -1534,10 +1686,22 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
       .sort((a, b) => a.delayMs - b.delayMs);
 
     for (const { cell, delayMs } of timed) {
-      spawnBiomeTile(cell.q, cell.r, cell.biome, cell.q === center.q && cell.r === center.r, {
-        t0,
-        delayMs
-      });
+      registerTileState(
+        cell.q,
+        cell.r,
+        cell.biome,
+        cell.q === center.q && cell.r === center.r,
+        (cell.buildingId ?? null) as BuildingId | null
+      );
+      // Expansion sous les yeux : toujours spawner le GPU (anim vague).
+      spawnBiomeTile(
+        cell.q,
+        cell.r,
+        cell.biome,
+        cell.q === center.q && cell.r === center.r,
+        { t0, delayMs },
+        (cell.buildingId ?? null) as BuildingId | null
+      );
     }
     for (const cell of tiles) {
       refreshDecorAround(cell.q, cell.r);
@@ -1552,24 +1716,92 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
   };
 
   const applyBuilding = (q: number, r: number, buildingId: BuildingId) => {
-    const tile = tilesByKey.get(hexKey(q, r));
-    if (!tile || tile.hasVillage || tile.buildingId) return false;
+    const key = hexKey(q, r);
+    const state = tileStatesByKey.get(key);
+    if (!state || state.hasVillage || state.buildingId) return false;
+    state.buildingId = buildingId;
+
+    const tile = tilesByKey.get(key) ?? ensureBiomeGpu(state, null);
     tile.buildingId = buildingId;
     clearBiomeDecor(tile);
     attachBuildingMesh(tile, buildingId);
     viewDirty = true;
     hoverDirty = true;
-    emitSelection(tile.mesh, biomePayload(tile));
+    emitSelection(tile.mesh, biomePayload(tile, { clientX: lastClientX, clientY: lastClientY }));
+    return true;
+  };
+
+  const removeBuilding = (q: number, r: number) => {
+    const key = hexKey(q, r);
+    const state = tileStatesByKey.get(key);
+    if (!state || state.hasVillage || !state.buildingId) return false;
+    state.buildingId = null;
+
+    const tile = tilesByKey.get(key);
+    if (!tile) {
+      viewDirty = true;
+      return true;
+    }
+    if (tile.hasVillage || !tile.buildingId) return false;
+    if (tile.buildingMesh) {
+      tile.mesh.remove(tile.buildingMesh);
+      tile.buildingMesh = null;
+    }
+    tile.buildingId = null;
+    refreshBiomeDecor(tile);
+    viewDirty = true;
+    hoverDirty = true;
+    emitSelection(tile.mesh, biomePayload(tile, { clientX: lastClientX, clientY: lastClientY }));
+    return true;
+  };
+
+  /** Remplace biome + mesh (ex. terre↔eau) et retire le bâtiment. */
+  const applyTileBiome = (q: number, r: number, biome: BiomeId) => {
+    const key = hexKey(q, r);
+    const state = tileStatesByKey.get(key);
+    if (!state) return false;
+
+    const wasCenter = state.isRegionCenter;
+    state.biome = biome;
+    state.buildingId = null;
+    biomesByKey.set(key, biome);
+
+    const old = tilesByKey.get(key);
+    if (old) {
+      clearBiomeDecor(old);
+      if (old.buildingMesh) {
+        old.mesh.remove(old.buildingMesh);
+        old.buildingMesh = null;
+      }
+      if (old.hasVillage) {
+        old.mesh.remove(village.group);
+      }
+      scene.remove(old.mesh);
+      for (const material of old.materials) material.dispose();
+      tilesByMesh.delete(old.mesh);
+      tilesByKey.delete(key);
+      const index = biomeTiles.indexOf(old);
+      if (index >= 0) biomeTiles.splice(index, 1);
+    }
+
+    const tile = spawnBiomeTile(q, r, biome, wasCenter, null, null);
+    refreshDecorAround(q, r);
+    refreshAllWaterLooks();
+    viewDirty = true;
+    hoverDirty = true;
+    emitSelection(tile.mesh, biomePayload(tile, { clientX: lastClientX, clientY: lastClientY }));
     return true;
   };
 
   const projectScratch = new Vector3();
   const projectTile = (q: number, r: number): HexScreenPoint | null => {
     const { x, z } = axialToWorld(q, r);
+    const state = tileStatesByKey.get(hexKey(q, r));
+    if (!state) return null;
     const tile = tilesByKey.get(hexKey(q, r));
-    if (!tile) return null;
+    const restY = tile?.restY ?? tileMeshHeight(state.biome) / 2;
     const lift = 0.52;
-    projectScratch.set(x, tile.restY + lift, z);
+    projectScratch.set(x, restY + lift, z);
     projectScratch.project(camera);
     const { width, height } = canvasSize();
     const sx = (projectScratch.x * 0.5 + 0.5) * width;
@@ -1615,6 +1847,7 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
     }
 
     if (viewDirty) {
+      syncBiomeTiles();
       syncEmptyTiles();
       viewDirty = false;
     }
@@ -1633,9 +1866,11 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
       : false;
 
     const now = performance.now();
+    const tutorialPulse = 0.55 + 0.45 * Math.sin(now * 0.006);
     for (const tile of biomeTiles) {
       const hoveredHere = tile.mesh === hoveredMesh;
       const selectedHere = tile.mesh === selectedMesh;
+      const tutorialHere = tutorialHighlightKeys.has(hexKey(tile.q, tile.r));
       const inPreview = previewKeys.has(hexKey(tile.q, tile.r));
 
       if (tile.spawn) {
@@ -1651,7 +1886,15 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
           }
         }
       } else {
-        const targetY = tile.restY + (hoveredHere ? HOVER_LIFT : selectedHere ? SELECT_LIFT : 0);
+        const targetY =
+          tile.restY +
+          (hoveredHere
+            ? HOVER_LIFT
+            : selectedHere
+              ? SELECT_LIFT
+              : tutorialHere
+                ? SELECT_LIFT * 0.55
+                : 0);
         tile.mesh.position.y += (targetY - tile.mesh.position.y) * 0.18;
       }
 
@@ -1659,6 +1902,9 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
         setEmissive(tile.materials, 0.14, 0.115, 0.056);
       } else if (selectedHere) {
         setEmissive(tile.materials, 0.22, 0.16, 0.04);
+      } else if (tutorialHere) {
+        const e = 0.14 + tutorialPulse * 0.2;
+        setEmissive(tile.materials, e * 0.95, e, e * 0.82);
       } else if (inPreview && previewOk) {
         setEmissive(tile.materials, 0.08, 0.14, 0.06);
       } else if (inPreview) {
@@ -1691,13 +1937,20 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
       if (!mesh.visible) continue;
       const hoveredHere = mesh === hoveredMesh;
       const selectedHere = mesh === selectedMesh;
+      const tutorialHere = tutorialHighlightKeys.has(key);
       const inPreview = previewKeys.has(key);
       const isCenter = revealableCenters.has(key);
       const inHintFootprint = Boolean(hintFootprint?.has(key) && !isCenter && !biomesByKey.has(key));
       const revealLift = inHintFootprint ? REVEAL_FOOTPRINT_LIFT : 0;
       const targetY =
         emptyRestY +
-        (hoveredHere && isCenter ? HOVER_LIFT : selectedHere && isCenter ? SELECT_LIFT : revealLift);
+        (hoveredHere && isCenter
+          ? HOVER_LIFT
+          : selectedHere && isCenter
+            ? SELECT_LIFT
+            : tutorialHere
+              ? SELECT_LIFT * 0.55
+              : revealLift);
       mesh.position.y += (targetY - mesh.position.y) * 0.18;
       const materials = meshMaterials(mesh);
 
@@ -1705,6 +1958,9 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
         setEmissive(materials, 0.06, 0.07, 0.065);
       } else if (selectedHere && isCenter) {
         setEmissive(materials, 0.08, 0.09, 0.085);
+      } else if (tutorialHere) {
+        const e = 0.12 + tutorialPulse * 0.18;
+        setEmissive(materials, e * 0.9, e, e * 0.85);
       } else if (inPreview && previewOk) {
         setEmissive(materials, 0.05, 0.07, 0.055);
       } else if (inPreview) {
@@ -1739,6 +1995,10 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
   requestAnimationFrame(resize);
   tick();
 
+  const setTutorialHighlights = (coords: readonly HexCoord[]) => {
+    tutorialHighlightKeys = new Set(coords.map((cell) => hexKey(cell.q, cell.r)));
+  };
+
   const api = {
     recenter,
     clearSelection,
@@ -1746,7 +2006,10 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
     generateRegion,
     applyRegion,
     applyBuilding,
+    removeBuilding,
+    applyTileBiome,
     projectTile,
+    setTutorialHighlights,
     dispose: () => {
       cancelAnimationFrame(frame);
       window.removeEventListener("resize", resize);
@@ -1761,9 +2024,11 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
       lumberCampKit.dispose();
       farmKit.dispose();
       quarryKit.dispose();
+      houseKit.dispose();
       forestDecor.dispose();
       plainsDecor.dispose();
       mountainDecor.dispose();
+      fusionDecor.dispose();
       shoreEdges.dispose();
       waterDecor.dispose();
       deepWaterTexture.dispose();

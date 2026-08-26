@@ -1,22 +1,27 @@
-import type { GameAction } from "@hexald/shared";
+import type { GameAction, HexCoord, PrimaryBiomeId } from "@hexald/shared";
+import { isPlaceableBuilding } from "./build.ts";
+import { isPrimaryBiome } from "./world.ts";
 
 export type ActionResult =
   | { ok: true }
   | { ok: false; reason: string };
 
+function isHexCoord(value: unknown): value is HexCoord {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    Number.isInteger((value as HexCoord).q) &&
+    Number.isInteger((value as HexCoord).r)
+  );
+}
+
 /**
  * Validation structurelle légère.
- * Les effets métier (économie, monde) passent par les services dédiés.
+ * Les effets métier (économie, monde) passent par applyWorldAction / services API.
  */
 export function validateAction(action: GameAction): ActionResult {
   if (action.type === "assign_workers") {
-    const origin = action.origin;
-    if (
-      !origin ||
-      typeof origin !== "object" ||
-      !Number.isInteger(origin.q) ||
-      !Number.isInteger(origin.r)
-    ) {
+    if (!isHexCoord(action.origin)) {
       return { ok: false, reason: "invalid_origin" };
     }
     if (!Number.isInteger(action.count) || action.count < 0 || action.count > 1) {
@@ -25,8 +30,24 @@ export function validateAction(action: GameAction): ActionResult {
     return { ok: true };
   }
 
-  if (action.type === "generate_region" || action.type === "build") {
-    return { ok: false, reason: "not_implemented" };
+  if (action.type === "build") {
+    if (!isHexCoord(action.origin)) {
+      return { ok: false, reason: "invalid_origin" };
+    }
+    if (!isPlaceableBuilding(action.buildingId)) {
+      return { ok: false, reason: "unknown_building" };
+    }
+    return { ok: true };
+  }
+
+  if (action.type === "generate_region") {
+    if (!isHexCoord(action.center)) {
+      return { ok: false, reason: "invalid_center" };
+    }
+    if (!isPrimaryBiome(action.biome as PrimaryBiomeId)) {
+      return { ok: false, reason: "invalid_biome" };
+    }
+    return { ok: true };
   }
 
   return { ok: false, reason: "unknown_action" };

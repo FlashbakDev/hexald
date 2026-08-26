@@ -15,5 +15,6 @@ export const resources: ResourceDefinition[] = [
   { id: "stone_blocks", label: "Blocs" },
   { id: "iron_ore", label: "Minerai de fer" },
   { id: "iron_ingot", label: "Lingot de fer" },
-  { id: "tools", label: "Outils" }
+  { id: "tools", label: "Outils" },
+  { id: "worldshard", label: "Éclat de monde" }
 ];

@@ -17,3 +17,5 @@ docs
 !**/.env.example
 .DS_Store
 *.md
+!apps/web/content/**/*.md
+!**/README.md

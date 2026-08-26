@@ -1,10 +1,16 @@
-import type { BuildingId, PrimaryBiomeId, WorkerJob } from "./ids.ts";
+import type { PrimaryBiomeId, WorkerJob } from "./ids.ts";
 import type { HexCoord } from "./hex.ts";
-import type { ExtractorJob } from "./world.ts";
+import type {
+  BuildResult,
+  ExpandRegionResult,
+  ExtractorJob,
+  PlaceableBuildingId,
+  WorldSnapshot
+} from "./world.ts";
 
 export type BuildAction = {
   type: "build";
-  buildingId: BuildingId;
+  buildingId: PlaceableBuildingId;
   origin: HexCoord;
 };
 
@@ -22,4 +28,13 @@ export type GenerateRegionAction = {
 
 export type GameAction = BuildAction | AssignWorkersAction | GenerateRegionAction;
 
-export type { ExtractorJob, WorkerJob };
+export type ApplyActionSuccess =
+  | { ok: true; type: "build"; result: BuildResult }
+  | { ok: true; type: "assign_workers"; world: WorldSnapshot }
+  | { ok: true; type: "generate_region"; result: ExpandRegionResult };
+
+export type ApplyActionFailure = { ok: false; error: string };
+
+export type ApplyActionOutcome = ApplyActionSuccess | ApplyActionFailure;
+
+export type { ExtractorJob, PlaceableBuildingId, WorkerJob };

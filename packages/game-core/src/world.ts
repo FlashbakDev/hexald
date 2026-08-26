@@ -65,6 +65,25 @@ export function isPrimaryBiome(biome: BiomeId): biome is PrimaryBiomeId {
   );
 }
 
+/** Biomes de fusion terre↔terre (plus rares, +20 % prod extracteur). */
+export function isFusionBiome(biome: BiomeId): boolean {
+  return (
+    biome === "forest_plains" ||
+    biome === "plains_mountain" ||
+    biome === "forest_mountain"
+  );
+}
+
+/** Tout biome connu (primaires + fusions). */
+export function isBiomeId(value: string): value is BiomeId {
+  return (
+    isPrimaryBiome(value as BiomeId) ||
+    value === "forest_plains" ||
+    value === "plains_mountain" ||
+    value === "forest_mountain"
+  );
+}
+
 /** Hex entièrement aquatique (pas de bâtiments terrestres). */
 export function isWaterBiome(biome: BiomeId): boolean {
   return biome === "water";

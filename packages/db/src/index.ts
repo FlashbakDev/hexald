@@ -1,5 +1,11 @@
-export { createDb, pingDb, type Database } from "./client.ts";
-export { players, worlds, worldTiles, worldRegions } from "./schema/index.ts";
+export { createDb, pingDb, type Database, type WorldDb } from "./client.ts";
+export {
+  players,
+  worlds,
+  worldInventory,
+  worldTiles,
+  worldRegions
+} from "./schema/index.ts";
 export {
   insertAnonymousPlayer,
   fetchPlayer,
@@ -17,14 +23,21 @@ export {
   appendRegion,
   updateWorldEconomy,
   setTileBuilding,
+  setTileBiomeDev,
+  clearTileBuilding,
   setTileWorkerState,
   setTileAssignedWorkers,
   deleteWorldForOwner,
+  withWorldLock,
+  WORLD_LOCK_TIMEOUT_MS,
   type PersistedWorld,
   type PersistedWorldSummary,
   type WorldTileRow,
   type WorldRegionRow,
-  type WorldEconomyRow
+  type WorldEconomyRow,
+  type WorldInventoryRow,
+  type WorldLockFailure,
+  type WorldLockResult
 } from "./worlds.ts";
 export {
   fetchAdminDbStats,

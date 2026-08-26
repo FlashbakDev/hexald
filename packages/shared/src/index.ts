@@ -19,7 +19,10 @@ export type {
   GameAction,
   BuildAction,
   AssignWorkersAction,
-  GenerateRegionAction
+  GenerateRegionAction,
+  ApplyActionSuccess,
+  ApplyActionFailure,
+  ApplyActionOutcome
 } from "./actions.ts";
 export type {
   WorldSnapshot,
@@ -27,12 +30,16 @@ export type {
   WorldTileSnapshot,
   WorldRegionSnapshot,
   WorldEconomySnapshot,
+  InventoryStockSnapshot,
   RegionExpansionCostSnapshot,
   ExpandRegionRequest,
   ExpandRegionResult,
   AssignWorkersRequest,
   BuildRequest,
   BuildResult,
+  DestroyBuildingRequest,
+  DestroyBuildingResult,
+  PlaceableBuildingId,
   ExtractorJob
 } from "./world.ts";
 export type { SessionSnapshot } from "./session.ts";

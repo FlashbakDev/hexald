@@ -1,7 +1,8 @@
 import {
-  BUILD_DURATION_MS,
   DEV_BUILD_DURATION_MS,
-  type PlaceableExtractorId
+  buildingDurationMsFromCatalog,
+  isPlaceableBuildingId,
+  type PlaceableBuildingId
 } from "@hexald/content";
 import type { BuildingId } from "@hexald/shared";
 
@@ -11,11 +12,11 @@ export type ConstructionTimeInput = {
 };
 
 export function resolveBuildDurationMs(
-  buildingId: PlaceableExtractorId,
+  buildingId: PlaceableBuildingId,
   options: ConstructionTimeInput = {}
 ): number {
   if (options.isDev) return DEV_BUILD_DURATION_MS;
-  return BUILD_DURATION_MS[buildingId];
+  return buildingDurationMsFromCatalog(buildingId);
 }
 
 /**
@@ -43,10 +44,13 @@ export function isBuildingUnderConstruction(
 }
 
 export function startConstruction(
-  buildingId: PlaceableExtractorId,
+  buildingId: PlaceableBuildingId,
   now: number,
   options: ConstructionTimeInput = {}
-): { buildingId: PlaceableExtractorId; constructionCompletesAt: number } {
+): { buildingId: PlaceableBuildingId; constructionCompletesAt: number } {
+  if (!isPlaceableBuildingId(buildingId)) {
+    throw new Error(`not_placeable:${buildingId}`);
+  }
   const durationMs = resolveBuildDurationMs(buildingId, options);
   return {
     buildingId,

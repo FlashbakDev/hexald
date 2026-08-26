@@ -3,7 +3,7 @@ const apiProxyTarget =
 
 export default defineNuxtConfig({
   compatibilityDate: "2025-07-15",
-  modules: ["@nuxt/ui"],
+  modules: ["@nuxt/ui", "@vite-pwa/nuxt"],
   css: ["~/assets/css/main.css"],
   fonts: {
     families: [
@@ -23,7 +23,9 @@ export default defineNuxtConfig({
     public: {
       apiBase: "/backend",
       /** Override with NUXT_PUBLIC_ADMIN_CODE */
-      adminCode: "nimda"
+      adminCode: "nimda",
+      /** AdSense publisher client — NUXT_PUBLIC_ADSENSE_CLIENT_ID (never load via head; plugin gates it) */
+      adsenseClientId: ""
     }
   },
   routeRules: {
@@ -34,6 +36,60 @@ export default defineNuxtConfig({
   vite: {
     optimizeDeps: {
       include: ["three"]
+    }
+  },
+  pwa: {
+    registerType: "autoUpdate",
+    injectRegister: "auto",
+    strategies: "generateSW",
+    manifest: {
+      name: "Hexald",
+      short_name: "Hexald",
+      description: "Gestion / stratégie hexagonale persistante.",
+      theme_color: "#2d5248",
+      background_color: "#e8f0ec",
+      display: "standalone",
+      orientation: "any",
+      start_url: "/",
+      lang: "fr",
+      icons: [
+        {
+          src: "/pwa/pwa-192x192.png",
+          sizes: "192x192",
+          type: "image/png"
+        },
+        {
+          src: "/pwa/pwa-512x512.png",
+          sizes: "512x512",
+          type: "image/png"
+        },
+        {
+          src: "/pwa/pwa-512x512.png",
+          sizes: "512x512",
+          type: "image/png",
+          purpose: "maskable"
+        }
+      ]
+    },
+    workbox: {
+      // Shell précaché pour afficher le message offline ; API jamais en cache.
+      navigateFallback: "/",
+      navigateFallbackDenylist: [/^\/backend/],
+      globPatterns: ["**/*.{js,css,html,png,svg,ico,webp,woff2}"],
+      runtimeCaching: [
+        {
+          urlPattern: /\/backend\//,
+          handler: "NetworkOnly"
+        }
+      ]
+    },
+    client: {
+      installPrompt: false,
+      periodicSyncForUpdates: 0
+    },
+    devOptions: {
+      enabled: false,
+      type: "module"
     }
   }
 });
