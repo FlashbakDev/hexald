@@ -125,12 +125,6 @@ export default defineNuxtConfig({
           sizes: "512x512",
           type: "image/png",
           purpose: "maskable"
-        },
-        {
-          src: "/icon.png",
-          sizes: "1254x1254",
-          type: "image/png",
-          purpose: "any"
         }
       ]
     },
@@ -138,7 +132,9 @@ export default defineNuxtConfig({
       // Shell précaché pour afficher le message offline ; API jamais en cache.
       navigateFallback: "/",
       navigateFallbackDenylist: [/^\/backend/, /^\/__\/auth/],
-      globPatterns: ["**/*.{js,css,html,png,svg,ico,webp,woff2}"],
+      // icon.png / favicon restent hors SW : servis en réseau (évite plafond 2 MiB).
+      globPatterns: ["**/*.{js,css,html,svg,webp,woff2}", "pwa/*.png", "favicon-*.png", "apple-touch-icon.png"],
+      maximumFileSizeToCacheInBytes: 2 * 1024 * 1024,
       runtimeCaching: [
         {
           urlPattern: /\/backend\//,
