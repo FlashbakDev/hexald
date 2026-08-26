@@ -1,5 +1,4 @@
 import {
-  BoxGeometry,
   ConeGeometry,
   CylinderGeometry,
   Group,
@@ -20,26 +19,36 @@ type TreeSpot = { x: number; z: number; scale: number; yaw: number; kind: 0 | 1 
 /** Layouts : kind 0 = pin, 1 = feuillu large, 2 = jeune pousse. */
 const TREE_LAYOUTS_NORMAL: readonly (readonly TreeSpot[])[] = [
   [
-    { x: -0.3, z: 0.2, scale: 0.95, yaw: 0.25, kind: 0 },
-    { x: 0.28, z: -0.2, scale: 1.05, yaw: -0.4, kind: 1 },
-    { x: 0.06, z: 0.32, scale: 0.72, yaw: 0.7, kind: 2 }
+    { x: -0.34, z: 0.22, scale: 1.0, yaw: 0.25, kind: 0 },
+    { x: 0.32, z: -0.24, scale: 1.1, yaw: -0.4, kind: 1 },
+    { x: 0.08, z: 0.34, scale: 0.85, yaw: 0.7, kind: 0 },
+    { x: -0.18, z: -0.32, scale: 0.92, yaw: -0.9, kind: 1 },
+    { x: 0.3, z: 0.26, scale: 0.75, yaw: 1.1, kind: 2 },
+    { x: -0.32, z: -0.05, scale: 0.8, yaw: 0.15, kind: 2 }
   ],
   [
-    { x: 0.3, z: 0.18, scale: 1.0, yaw: -0.15, kind: 1 },
-    { x: -0.26, z: -0.26, scale: 0.88, yaw: 0.55, kind: 0 },
-    { x: -0.08, z: 0.3, scale: 0.7, yaw: -0.8, kind: 2 },
-    { x: 0.18, z: -0.34, scale: 0.78, yaw: 1.1, kind: 0 }
+    { x: 0.34, z: 0.18, scale: 1.05, yaw: -0.15, kind: 1 },
+    { x: -0.3, z: -0.28, scale: 0.95, yaw: 0.55, kind: 0 },
+    { x: -0.1, z: 0.34, scale: 0.88, yaw: -0.8, kind: 0 },
+    { x: 0.2, z: -0.34, scale: 0.9, yaw: 1.1, kind: 1 },
+    { x: -0.34, z: 0.2, scale: 0.78, yaw: 0.4, kind: 2 },
+    { x: 0.05, z: 0.05, scale: 0.7, yaw: -0.3, kind: 2 }
   ],
   [
-    { x: -0.32, z: -0.08, scale: 0.92, yaw: 0.3, kind: 0 },
-    { x: 0.22, z: 0.28, scale: 1.08, yaw: -0.25, kind: 1 },
-    { x: 0.3, z: -0.28, scale: 0.68, yaw: 1.0, kind: 2 }
+    { x: -0.34, z: -0.1, scale: 1.0, yaw: 0.3, kind: 0 },
+    { x: 0.26, z: 0.3, scale: 1.12, yaw: -0.25, kind: 1 },
+    { x: 0.32, z: -0.28, scale: 0.9, yaw: 1.0, kind: 0 },
+    { x: -0.2, z: 0.32, scale: 0.95, yaw: -0.55, kind: 1 },
+    { x: 0.02, z: -0.34, scale: 0.82, yaw: 0.8, kind: 0 },
+    { x: -0.08, z: -0.05, scale: 0.72, yaw: 1.2, kind: 2 }
   ],
   [
-    { x: -0.22, z: 0.28, scale: 1.02, yaw: -0.5, kind: 1 },
-    { x: 0.32, z: 0.05, scale: 0.9, yaw: 0.4, kind: 0 },
-    { x: -0.05, z: -0.32, scale: 0.82, yaw: 0.9, kind: 0 },
-    { x: 0.12, z: 0.22, scale: 0.65, yaw: -1.0, kind: 2 }
+    { x: -0.26, z: 0.3, scale: 1.08, yaw: -0.5, kind: 1 },
+    { x: 0.34, z: 0.05, scale: 0.98, yaw: 0.4, kind: 0 },
+    { x: -0.08, z: -0.34, scale: 0.95, yaw: 0.9, kind: 0 },
+    { x: 0.22, z: 0.32, scale: 0.85, yaw: -1.0, kind: 2 },
+    { x: -0.34, z: -0.18, scale: 0.9, yaw: 0.2, kind: 1 },
+    { x: 0.28, z: -0.28, scale: 0.78, yaw: -0.7, kind: 2 }
   ]
 ];
 
@@ -90,61 +99,51 @@ function tileHash(q: number, r: number, salt = 0) {
 }
 
 /**
- * Décor forêt enrichi : pins / feuillus multi-étages, sous-bois, rochers, souches.
+ * Décor forêt : pins / feuillus multi-étages + sous-bois (pas de rochers).
  */
 export function createForestDecorKit() {
   const geometries: BufferGeometry[] = [];
   const materials: Material[] = [];
 
   const trunk = new MeshStandardMaterial({
-    color: 0x5c3a22,
+    color: 0xa86a42,
     roughness: 0.94,
     metalness: 0.01
   });
   const trunkPale = new MeshStandardMaterial({
-    color: 0x7a5332,
+    color: 0xc48858,
     roughness: 0.92,
     metalness: 0.01
   });
   const foliageA = new MeshStandardMaterial({
-    color: 0x3f8f4a,
+    color: 0x458a64,
     roughness: 0.84,
     metalness: 0.02
   });
   const foliageB = new MeshStandardMaterial({
-    color: 0x2f7340,
+    color: 0x3a7656,
     roughness: 0.86,
     metalness: 0.02
   });
   const foliageC = new MeshStandardMaterial({
-    color: 0x4aa358,
+    color: 0x529872,
     roughness: 0.82,
     metalness: 0.02
   });
   const foliageHigh = new MeshStandardMaterial({
-    color: 0x246038,
+    color: 0x2f6a4a,
     roughness: 0.85,
     metalness: 0.02
   });
   const bush = new MeshStandardMaterial({
-    color: 0x3a7a42,
+    color: 0x427a58,
     roughness: 0.9,
     metalness: 0.01
   });
   const fern = new MeshStandardMaterial({
-    color: 0x5a9a4e,
+    color: 0x528a68,
     roughness: 0.88,
     metalness: 0.01
-  });
-  const rock = new MeshStandardMaterial({
-    color: 0x6a737c,
-    roughness: 0.96,
-    metalness: 0.03
-  });
-  const rockMoss = new MeshStandardMaterial({
-    color: 0x5a6e52,
-    roughness: 0.94,
-    metalness: 0.02
   });
   materials.push(
     trunk,
@@ -154,9 +153,7 @@ export function createForestDecorKit() {
     foliageC,
     foliageHigh,
     bush,
-    fern,
-    rock,
-    rockMoss
+    fern
   );
 
   const trunkGeom = new CylinderGeometry(0.026, 0.04, 0.16, 6);
@@ -167,7 +164,6 @@ export function createForestDecorKit() {
   const leafRound = new ConeGeometry(0.14, 0.18, 8);
   const bushGeom = new ConeGeometry(0.09, 0.1, 5);
   const fernGeom = new ConeGeometry(0.045, 0.08, 4);
-  const rockGeom = new CylinderGeometry(0.05, 0.065, 0.04, 5);
   geometries.push(
     trunkGeom,
     trunkThin,
@@ -176,8 +172,7 @@ export function createForestDecorKit() {
     leafTip,
     leafRound,
     bushGeom,
-    fernGeom,
-    rockGeom
+    fernGeom
   );
 
   function addMesh(
@@ -253,7 +248,9 @@ export function createForestDecorKit() {
     const high = density === "high";
     const layouts = high ? TREE_LAYOUTS_HIGH : TREE_LAYOUTS_NORMAL;
     const layout = layouts[hash % layouts.length]!;
-    const count = high ? Math.min(layout.length, 5 + (hash % 2)) : Math.min(layout.length, 2 + (hash % 3));
+    const count = high
+      ? Math.min(layout.length, 5 + (hash % 2))
+      : Math.min(layout.length, 5 + (hash % 2));
     const group = new Group();
 
     for (let i = 0; i < count; i += 1) {
@@ -275,14 +272,15 @@ export function createForestDecorKit() {
       last.position.set(spot.x, 0, spot.z);
     }
 
-    // Sous-bois : buissons + fougères
-    const underCount = high ? 4 + (h1 % 3) : 2 + (h1 % 3);
+    // Sous-bois : surtout buissons (+ quelques fougères)
+    const underCount = high ? 7 + (h1 % 3) : 5 + (h1 % 3);
     for (let i = 0; i < underCount; i += 1) {
       const spot = UNDERGROWTH_SPOTS[(h1 + i * 3) % UNDERGROWTH_SPOTS.length]!;
       const jx = (((h2 >>> (i * 3)) & 7) / 7 - 0.5) * 0.06;
       const jz = (((h2 >>> (i * 3 + 2)) & 7) / 7 - 0.5) * 0.06;
-      const sx = 0.85 + ((h1 >>> i) & 3) * 0.12;
-      if (((h1 >>> i) & 1) === 0) {
+      const sx = 0.9 + ((h1 >>> i) & 3) * 0.14;
+      // ~70 % buissons
+      if (((h1 >>> i) & 3) !== 0) {
         addMesh(group, bushGeom, bush, spot.x + jx, 0.045 * sx, spot.z + jz, sx, sx, sx, i * 0.7);
       } else {
         addMesh(group, fernGeom, fern, spot.x + jx, 0.04 * sx, spot.z + jz, sx, sx * 1.1, sx, i * 0.9);
@@ -299,26 +297,6 @@ export function createForestDecorKit() {
           i * 1.2
         );
       }
-    }
-
-    // Rochers moussus
-    const rockCount = high ? 2 + (h2 % 2) : 1 + (h2 % 2);
-    for (let i = 0; i < rockCount; i += 1) {
-      const ang = ((h2 + i * 2.3) % (Math.PI * 2));
-      const dist = 0.28 + ((h1 >>> (i * 2)) % 4) * 0.05;
-      const mat = ((h2 >>> i) & 1) === 1 ? rockMoss : rock;
-      addMesh(
-        group,
-        rockGeom,
-        mat,
-        Math.cos(ang) * dist,
-        0.02,
-        Math.sin(ang) * dist,
-        0.9 + (i % 2) * 0.35,
-        0.8 + (i % 2) * 0.2,
-        1 + (i % 3) * 0.15,
-        ang
-      );
     }
 
     return group;

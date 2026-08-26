@@ -10,10 +10,14 @@ export {
   insertAnonymousPlayer,
   fetchPlayer,
   findPlayerByPseudo,
+  findPlayerByFirebaseUid,
+  insertFirebasePlayer,
+  linkOrCreateFirebasePlayer,
   isPseudoAvailable,
   claimPlayerPseudo,
   type PersistedPlayer,
-  type ClaimPseudoResult
+  type ClaimPseudoResult,
+  type LinkFirebaseResult
 } from "./players.ts";
 export {
   insertWorldWithTerrain,

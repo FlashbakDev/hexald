@@ -22,6 +22,9 @@ export type ResourceId =
   /** Éclat de monde — ancrage / révélation de région. */
   | "worldshard";
 
+/** Points d’intérêt naturels / landmarks (couche sur la tuile). */
+export type PoiId = "fish_bank" | "cow_herd" | "iron_deposit";
+
 export type BuildingId =
   | "village"
   | "lumber_camp"
@@ -31,6 +34,7 @@ export type BuildingId =
   | "mill"
   | "bakery"
   | "quarry"
+  | "fishing_hut"
   | "smelter"
   | "forge"
   | "monument"
@@ -42,6 +46,7 @@ export type WorkerJob =
   | "miner"
   | "quarrier"
   | "farmer"
+  | "fisher"
   | "laborer"
   | "artisan"
   | "builder";

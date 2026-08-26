@@ -6,6 +6,8 @@ import {
   POPULATION_CAP,
   FARM_MAX_WORKERS,
   QUARRY_MAX_WORKERS,
+  FISHING_HUT_MAX_WORKERS,
+  FISHING_HUT_FOOD_RATE_PER_WORKER_PER_MINUTE,
   STARTING_FOOD,
   STARTING_POPULATION,
   STARTING_STONE,
@@ -53,16 +55,19 @@ export type EconomyState = {
   woodcutters: number;
   farmers: number;
   quarriers: number;
+  fishers: number;
   /** Inventaire générique (resource_id → stock). */
   stocks: Partial<Record<ResourceId, StockEntry>>;
   /** Sites posés (y compris en chantier). */
   lumberCampSites: number;
   farmSites: number;
   quarrySites: number;
+  fishingHutSites: number;
   /** Au moins un site achevé — requis pour produire. */
   hasLumberCamp: boolean;
   hasFarm: boolean;
   hasQuarry: boolean;
+  hasFishingHut: boolean;
   /** DEC-017 — surplus food cumulé vers le prochain habitant. */
   foodSurplusAccumulated: number;
   /** Sites extracteurs (biome + workers) pour bonus fusion. */
@@ -135,15 +140,24 @@ function workersAndActiveForBuilding(
   if (buildingId === "farm") {
     return { workers: state.farmers, active: state.hasFarm };
   }
+  if (buildingId === "fishing_hut") {
+    return { workers: state.fishers, active: state.hasFishingHut };
+  }
   return { workers: state.quarriers, active: state.hasQuarry };
 }
 
 function buildExtractorProducers(): ExtractorProducer[] {
-  const ids: PlaceableExtractorId[] = ["lumber_camp", "farm", "quarry"];
+  const ids: PlaceableExtractorId[] = [
+    "lumber_camp",
+    "farm",
+    "quarry",
+    "fishing_hut"
+  ];
   const producers: ExtractorProducer[] = [];
   for (const buildingId of ids) {
     const output = resourceOutputForBuilding(buildingId);
-    if (!output) continue;
+    // Food : settle via settleFoodAndGrowth (HDV + pêche), pas extracteur stock brut.
+    if (!output || output === "food") continue;
     producers.push({
       buildingId,
       resourceId: output,
@@ -210,6 +224,7 @@ export function createInitialEconomy(now = Date.now()): EconomyState {
     woodcutters: 0,
     farmers: 0,
     quarriers: 0,
+    fishers: 0,
     stocks: {
       wood: { amount: STARTING_WOOD, lastCalculatedAt: now },
       wheat: { amount: STARTING_WHEAT, lastCalculatedAt: now },
@@ -220,9 +235,11 @@ export function createInitialEconomy(now = Date.now()): EconomyState {
     lumberCampSites: 0,
     farmSites: 0,
     quarrySites: 0,
+    fishingHutSites: 0,
     hasLumberCamp: false,
     hasFarm: false,
     hasQuarry: false,
+    hasFishingHut: false,
     foodSurplusAccumulated: 0,
     extractorSites: []
   };
@@ -265,15 +282,23 @@ export function stoneRateFromState(state: EconomyState): number {
   return rateFromSites(state, "quarry");
 }
 
+export function fishingFoodRateFromState(state: EconomyState): number {
+  return rateFromSites(state, "fishing_hut");
+}
+
 export function wheatFoodEquivalentPerMinute(state: EconomyState): number {
   const wheatRate = wheatRateFromState(state);
   if (wheatRate <= 0 || WHEAT_TO_FOOD_EMERGENCY_RATIO <= 0) return 0;
   return Math.floor(wheatRate / WHEAT_TO_FOOD_EMERGENCY_RATIO);
 }
 
-/** Prod food : hôtel de ville + équivalent blé brut (ferme, sans moulin). */
+/** Prod food : hôtel de ville + cabane de pêcheur + équivalent blé brut (ferme). */
 export function foodProductionPerMinute(state: EconomyState): number {
-  return TOWN_HALL_FOOD_PRODUCTION_PER_MINUTE + wheatFoodEquivalentPerMinute(state);
+  return (
+    TOWN_HALL_FOOD_PRODUCTION_PER_MINUTE +
+    fishingFoodRateFromState(state) +
+    wheatFoodEquivalentPerMinute(state)
+  );
 }
 
 export function foodConsumptionPerMinute(state: EconomyState): number {
@@ -412,18 +437,20 @@ function settleFoodAndGrowth(state: EconomyState, now: number): EconomyState {
   let population = state.population;
   let surplus = Math.max(0, Math.floor(state.foodSurplusAccumulated));
 
-  // Stock food : uniquement l’hôtel de ville (le blé reste du blé jusqu’à conversion).
-  const hallNet =
-    TOWN_HALL_FOOD_PRODUCTION_PER_MINUTE -
+  // Stock food : HDV + cabane de pêcheur (le blé reste du blé jusqu’à conversion).
+  const fishingRate = fishingFoodRateFromState(next);
+  const foodNet =
+    TOWN_HALL_FOOD_PRODUCTION_PER_MINUTE +
+    fishingRate -
     population * FOOD_CONSUMPTION_PER_POP_PER_MINUTE;
   const wheatRate = wheatProductionRatePerMinute(next.farmers, next.hasFarm);
   const wheatFoodRate = wheatFoodEquivalentPerMinute(next);
 
-  if (hallNet >= 0) {
+  if (foodNet >= 0) {
     const settled = applyOfflineProduction(
       {
         stock: current.amount,
-        productionRatePerMinute: hallNet,
+        productionRatePerMinute: foodNet,
         lastCalculatedAt: current.lastCalculatedAt,
         cap: foodCap
       },
@@ -436,7 +463,7 @@ function settleFoodAndGrowth(state: EconomyState, now: number): EconomyState {
   } else {
     const result = applyOfflineConsumption(
       current.amount,
-      -hallNet,
+      -foodNet,
       current.lastCalculatedAt,
       now
     );
@@ -450,12 +477,12 @@ function settleFoodAndGrowth(state: EconomyState, now: number): EconomyState {
     }
   }
 
-  // Croissance : surplus HDV + blé brut (5 blé ≈ 1 food).
+  // Croissance : surplus food (HDV + pêche) + blé brut (5 blé ≈ 1 food).
   // On accumule même au cap (barre visible) ; le +1 pop attend une place libre.
   if (elapsedMinutes > 0) {
     let growthFood = 0;
-    if (hallNet > 0) {
-      growthFood += Math.floor(hallNet * elapsedMinutes);
+    if (foodNet > 0) {
+      growthFood += Math.floor(foodNet * elapsedMinutes);
     }
 
     if (wheatFoodRate > 0) {
@@ -537,12 +564,14 @@ export type AssignWorkersResult =
 function siteCountForJob(job: ExtractorJob, state: EconomyState): number {
   if (job === "woodcutter") return state.lumberCampSites;
   if (job === "farmer") return state.farmSites;
+  if (job === "fisher") return state.fishingHutSites;
   return state.quarrySites;
 }
 
 function currentWorkersForJob(state: EconomyState, job: ExtractorJob): number {
   if (job === "woodcutter") return state.woodcutters;
   if (job === "farmer") return state.farmers;
+  if (job === "fisher") return state.fishers;
   return state.quarriers;
 }
 
@@ -560,17 +589,23 @@ export function maxAssignableWorkersForJob(
 function jobConfig(job: ExtractorJob, state: EconomyState) {
   const sites = siteCountForJob(job, state);
   const key =
-    job === "woodcutter" ? "woodcutters" : job === "farmer" ? "farmers" : "quarriers";
+    job === "woodcutter"
+      ? "woodcutters"
+      : job === "farmer"
+        ? "farmers"
+        : job === "fisher"
+          ? "fishers"
+          : "quarriers";
   return {
     hasBuilding: sites > 0,
     maxWorkers: maxAssignableWorkersForJob(job, state),
     current: currentWorkersForJob(state, job),
-    key: key as "woodcutters" | "farmers" | "quarriers"
+    key: key as "woodcutters" | "farmers" | "quarriers" | "fishers"
   };
 }
 
 export function assignedWorkers(state: EconomyState): number {
-  return state.woodcutters + state.farmers + state.quarriers;
+  return state.woodcutters + state.farmers + state.quarriers + state.fishers;
 }
 
 export function idleWorkers(state: EconomyState): number {
@@ -584,13 +619,15 @@ export function extractorJobForBuilding(
   if (
     definition?.workerJob === "woodcutter" ||
     definition?.workerJob === "farmer" ||
-    definition?.workerJob === "quarrier"
+    definition?.workerJob === "quarrier" ||
+    definition?.workerJob === "fisher"
   ) {
     return definition.workerJob;
   }
   const output = resourceOutputForBuilding(buildingId);
   if (output === "wood") return "woodcutter";
   if (output === "wheat") return "farmer";
+  if (output === "food") return "fisher";
   return "quarrier";
 }
 
@@ -698,12 +735,14 @@ export {
   LUMBER_CAMP_MAX_WORKERS,
   FARM_MAX_WORKERS,
   QUARRY_MAX_WORKERS,
+  FISHING_HUT_MAX_WORKERS,
   WOOD_STOCK_CAP,
   WHEAT_STOCK_CAP,
   STONE_STOCK_CAP,
   WOOD_RATE_PER_WORKER_PER_MINUTE,
   WHEAT_RATE_PER_WORKER_PER_MINUTE,
   STONE_RATE_PER_WORKER_PER_MINUTE,
+  FISHING_HUT_FOOD_RATE_PER_WORKER_PER_MINUTE,
   FOOD_CONSUMPTION_PER_POP_PER_MINUTE,
   TOWN_HALL_FOOD_PRODUCTION_PER_MINUTE,
   POP_GROWTH_SURPLUS_FOOD_REQUIRED,

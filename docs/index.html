@@ -5,7 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Hexald — Project Hub</title>
   <meta name="description" content="Documentation et tableau de bord de suivi du projet Hexald.">
-  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="assets/icon.png" type="image/png" sizes="any">
+  <link rel="apple-touch-icon" href="assets/icon.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&display=swap" rel="stylesheet">
@@ -104,12 +105,12 @@
             <article class="card stat-card">
               <div class="label">Phase</div>
               <div class="value">POC</div>
-              <div class="hint">Phase 3 — éclats · food · extracteurs</div>
+              <div class="hint">Phase 3 — pêche · comptes · éclats</div>
             </article>
             <article class="card stat-card">
               <div class="label">Priority</div>
               <div class="value">Industry</div>
-              <div class="hint">Mine · adjacence · /admin</div>
+              <div class="hint">Science · mine · adjacence</div>
             </article>
             <article class="card stat-card">
               <div class="label">Status</div>
@@ -126,14 +127,15 @@
           <div class="grid grid-2" style="margin-top:14px">
             <article class="card">
               <h3>Stack en place</h3>
-              <p>Frontend Nuxt 4 / Vue / TypeScript / Three.js / Tailwind / Nuxt UI. Backend Fastify autoritaire. PostgreSQL + Drizzle (sessions, mondes, tuiles, inventaire, chantiers). Deploy Docker Compose + GitHub Actions SSH. Admin ops <code>/admin</code>. Contenu design dans <code>packages/content</code>.</p>
+              <p>Frontend Nuxt 4 / Vue / TypeScript / Three.js / Tailwind / Nuxt UI / PWA. Backend Fastify autoritaire. PostgreSQL + Drizzle (sessions, mondes, tuiles, inventaire, chantiers). Auth joueur : session cookie + <strong>Firebase</strong> (Google / email). Deploy Docker Compose + GitHub Actions SSH. Admin ops <code>/admin</code>. Contenu design dans <code>packages/content</code>.</p>
               <div class="chip-row">
                 <span class="badge badge-accent">Nuxt 4</span>
                 <span class="badge badge-accent">Three.js</span>
                 <span class="badge badge-accent">Fastify</span>
                 <span class="badge badge-accent">PostgreSQL</span>
+                <span class="badge badge-accent">Firebase</span>
                 <span class="badge badge-accent">Docker</span>
-                <span class="badge badge-accent">Admin</span>
+                <span class="badge badge-accent">PWA</span>
                 <span class="badge badge-neutral">ads.txt</span>
                 <span class="badge badge-neutral">Wiki contenu</span>
                 <span class="badge badge-neutral">UI nuages</span>
@@ -141,8 +143,8 @@
             </article>
             <article class="card">
               <h3>Dernière décision importante</h3>
-              <p><span class="badge badge-accent">DEC-020</span> Expansion payée en <strong>éclats de monde</strong> (<code>worldshard</code>) : coût = hop ; prod HDV 1 / 15&nbsp;min.</p>
-              <p>Aussi live : bonus fusion +20&nbsp;% extracteurs (DEC-019), food + barre pop (DEC-016–017), extracteurs posables (DEC-018).</p>
+              <p><span class="badge badge-accent">DEC-024</span> Comptes Firebase : invité → lien Google / email, monde conservé.</p>
+              <p>Aussi : pêche (DEC-023), science (DEC-022), banc (DEC-021), éclats (DEC-020).</p>
             </article>
           </div>
 
@@ -150,11 +152,12 @@
             <article class="card">
               <h3>Prochaines étapes</h3>
               <ol class="next-list">
-                <li><span>01</span> Extracteurs + construction + expansion éclats — fait</li>
-                <li><span>02</span> Food settle + UI barre pop (DEC-016–017) — fait</li>
-                <li><span>03</span> Bonus fusion + éclats de monde — fait</li>
-                <li><span>04</span> Bonus d’adjacence Civ (voisins)</li>
-                <li><span>05</span> Mine (fer) · sécuriser <code>/admin</code></li>
+                <li><span>01</span> Extracteurs + food + éclats + fusion — fait</li>
+                <li><span>02</span> Cabane de pêcheur + banc de poisson — fait</li>
+                <li><span>03</span> Comptes Firebase (lien invité) — fait</li>
+                <li><span>04</span> Tutoriel play + parallax gyro + pages légales — fait</li>
+                <li><span>05</span> Centre de recherche + science / techs (DEC-022)</li>
+                <li><span>06</span> Bonus d’adjacence Civ · Mine (fer) · sécuriser <code>/admin</code></li>
               </ol>
             </article>
             <article class="card notes-card">
@@ -275,7 +278,7 @@
           <div class="grid grid-2">
             <article class="card">
               <h3>Monde personnel</h3>
-              <p>Chaque joueur possède son propre monde. La carte n’est pas un territoire unique où tout le monde construit. Le multijoueur pourra exister plus tard via visites, commerce, classements, interactions économiques, événements, éventuellement du PvP instancié. Le monde principal reste l’espace de progression.</p>
+              <p>Chaque joueur possède son propre monde. La carte n’est pas un territoire unique où tout le monde construit. Le multijoueur pourra exister plus tard via visites, commerce, <strong>score de monde + classements</strong>, interactions économiques, événements, éventuellement du PvP instancié. Le monde principal reste l’espace de progression.</p>
             </article>
             <article class="card">
               <h3>Structure d’une région</h3>
@@ -403,7 +406,7 @@
                   <li><strong>Cap de base = hôtel de ville</strong> (DEC-016) — ex. 80 par ressource ; les entrepôts / niveaux augmentent plus tard</li>
                   <li><strong>Cap hard actuel (placeholders)</strong> bois/blé 200, pierre 150 — à rattacher au stockage village</li>
                   <li><strong>Feedback UI</strong> <span class="status status-done">Live</span> — <code>stock/cap</code>, état near/full, rate <code>0/min</code> au cap, hint soft bois plein</li>
-                  <li><strong>Sinks réguliers</strong> — coûts d’expansion en <strong>éclats</strong> (DEC-020), construction bois, upgrades, transformateurs, <strong>consommation food/pop</strong></li>
+                  <li><strong>Sinks réguliers</strong> — coûts d’expansion en <strong>éclats</strong> (DEC-020), construction bois, <strong>recherche science</strong> (DEC-022), upgrades, transformateurs, <strong>consommation food/pop</strong></li>
                 </ul>
               </div>
             </div>
@@ -426,6 +429,7 @@
                 <h4 style="margin:0 0 8px">Chaîne</h4>
                 <ul class="tech-list">
                   <li><strong>Cible</strong> — ferme → blé → moulin → farine → boulangerie → food</li>
+                  <li><strong>Live</strong> — cabane de pêcheur sur <code>fish_bank</code> → food directe (DEC-023)</li>
                   <li><strong>Secours</strong> — 5 blé ≈ 1 food si pas encore de boulangerie</li>
                   <li>Le pain reste la voie efficace ; le blé brut = filet de sécurité, pas la meta</li>
                   <li>Balance : le worker mange aussi — une ferme qui nourrit juste son fermier = 0 surplus</li>
@@ -485,6 +489,33 @@
                 </ul>
               </div>
             </div>
+          </article>
+
+          <article class="card" style="margin-top:14px">
+            <h3>Science &amp; arbre technologique <span class="status status-planned">Planned</span> <span class="badge badge-neutral">DEC-022</span></h3>
+            <p>Progression Civ-light : la <strong>science</strong> est une ressource d’inventaire ; le <strong>Centre de recherche</strong> produit et sert de porte d’entrée à l’arbre. Séparé des éclats (expansion) et du bois (construction).</p>
+            <div class="grid grid-2" style="margin-top:12px">
+              <div>
+                <h4 style="margin:0 0 8px">Accumulation</h4>
+                <ul class="tech-list">
+                  <li>HDV : filet passif <strong>+1 science / 10&nbsp;min</strong> (lazy)</li>
+                  <li>Centre de recherche : <strong>2 science / worker / min</strong>, max 1 worker niv. 1</li>
+                  <li>Cap stock <strong>60</strong> · départ <strong>0</strong></li>
+                  <li>Pas de yield Civ par tuile au MVP</li>
+                </ul>
+              </div>
+              <div>
+                <h4 style="margin:0 0 8px">Arbre MVP (unlock bâtiments)</h4>
+                <ul class="tech-list">
+                  <li><code>woodworking</code> ~25 → scierie</li>
+                  <li><code>agriculture</code> ~30 → moulin + boulangerie</li>
+                  <li><code>mining</code> ~40 → mine</li>
+                  <li><code>metallurgy</code> ~50 (req. mining) → fonderie + forge</li>
+                  <li>Camp / ferme / carrière / maison : <strong>jamais</strong> gated</li>
+                </ul>
+              </div>
+            </div>
+            <p class="notes-hint" style="margin-top:12px">Plusieurs centres possibles. UI arbre ouverte depuis un centre achevé ; <strong>1 recherche active / centre</strong> (action <code>research</code> ciblée sur la tuile). Techs débloquées = monde entier.</p>
           </article>
 
           <article class="card" style="margin-top:14px">
@@ -730,11 +761,11 @@
             </article>
             <article class="card">
               <h3>Caméra</h3>
-              <p>Orthographique, vraie géométrie 3D légère, perspective 2.5D. Caméra relativement fixe. Le joueur ne tourne pas librement autour du monde comme dans un jeu 3D classique.</p>
+              <p>Orthographique, vraie géométrie 3D légère, perspective 2.5D. Caméra relativement fixe. Sur mobile : parallax optionnel via gyroscope (bouton play). Le joueur ne tourne pas librement autour du monde comme dans un jeu 3D classique.</p>
             </article>
             <article class="card">
               <h3>Client jouable</h3>
-              <p>Landing <code>/</code> (pseudo + CTA). Carte Three.js dans <code>/play</code> : header / bottom sheet nuage, food + barre croissance, <strong>éclats de monde</strong>, roue biomes (coût en éclats), roue build (camp / ferme / carrière / maison), stocks bois·blé·pierre·food, workers /tuile, badges +20&nbsp;% fusion. Dev <code>/poc</code> + reset/grant. Admin <code>/admin</code>. <code>ads.txt</code> AdSense en public.</p>
+              <p>Landing <code>/</code> (pseudo + CTA + connexion Firebase). Carte Three.js dans <code>/play</code> : header / bottom sheet nuage, food + barre croissance, <strong>éclats</strong>, roue biomes, roue build (camp / ferme / carrière / maison / <strong>cabane de pêcheur</strong>), stocks, workers, badges +20&nbsp;% fusion, tutoriel coach, lien de compte, parallax gyro (mobile), réglages. Actualités <code>/news</code>, pages légales. Dev <code>/poc</code>. Admin <code>/admin</code>. PWA + blocker offline. <code>ads.txt</code> AdSense.</p>
             </article>
           </div>
 
@@ -765,16 +796,16 @@
             </div>
             <div class="tab-panels">
               <div class="panel-front card">
-                <h3>Nuxt 4 · Vue · TypeScript · Three.js</h3>
-                <p>Routes : <code>/</code> landing, <code>/play</code> jeu, <code>/admin</code> ops, <code>/poc</code> sandbox. Proxy <code>/backend</code> → API. Static <code>public/ads.txt</code>. Three.js uniquement pour la carte (<code>app/renderer</code>).</p>
+                <h3>Nuxt 4 · Vue · TypeScript · Three.js · Firebase Auth</h3>
+                <p>Routes : <code>/</code> landing, <code>/play</code> jeu, <code>/news</code>, légales (<code>/privacy</code>…), <code>/admin</code>, <code>/poc</code>. Proxy <code>/backend</code> → API (+ proxy Firebase Auth Domain si configuré). Client Firebase (popup desktop / redirect mobile). Three.js uniquement pour la carte (<code>app/renderer</code>). PWA + <code>OfflineBlocker</code>.</p>
               </div>
               <div class="panel-back card">
-                <h3>Node.js · TypeScript · Fastify</h3>
-                <p>Session cookie <code>tw_sid</code>, mondes, régions, bâtiments (chantiers), workers/tuile, settle lazy (extracteurs + food/croissance + <strong>éclats</strong>), content, admin. Dev : reset / grant / set-biome. Présence en mémoire (TTL 5&nbsp;min).</p>
+                <h3>Node.js · TypeScript · Fastify · Firebase Admin</h3>
+                <p>Session cookie <code>tw_sid</code> (anonyme ou liée). <code>POST /v1/session/firebase</code> vérifie l’idToken et lie / crée le joueur. Mondes, régions, bâtiments (chantiers), workers/tuile, settle lazy (extracteurs dont pêche + food/croissance + <strong>éclats</strong>), content, admin, support Resend. Présence en mémoire (TTL 5&nbsp;min).</p>
               </div>
               <div class="panel-data card">
                 <h3>PostgreSQL · Drizzle ORM</h3>
-                <p>Schéma : <code>players</code>, <code>worlds</code> (pop + surplus food), <code>world_inventory</code>, tuiles (<code>building_id</code>, <code>construction_completes_at</code>, <code>assigned_workers</code>) / régions. Contenu design dans <code>packages/content</code>.</p>
+                <p>Schéma : <code>players</code> (<code>kind</code>, <code>firebase_uid</code>, email), <code>worlds</code> (pop + surplus food), <code>world_inventory</code>, tuiles (<code>building_id</code>, <code>poi_id</code>, chantiers, workers) / régions. Contenu design dans <code>packages/content</code>.</p>
               </div>
               <div class="panel-arch">
                 <pre class="mono"><span class="tree-key">hexald/</span>
@@ -848,7 +879,7 @@
         <section id="decisions">
           <p class="section-kicker">Decision log</p>
           <h2>Technical Decisions</h2>
-          <p>Dupliquer le bloc en pointillés en bas de liste pour ajouter une décision. Incrémenter l’ID (DEC-019, etc.).</p>
+          <p>Dupliquer le bloc en pointillés en bas de liste pour ajouter une décision. Incrémenter l’ID (DEC-025, etc.).</p>
 
           <div class="decision-grid">
             <article class="decision">
@@ -1188,6 +1219,104 @@
               </dl>
             </article>
 
+            <article class="decision">
+              <header>
+                <span class="id">DEC-021</span>
+                <span class="status status-accepted">Accepted</span>
+                <span class="badge badge-neutral">2026-08-26</span>
+              </header>
+              <h3>POI banc de poisson (eau côtière)</h3>
+              <dl>
+                <dt>Contexte</dt><dd>Les POI naturels étaient documentés mais absents du runtime. L’eau côtière n’avait pas d’intérêt économique.</dd>
+                <dt>Décision</dt><dd>
+                  <ul style="margin:0;padding-left:1.1em">
+                    <li>POI <code>fish_bank</code> sur tuile <code>water</code> touchant ≥1 terre.</li>
+                    <li>À la génération d’une région : si candidats côtiers, <strong>40&nbsp;%</strong> de chance d’en poser <strong>un</strong>.</li>
+                    <li><strong>Pas de food passif</strong> — extraction via <strong>cabane de pêcheur</strong> (DEC-023).</li>
+                    <li>Colonne <code>world_tiles.poi_id</code> ; décor 3D + badge carte.</li>
+                  </ul>
+                </dt>
+                <dt>Raison</dt><dd>Premier POI naturel live, signale les bonnes côtes sans short-circuiter la boucle extracteur.</dd>
+                <dt>Conséquences</dt><dd>Migration 0016. Cabane de pêcheur livrée en DEC-023. Futurs POI réutilisent <code>poi_id</code>.</dd>
+              </dl>
+            </article>
+
+            <article class="decision">
+              <header>
+                <span class="id">DEC-023</span>
+                <span class="status status-accepted">Accepted</span>
+                <span class="badge badge-neutral">2026-08-26</span>
+              </header>
+              <h3>Cabane de pêcheur (extracteur eau + POI)</h3>
+              <dl>
+                <dt>Contexte</dt><dd>Le banc de poisson (DEC-021) n’avait pas encore d’extracteur. La food MVP restait HDV + blé d’urgence.</dd>
+                <dt>Décision</dt><dd>
+                  <ul style="margin:0;padding-left:1.1em">
+                    <li>Bâtiment <code>fishing_hut</code> : terrain <code>water</code>, <code>requiredPoiId: fish_bank</code>, 20 bois, 1 fisher, 2 food/min.</li>
+                    <li>Food directe dans le stock (settle food / croissance), pas via inventaire extracteur brut.</li>
+                    <li>Placement bloqué hors eau / hors POI (<code>missing_poi</code>).</li>
+                  </ul>
+                </dt>
+                <dt>Raison</dt><dd>Donne une raison de construire sur la côte et une 2ᵉ source de food avant la chaîne pain.</dd>
+                <dt>Conséquences</dt><dd>Content / shared / game-core / API / mesh / UI roue + workers. Pattern réutilisable pour futurs POI à bâtiment dédié.</dd>
+              </dl>
+            </article>
+
+            <article class="decision">
+              <header>
+                <span class="id">DEC-022</span>
+                <span class="status status-accepted">Accepted</span>
+                <span class="badge badge-neutral">2026-08-26</span>
+              </header>
+              <h3>Arbre technologique Civ-light — science + Centre de recherche</h3>
+              <dl>
+                <dt>Contexte</dt><dd>Les chaînes Phase 4 (scierie, mine, forge…) doivent se débloquer progressivement sans casser le MVP extracteurs. Le backlog « Âges technologiques » et l’idée Civ demandent une progression lisible, idle-friendly, alignée inventaire générique (DEC-013+) — pas un yield Civ par tuile.</dd>
+                <dt>Décision</dt><dd>
+                  <ul style="margin:0;padding-left:1.1em">
+                    <li><strong>Ressource <code>science</code></strong> (« Science ») dans l’inventaire monde — settle lazy, caps entiers, sink = recherche. Distinct de <code>worldshard</code> (expansion) et <code>wood</code> (construction).</li>
+                    <li><strong>Prod</strong> : hôtel de ville <strong>+1 / 10&nbsp;min</strong> (filet) ; bâtiment <code>research_center</code> (« Centre de recherche ») <strong>2 / worker / min</strong>, max <strong>1</strong> worker niveau 1, terrain <code>any</code>, rôle <code>special</code>. Cap stock science <strong>60</strong>, départ <strong>0</strong>. Prod totale = somme des centres (workers assignés).</li>
+                    <li><strong>Centre de recherche</strong> : <strong>pas de limite</strong> de nombre par monde ; posable (coût bois + chantier, même pattern DEC-018) <strong>sans</strong> prérequis tech. Chaque centre achevé : (1) <strong>accès UI</strong> à l’arbre (sélection tuile / sheet), (2) <strong>1 slot de recherche</strong> — une tech en cours à la fois <em>par centre</em>. Plusieurs centres = recherches parallèles. Techs débloquées restent <strong>monde-wide</strong>. Pas de menu global tech sans au moins un centre (le filet HDV peut remplir le stock, mais pas ouvrir l’UI).</li>
+                    <li><strong>Techs</strong> : catalogue data-driven (<code>packages/content</code>) — id, coût science, prérequis tech[], unlocks (bâtiments / chaînes). Action unifiée <code>research</code> sur <code>POST /v1/worlds/:id/actions</code> (lock monde), payload avec tuile / id du centre. Le slot du centre doit être libre ; débit science (stock monde) jusqu’à complétion — pas d’instant unlock au MVP si un slot est ouvert (barre « en cours » sur le centre).</li>
+                    <li><strong>Arbre MVP</strong> (coûts tunables) :
+                      <ul style="margin:0.35em 0 0;padding-left:1.1em">
+                        <li><code>woodworking</code> (~25) → unlock <code>sawmill</code></li>
+                        <li><code>agriculture</code> (~30) → unlock <code>mill</code> + <code>bakery</code></li>
+                        <li><code>mining</code> (~40) → unlock <code>mine</code></li>
+                        <li><code>metallurgy</code> (~50, req. <code>mining</code>) → unlock <code>smelter</code> + <code>forge</code></li>
+                      </ul>
+                    </li>
+                    <li><strong>Hors gate</strong> : <code>lumber_camp</code>, <code>farm</code>, <code>quarry</code>, <code>fishing_hut</code>, <code>house</code>, expansion, centre de recherche. Pas de bonus rate magique via tech au MVP (unlock only).</li>
+                    <li>Pas d’âges nommés (Antiquité…) tant que &lt; ~8 techs — graphe court + label « Technologies ».</li>
+                  </ul>
+                </dt>
+                <dt>Raison</dt><dd>Même modèle ressource que le reste de l’éco (lisible, settle lazy). Le bâtiment ancre fantasy Civ (campus) et force un choix pop (worker recherche vs prod). Plusieurs centres = scaling science + recherches parallèles, sans plafond artificiel. Unlock des chaînes déjà catalogue sans payer la puissance. Sépare clairement expansion / build / research.</dd>
+                <dt>Conséquences</dt><dd>Shared : <code>science</code> ResourceId, <code>research_center</code> BuildingId, <code>TechId</code> + état débloqué monde + tech en cours <em>par tuile centre</em>. Content : techs + placeable centre (multi). game-core : settle science (tous centres), spend progressif + complete tech. API : action <code>research</code> (cible tuile), gate <code>build</code> sur unlocks. UI : stock science, mesh centres, panneau arbre + barre slot depuis le bâtiment cliqué.</dd>
+              </dl>
+            </article>
+
+            <article class="decision">
+              <header>
+                <span class="id">DEC-024</span>
+                <span class="status status-done">Accepted</span>
+                <span class="badge badge-neutral">2026-08-26</span>
+              </header>
+              <h3>Comptes Firebase — lien invité → Google / email</h3>
+              <dl>
+                <dt>Contexte</dt><dd>Les sessions anonymes (cookie <code>tw_sid</code>) perdent la progression si le joueur change d’appareil ou efface les cookies. Il faut une sauvegarde compte sans forcer l’inscription au premier lancement.</dd>
+                <dt>Décision</dt>
+                <dd>
+                  <ul>
+                    <li>Jouer d’abord en <strong>invité</strong> (session cookie). Prompt optionnel pour <strong>lier un compte</strong> (Google ou email/mot de passe) depuis le jeu ou les réglages.</li>
+                    <li>Client : Firebase Auth (popup desktop, redirect mobile). Serveur : Firebase Admin vérifie l’idToken via <code>POST /v1/session/firebase</code>.</li>
+                    <li>Lien : si un invité sans <code>firebase_uid</code> est présent, on attache l’UID au même <code>players</code> (monde conservé). Sinon création / reprise du joueur Firebase existant.</li>
+                    <li>Déconnexion : clear cookie session API + <code>signOut</code> Firebase ; retour landing.</li>
+                  </ul>
+                </dd>
+                <dt>Raison</dt><dd>Firebase évite de gérer mots de passe / OAuth soi-même. Le flux invité-first protège le funnel POC. Même cookie session après lien → pas de double identité côté API.</dd>
+                <dt>Conséquences</dt><dd>Env : <code>FIREBASE_*</code> (Admin) + <code>NUXT_PUBLIC_FIREBASE_*</code> (client). Colonne <code>players.firebase_uid</code> unique. UI : <code>LinkAccountDialog</code>, landing connexion, réglages play. Phase 6 « Comptes » partiellement livrée (pas encore multi-appareil sync avancée hors Firebase).</dd>
+              </dl>
+            </article>
+
             <article class="decision decision-template">
               <header>
                 <span class="id">DEC-00X</span>
@@ -1214,7 +1343,7 @@
           <div class="grid grid-3">
             <a class="card wiki-nav-card" href="#wiki-biomes">
               <h3>Biomes</h3>
-              <p>Primaires, fusions terre↔terre, rivages (décor d’arête). Ce que le joueur choisit vs ce qui apparaît aux frontières.</p>
+              <p>Primaires live + planifiés (désert, jungle, glace…), fusions, rivages.</p>
             </a>
             <a class="card wiki-nav-card" href="#wiki-resources">
               <h3>Ressources</h3>
@@ -1247,12 +1376,14 @@
           <p class="section-kicker">Wiki · Biomes</p>
           <h2>Biomes</h2>
           <p>Quatre biomes <strong>primaires</strong> sont choisis à la génération d’une région. Les fusions <strong>terre↔terre</strong> apparaissent aux frontières (40&nbsp;% / 40&nbsp;% / 20&nbsp;%). Terre↔eau : pas de fusion — rivage en décor d’arête.</p>
+          <p><span class="badge badge-neutral">Planned</span> De nouveaux biomes primaires (désert, jungle, glace, neige…) étendront la roue de choix et les fusions / rivages associés — voir cartes « Planifié » ci-dessous. Pas encore dans <code>packages/content</code>.</p>
 
           <div class="filters" role="group" aria-label="Filtrer les biomes">
             <button type="button" class="filter-btn is-on" data-wiki-filter="all" data-wiki-target="biomes">Tous</button>
             <button type="button" class="filter-btn" data-wiki-filter="primary" data-wiki-target="biomes">Primaires</button>
             <button type="button" class="filter-btn" data-wiki-filter="fusion" data-wiki-target="biomes">Fusions terre</button>
             <button type="button" class="filter-btn" data-wiki-filter="coast" data-wiki-target="biomes">Rivages</button>
+            <button type="button" class="filter-btn" data-wiki-filter="planned" data-wiki-target="biomes">Planifiés</button>
           </div>
 
           <div class="grid grid-2" id="wiki-biomes-grid">
@@ -1301,8 +1432,8 @@
                 </div>
                 <span class="status status-mvp">Primary</span>
               </header>
-              <p>Hex entièrement aquatique, rendu plus bas que la terre. <strong>Pas de bâtiments terrestres</strong>. Au contact d’une terre, un décor de rivage apparaît sur l’arête (selon le biome voisin). Pas de biome hybride terre↔eau.</p>
-              <p class="wiki-meta">Kind · <strong>water</strong> · Choix joueur · oui · Build · non</p>
+              <p>Hex entièrement aquatique, rendu plus bas que la terre. <strong>Pas de bâtiments terrestres</strong> (sauf cabane de pêcheur sur POI). Au contact d’une terre, un décor de rivage apparaît sur l’arête (selon le biome voisin). Pas de biome hybride terre↔eau.</p>
+              <p class="wiki-meta">Kind · <strong>water</strong> · Choix joueur · oui · Build · limité (POI)</p>
             </article>
             <article class="card wiki-entry" data-wiki-kind="fusion">
               <header class="wiki-entry-head">
@@ -1376,7 +1507,91 @@
               <p>Pas un biome. Roches de bordure sur les arêtes où montagne (ou piémont) touche l’eau.</p>
               <p class="wiki-meta">Kind · <strong>decor</strong> · Parents · mountain ↔ water · Build · n/a</p>
             </article>
+
+            <article class="card wiki-entry" data-wiki-kind="planned">
+              <header class="wiki-entry-head">
+                <span class="wiki-swatch" style="background:#e2c07a"></span>
+                <div>
+                  <h3>Désert</h3>
+                  <code class="wiki-id">desert</code>
+                </div>
+                <span class="status status-planned">Planned</span>
+              </header>
+              <p>Sable, dunes low-poly, oasis éventuelles. Ouverture vers extracteurs / POI arides (sel, argile, caravanes). Rivage sable ↔ eau distinct de la plage de plaine.</p>
+              <p class="wiki-meta">Kind · <strong>land</strong> · Choix joueur · oui (cible) · Fusions possibles · désert↔plaine, désert↔montagne…</p>
+            </article>
+            <article class="card wiki-entry" data-wiki-kind="planned">
+              <header class="wiki-entry-head">
+                <span class="wiki-swatch" style="background:#3d9a5c"></span>
+                <div>
+                  <h3>Jungle</h3>
+                  <code class="wiki-id">jungle</code>
+                </div>
+                <span class="status status-planned">Planned</span>
+              </header>
+              <p>Forêt dense / tropicale, canopée plus saturée. Bois rare ou fruits ; malus de lisibilité volontaire, fort potentiel décor + adjacence.</p>
+              <p class="wiki-meta">Kind · <strong>land</strong> · Choix joueur · oui (cible) · Fusions possibles · jungle↔forêt, jungle↔plaine…</p>
+            </article>
+            <article class="card wiki-entry" data-wiki-kind="planned">
+              <header class="wiki-entry-head">
+                <span class="wiki-swatch" style="background:#a8d4e8"></span>
+                <div>
+                  <h3>Glace</h3>
+                  <code class="wiki-id">ice</code>
+                </div>
+                <span class="status status-planned">Planned</span>
+              </header>
+              <p>Banquise / pack : sol glacial constructible avec contraintes (ou semi-eau selon design). Look froid, rivages verglacés. Distinct de la neige (plus « sol » que « couverture »).</p>
+              <p class="wiki-meta">Kind · <strong>land</strong> (ou hybride à trancher) · Choix joueur · oui (cible)</p>
+            </article>
+            <article class="card wiki-entry" data-wiki-kind="planned">
+              <header class="wiki-entry-head">
+                <span class="wiki-swatch" style="background:#eef4f8"></span>
+                <div>
+                  <h3>Neige</h3>
+                  <code class="wiki-id">snow</code>
+                </div>
+                <span class="status status-planned">Planned</span>
+              </header>
+              <p>Toundra / taïga enneigée : terre blanche, sapins, villages d’hiver. Peut fusionner avec montagne (alpages) ou forêt. Ressources froides / peaux / gibier — à définir.</p>
+              <p class="wiki-meta">Kind · <strong>land</strong> · Choix joueur · oui (cible) · Fusions possibles · snow↔mountain, snow↔forest…</p>
+            </article>
+            <article class="card wiki-entry" data-wiki-kind="planned">
+              <header class="wiki-entry-head">
+                <span class="wiki-swatch" style="background:#6b8f6a"></span>
+                <div>
+                  <h3>Marais</h3>
+                  <code class="wiki-id">swamp</code>
+                </div>
+                <span class="status status-planned">Planned</span>
+              </header>
+              <p>Zones humides entre plaine et eau : roseaux, brume, malus de construction ou chemins. Bon candidat POI (tourbières, gaz des marais).</p>
+              <p class="wiki-meta">Kind · <strong>land</strong> · Choix joueur · à trancher (primaire vs fusion plaine↔eau visuelle)</p>
+            </article>
+            <article class="card wiki-entry" data-wiki-kind="planned">
+              <header class="wiki-entry-head">
+                <span class="wiki-swatch" style="background:#c45a3a"></span>
+                <div>
+                  <h3>Volcanique</h3>
+                  <code class="wiki-id">volcanic</code>
+                </div>
+                <span class="status status-planned">Planned</span>
+              </header>
+              <p>Basalte, lave figée, fumées. Rare / « wow » sur le diorama. Liens naturels avec montagne et minerais avancés. Peut rester un POI landmark plutôt qu’un biome de région — à décider.</p>
+              <p class="wiki-meta">Kind · <strong>land</strong> ou <strong>POI</strong> · Priorité · basse / spectacle</p>
+            </article>
           </div>
+
+          <article class="card" style="margin-top:14px">
+            <h3>Règles d’ajout d’un biome primaire</h3>
+            <ul style="margin:0;padding-left:1.1em;color:var(--muted)">
+              <li>ID dans <code>packages/shared</code> + entrée <code>packages/content/src/biomes.ts</code> + mesh / décor renderer.</li>
+              <li>Apparition dans la roue de biomes (choix joueur) + coût d’expansion inchangé (éclats).</li>
+              <li>Définir les <strong>fusions terre↔terre</strong> avec les primaires existants (et le bonus +20&nbsp;% DEC-019 si applicable).</li>
+              <li>Rivages : décor d’arête dédié au contact <code>water</code> (pas de biome <code>*_water</code> — DEC-010).</li>
+              <li>Au moins un bâtiment ou POI qui donne une raison économique de choisir ce biome.</li>
+            </ul>
+          </article>
         </section>
 
         <section id="wiki-resources">
@@ -1405,6 +1620,7 @@
                 <tr><td><code>iron_ingot</code></td><td>Lingot de fer</td><td>Fonderie</td></tr>
                 <tr><td><code>tools</code></td><td>Outils</td><td>Forge — bout de chaîne fer</td></tr>
                 <tr><td><code>worldshard</code></td><td>Éclat de monde</td><td>Ancrage / révélation de région (DEC-020) ; prod HDV 1/15&nbsp;min, cap 5</td></tr>
+                <tr><td><code>science</code></td><td>Science</td><td>Recherche (DEC-022) ; HDV 1/10&nbsp;min + Centre de recherche ; sink techs ; cap 60</td></tr>
               </tbody>
             </table>
           </div>
@@ -1471,12 +1687,20 @@
                   <td><span class="status status-done">Live</span></td>
                 </tr>
                 <tr data-wiki-kind="mvp">
+                  <td>Cabane de pêcheur</td><td><code>fishing_hut</code></td><td>water + fish_bank</td><td>workers</td><td>food</td><td>1</td>
+                  <td><span class="status status-done">Live</span> <span class="badge badge-neutral">DEC-023</span></td>
+                </tr>
+                <tr data-wiki-kind="mvp">
                   <td>Fonderie</td><td><code>smelter</code></td><td>any</td><td>iron_ore</td><td>iron_ingot</td><td>multi</td>
                   <td><span class="status status-mvp">MVP</span></td>
                 </tr>
                 <tr data-wiki-kind="mvp">
                   <td>Forge</td><td><code>forge</code></td><td>any</td><td>iron_ingot</td><td>tools</td><td>1</td>
                   <td><span class="status status-mvp">MVP</span></td>
+                </tr>
+                <tr data-wiki-kind="planned">
+                  <td>Centre de recherche</td><td><code>research_center</code></td><td>any</td><td>workers</td><td>science (+ accès arbre)</td><td>1</td>
+                  <td><span class="status status-planned">Planned</span> <span class="badge badge-neutral">DEC-022</span></td>
                 </tr>
                 <tr data-wiki-kind="later">
                   <td>Monument</td><td><code>monument</code></td><td>any</td><td>—</td><td>prestige</td><td>multi</td>
@@ -1516,6 +1740,7 @@
               <h3>Nourriture <code class="wiki-id">food</code></h3>
               <div class="wiki-chain">
                 <span>Hôtel de ville → food (subsistance)</span>
+                <span>Cabane de pêcheur → <code>food</code> (sur <code>fish_bank</code>)</span>
                 <span>Ferme → <code>wheat</code> (récolte, pas food)</span>
                 <span>Moulin → <code>flour</code></span>
                 <span>Boulangerie → <code>food</code></span>
@@ -1529,6 +1754,15 @@
                 <span>Dépenser → révéler une région (coût = hop)</span>
               </div>
               <p class="wiki-meta">DEC-020 · Cap 5 · Départ 1 · Futurs bâtiments prod. dédiés</p>
+            </article>
+            <article class="card wiki-entry">
+              <h3>Science <code class="wiki-id">science</code></h3>
+              <div class="wiki-chain">
+                <span>Hôtel de ville → <code>science</code> (1 / 10&nbsp;min)</span>
+                <span>Centre de recherche → <code>science</code> (2 / worker / min)</span>
+                <span>Dépenser → tech (<code>research</code>) → unlock bâtiments</span>
+              </div>
+              <p class="wiki-meta">DEC-022 · Cap 60 · Départ 0 · Multi-centres · 1 slot recherche / centre · techs monde-wide</p>
             </article>
             <article class="card wiki-entry">
               <h3>Pierre <code class="wiki-id">stone</code></h3>
@@ -1681,12 +1915,24 @@
               <header class="wiki-entry-head">
                 <span class="wiki-swatch" style="background:#3a88b8"></span>
                 <div>
+                  <h3>Banc de poisson</h3>
+                  <code class="wiki-id">fish_bank</code>
+                </div>
+                <span class="status status-done">Live</span>
+              </header>
+              <p>École de poissons sur une <strong>eau côtière</strong> (touche une terre). Apparaît aléatoirement à la génération d’une région (≤1 / région, chance 40&nbsp;%). Pas de prod passive — pose une <strong>cabane de pêcheur</strong> dessus.</p>
+              <p class="wiki-meta">Biome · <strong>water</strong> (côte) · Bonus · extracteur <code>fishing_hut</code> · Emprise · 1 hex · DEC-021 / DEC-023</p>
+            </article>
+            <article class="card wiki-entry" data-wiki-kind="natural">
+              <header class="wiki-entry-head">
+                <span class="wiki-swatch" style="background:#3a88b8"></span>
+                <div>
                   <h3>Lagune de corail</h3>
                   <code class="wiki-id">coral_lagoon</code>
                 </div>
                 <span class="status status-planned">Natural</span>
               </header>
-              <p>Eau peu profonde aux teintes turquoise, récif visible. Touche souvent un rivage.</p>
+              <p>Eau peu profonde aux teintes turquoise, récif visible. Variante visuelle / lore plus tard (le MVP utilise <code>fish_bank</code>).</p>
               <p class="wiki-meta">Biome · <strong>water</strong> · Bonus · nourriture marine / port futur · Emprise · 1 hex</p>
             </article>
             <article class="card wiki-entry" data-wiki-kind="natural">
@@ -1829,7 +2075,7 @@
                 <li>Landing + session + claim pseudo — fait</li>
                 <li>Admin ops (<code>/admin</code>, overview API) — fait</li>
                 <li>Pop + workers + bois lazy — fait</li>
-                <li>Pose extracteurs <code>lumber_camp</code> / <code>farm</code> / <code>quarry</code> + chantiers — fait</li>
+                <li>Pose extracteurs <code>lumber_camp</code> / <code>farm</code> / <code>quarry</code> / <code>fishing_hut</code> + chantiers — fait</li>
                 <li>Workers par tuile (1 max / site) — fait</li>
                 <li>Coût d’expansion — éclats de monde (hop) — fait</li>
                 <li>UI play : header / bottom sheet nuage — fait</li>
@@ -1839,6 +2085,10 @@
                 <li>Feedback caps stocks (plein) — fait</li>
                 <li>Bonus fusion +20&nbsp;% extracteurs (DEC-019) — fait</li>
                 <li>Éclats de monde / prod HDV (DEC-020) — fait</li>
+                <li>POI banc de poisson + cabane de pêcheur (DEC-021 / 023) — fait</li>
+                <li>Comptes Firebase / lien invité (DEC-024) — fait</li>
+                <li>Tutoriel play + parallax gyro + pages légales / news — fait</li>
+                <li>Décors fusion / eau / pêche (meshes &amp; silhouettes) — fait</li>
                 <li>Bonus d’adjacence Civ (voisins → rate)</li>
                 <li>Bâtiments producteurs d’éclats (post-MVP)</li>
                 <li>Mine (fer) — même pattern extracteur</li>
@@ -1848,8 +2098,10 @@
             <article class="roadmap-item">
               <div class="roadmap-head"><h3>Phase 4 — Industry</h3><span class="status status-planned">Planned</span></div>
               <ul>
-                <li>Mine, fonderie, forge, outils</li>
-                <li>Chaînes de production</li>
+                <li>Centre de recherche + ressource science (DEC-022) — multi-centres, 1 recherche / centre</li>
+                <li>Arbre MVP : woodworking → agriculture → mining → metallurgy</li>
+                <li>Mine, fonderie, forge, outils (gated techs)</li>
+                <li>Chaînes de production (scierie, moulin / boulangerie)</li>
               </ul>
             </article>
             <article class="roadmap-item">
@@ -1859,13 +2111,15 @@
                 <li>Routes</li>
                 <li>Bâtiments multi-hexagones</li>
                 <li>Logistique</li>
+                <li>Nouveaux biomes primaires (désert, jungle, glace, neige, marais…) + fusions / rivages</li>
               </ul>
             </article>
             <article class="roadmap-item">
               <div class="roadmap-head"><h3>Phase 6 — Online</h3><span class="status status-planned">Planned</span></div>
               <ul>
-                <li>Comptes</li>
-                <li>Persistance complète</li>
+                <li>Comptes Firebase (lien invité Google / email) — fait (DEC-024)</li>
+                <li>Persistance multi-appareil via compte — fait (même monde lié)</li>
+                <li><strong>Score de joueur</strong> basé sur l’ensemble du monde + <strong>leaderboard</strong> / classements</li>
                 <li>Interaction entre joueurs</li>
                 <li>Commerce</li>
               </ul>
@@ -1911,11 +2165,14 @@
                 <li>Feedback caps stocks (plein) — validé</li>
                 <li>Bonus fusion +20&nbsp;% — validé</li>
                 <li>Éclats de monde (prod HDV) — validé</li>
+                <li>Pêche (banc + cabane) — validé</li>
+                <li>Comptes Firebase (lien invité) — validé</li>
               </ul>
             </article>
             <article class="card priority-col">
               <h3><span class="priority priority-p1">P1</span> Important</h3>
               <ul>
+                <li>Centre de recherche + science (DEC-022)</li>
                 <li>Mine (fer) + chaînes industrielles</li>
                 <li>Bonus d’adjacence (Civ-like)</li>
                 <li>Bâtiments prod. d’éclats</li>
@@ -1956,8 +2213,8 @@
             <div class="kanban-col" data-column="ideas">
               <h3>Ideas</h3>
               <article class="task" draggable="true" data-id="task-ages">
-                <strong>Âges technologiques</strong>
-                <p>Débloquer de nouvelles chaînes sans casser le MVP.</p>
+                <strong>Science + Centre de recherche</strong>
+                <p>DEC-022 — science, multi-centres (1 recherche / centre), arbre MVP unlock chaînes.</p>
               </article>
               <article class="task" draggable="true" data-id="task-adjacency-bonus">
                 <strong>Bonus d’adjacence Civ</strong>
@@ -1974,6 +2231,14 @@
               <article class="task" draggable="true" data-id="task-pvm-hostile-regions">
                 <strong>PvM — régions hostiles</strong>
                 <p>Ennemis / villages ennemis à la génération. Caserne pour soldats. Voir section PvM.</p>
+              </article>
+              <article class="task" draggable="true" data-id="task-planned-biomes">
+                <strong>Nouveaux biomes</strong>
+                <p>Désert, jungle, glace, neige, marais (+ volcanique ?). Roue, fusions, rivages, raison économique. Wiki · Biomes.</p>
+              </article>
+              <article class="task" draggable="true" data-id="task-world-score-leaderboard">
+                <strong>Score monde + leaderboard</strong>
+                <p>Score agrégé sur tout le diorama (pop, bâtiments, régions, prod…). Classements globaux / périodiques. Voir Ideas &amp; PvP V1.</p>
               </article>
             </div>
             <div class="kanban-col" data-column="todo">
@@ -1996,6 +2261,18 @@
             </div>
             <div class="kanban-col" data-column="done">
               <h3>Done</h3>
+              <article class="task" draggable="true" data-id="task-firebase-accounts">
+                <strong>Comptes Firebase</strong>
+                <p>Invité → lien Google / email, <code>POST /v1/session/firebase</code>, DEC-024.</p>
+              </article>
+              <article class="task" draggable="true" data-id="task-fishing-hut">
+                <strong>Cabane de pêcheur</strong>
+                <p>POI <code>fish_bank</code> + <code>fishing_hut</code> → food (DEC-021 / 023).</p>
+              </article>
+              <article class="task" draggable="true" data-id="task-play-tutorial-gyro">
+                <strong>Tutoriel + gyro + légales</strong>
+                <p>Coach play, parallax tilt, pages privacy/terms/cookies, news.</p>
+              </article>
               <article class="task" draggable="true" data-id="task-stock-caps-feedback">
                 <strong>Feedback caps stocks</strong>
                 <p><code>stock/cap</code>, near/full, rate 0 au cap, hint soft bois plein (header + sheet).</p>
@@ -2139,6 +2416,16 @@
           <div class="grid grid-3" id="ideas-grid">
               <article class="card idea" data-status="confirmed">
                 <span class="status status-confirmed">Confirmed</span>
+                <h3>Score de monde + leaderboard</h3>
+                <p>Chaque joueur a un <strong>score</strong> calculé sur l’ensemble de son monde (taille, population, bâtiments, progression économique, etc. — formule à préciser). Classements (global, hebdo, amis…) pour comparer sans envahir le diorama d’autrui. Socle du PvP indirect (V1). Phase 6.</p>
+              </article>
+              <article class="card idea" data-status="confirmed">
+                <span class="status status-confirmed">Confirmed</span>
+                <h3>Nouveaux biomes primaires</h3>
+                <p>Après les 4 de base : <strong>désert</strong>, <strong>jungle</strong>, <strong>glace</strong>, <strong>neige</strong>, éventuellement <strong>marais</strong> / <strong>volcanique</strong>. Chaque biome = look + fusions + rivage + au moins une raison de le choisir. Voir <a href="#wiki-biomes">Wiki · Biomes</a>.</p>
+              </article>
+              <article class="card idea" data-status="confirmed">
+                <span class="status status-confirmed">Confirmed</span>
                 <h3>Bonus d’adjacence (Civ)</h3>
                 <p>Production du bâtiment bonusée par les tuiles voisines (forêt autour du camp, plaine autour de la ferme…). Cap de bonus, UI lisible. Voir Economy.</p>
               </article>
@@ -2167,10 +2454,10 @@
               <h3>Spécialisations des villages</h3>
               <p>Forestier, minier, agricole, industriel. Direction validée, détails plus tard.</p>
             </article>
-            <article class="card idea" data-status="idea">
-              <span class="status status-idea">Idea</span>
-              <h3>Nouveaux âges technologiques</h3>
-              <p>Étendre les chaînes sans payer la puissance. Hors MVP.</p>
+            <article class="card idea" data-status="confirmed">
+              <span class="status status-confirmed">Confirmed</span>
+              <h3>Arbre technologique (science)</h3>
+              <p>Validé DEC-022 : Centre de recherche + ressource science ; âges nommés / extensions hors MVP.</p>
             </article>
             <article class="card idea" data-status="confirmed">
               <span class="status status-confirmed">Confirmed</span>
@@ -2213,7 +2500,7 @@
           <div class="grid grid-3">
             <article class="card">
               <h3>V1 — Indirect</h3>
-              <p>Compétition sans invasion : classements, économie, commerce, performances.</p>
+              <p>Compétition sans invasion : <strong>score de monde</strong>, <strong>leaderboards</strong>, économie, commerce, performances. Le classement récompense la qualité / l’ampleur du diorama, pas le raid.</p>
             </article>
             <article class="card">
               <h3>V2 — Instancié</h3>
@@ -2332,11 +2619,12 @@
             <div class="check-item is-done"><span class="check-box"></span>Village</div>
             <div class="check-item is-done"><span class="check-box"></span>Population + affectation travailleurs</div>
             <div class="check-item is-done"><span class="check-box"></span>Récolte bois / blé / pierre (lazy + extracteurs posés)</div>
-            <div class="check-item is-done"><span class="check-box"></span>Pose extracteurs + chantiers (camp / ferme / carrière)</div>
-            <div class="check-item is-done"><span class="check-box"></span>Autres ressources extracteurs (blé, pierre)</div>
+            <div class="check-item is-done"><span class="check-box"></span>Pose extracteurs + chantiers (camp / ferme / carrière / pêche)</div>
+            <div class="check-item is-done"><span class="check-box"></span>Autres ressources extracteurs (blé, pierre, food pêche)</div>
             <div class="check-item is-done"><span class="check-box"></span>UI food + croissance pop (barre)</div>
             <div class="check-item is-done"><span class="check-box"></span>Éclats de monde (expansion)</div>
             <div class="check-item is-done"><span class="check-box"></span>Bonus fusion +20&nbsp;% extracteurs</div>
+            <div class="check-item is-done"><span class="check-box"></span>Comptes Firebase (lien invité)</div>
             <div class="check-item"><span class="check-box"></span>Mine + minerai</div>
             <div class="check-item"><span class="check-box"></span>Fonderie + lingot</div>
             <div class="check-item"><span class="check-box"></span>Forge + outils</div>
@@ -2363,7 +2651,7 @@
         </section>
 
         <footer class="page-foot">
-          Hexald — Project Hub. Site statique de documentation, pas le jeu. Ouvrir <code>docs/index.html</code> dans le navigateur. Dernière mise à jour du contenu : 26 août 2026 (DEC-019 fusion · DEC-020 éclats · Phase 3).
+          Hexald — Project Hub. Site statique de documentation, pas le jeu. Ouvrir <code>docs/index.html</code> dans le navigateur. Dernière mise à jour du contenu : 26 août 2026 (score / leaderboard · DEC-024 Firebase · pêche · biomes planifiés · Phase 3–6).
         </footer>
       </div>
     </div>

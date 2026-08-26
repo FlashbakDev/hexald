@@ -13,6 +13,12 @@ const ADMIN_UNLOCK_KEY = "hexald-admin-ok";
 type AdminOverview = {
   generatedAt: string;
   presenceTtlMs: number;
+  supportMail?: {
+    isDev: boolean;
+    configured: boolean;
+    to: string;
+    from: string;
+  };
   counts: {
     playersTotal: number;
     playersNamed: number;
@@ -46,10 +52,19 @@ type AdminOverview = {
   }>;
 };
 
+type TestMailResult = {
+  ok: true;
+  mode: "resend" | "log";
+  to: string;
+  from: string;
+};
+
 const config = useRuntimeConfig();
 const expectedCode = String(config.public.adminCode ?? "nimda");
 
 const unlocked = ref(false);
+const testMailBusy = ref(false);
+const testMailStatus = ref<string | null>(null);
 
 const {
   data,
@@ -115,6 +130,39 @@ function shortId(id: string) {
 const ttlMinutes = computed(() =>
   Math.round((data.value?.presenceTtlMs ?? 300_000) / 60_000)
 );
+
+const showTestMail = computed(() => data.value?.supportMail?.isDev === true);
+
+async function sendTestMail() {
+  if (testMailBusy.value || !showTestMail.value) return;
+  testMailBusy.value = true;
+  testMailStatus.value = null;
+  try {
+    const result = await $fetch<TestMailResult>("/v1/admin/test-mail", {
+      baseURL: config.public.apiBase,
+      method: "POST"
+    });
+    if (result.mode === "resend") {
+      testMailStatus.value = `Envoyé via Resend → ${result.to}`;
+    } else {
+      testMailStatus.value = `Pas de RESEND_API_KEY — contenu loggé côté API (→ ${result.to})`;
+    }
+  } catch (err: unknown) {
+    const status =
+      err && typeof err === "object" && "statusCode" in err
+        ? Number((err as { statusCode?: number }).statusCode)
+        : 0;
+    if (status === 403) {
+      testMailStatus.value = "Réservé au mode development de l’API.";
+    } else if (status === 503) {
+      testMailStatus.value = "RESEND_API_KEY manquante.";
+    } else {
+      testMailStatus.value = "Échec d’envoi — vérifie Resend / domaine / logs API.";
+    }
+  } finally {
+    testMailBusy.value = false;
+  }
+}
 </script>
 
 <template>
@@ -135,10 +183,19 @@ const ttlMinutes = computed(() =>
           </p>
         </div>
 
-        <div class="flex items-center gap-3">
+        <div class="flex flex-wrap items-center gap-3">
           <p v-if="data" class="text-sm text-[#6b7c76]">
             Maj {{ formatWhen(data.generatedAt) }}
           </p>
+          <UButton
+            v-if="showTestMail"
+            color="primary"
+            variant="soft"
+            :loading="testMailBusy"
+            @click="sendTestMail"
+          >
+            Tester l’envoi mail
+          </UButton>
           <UButton
             color="neutral"
             variant="soft"
@@ -149,6 +206,22 @@ const ttlMinutes = computed(() =>
           </UButton>
         </div>
       </header>
+
+      <p
+        v-if="testMailStatus"
+        class="mb-6 rounded-lg px-4 py-3 text-sm"
+        :class="
+          testMailStatus.startsWith('Envoyé')
+            ? 'bg-emerald-100 text-emerald-900'
+            : 'bg-amber-100 text-amber-950'
+        "
+      >
+        {{ testMailStatus }}
+        <span v-if="data?.supportMail" class="mt-1 block text-xs opacity-80">
+          From {{ data.supportMail.from }} · Resend
+          {{ data.supportMail.configured ? "configuré" : "non configuré" }}
+        </span>
+      </p>
 
       <p v-if="error" class="rounded-lg bg-red-100 px-4 py-3 text-red-900">
         Impossible de charger l’overview admin.

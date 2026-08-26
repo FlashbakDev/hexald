@@ -25,6 +25,18 @@ function setSessionCookie(reply: FastifyReply, playerId: string) {
   });
 }
 
+export function clearSessionCookie(reply: FastifyReply) {
+  reply.clearCookie(SESSION_COOKIE, {
+    path: "/",
+    httpOnly: true,
+    sameSite: "lax",
+    signed: true,
+    secure: !env.isDev
+  });
+}
+
+export { setSessionCookie };
+
 export async function resolvePlayerFromCookie(
   app: FastifyInstance,
   request: FastifyRequest

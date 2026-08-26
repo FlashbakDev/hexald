@@ -13,11 +13,14 @@ import {
   BUILD_IDLE_POP_REQUIREMENT,
   BUILD_DURATION_MS,
   DEV_BUILD_DURATION_MS,
+  getBiomeDefinition,
   getBuildingDefinition,
+  getPoiDefinition,
   primaryBiomes,
   STONE_RATE_PER_WORKER_PER_MINUTE,
   WHEAT_RATE_PER_WORKER_PER_MINUTE,
   WOOD_RATE_PER_WORKER_PER_MINUTE,
+  FISHING_HUT_FOOD_RATE_PER_WORKER_PER_MINUTE,
   TOWN_HALL_WORLDSHARD_INTERVAL_MS,
   type PlaceableBuildingId,
   type PlaceableExtractorId
@@ -46,6 +49,7 @@ definePageMeta({
 });
 
 const { pseudo, ensureSession } = useSession();
+const { logoutFirebase } = useFirebaseAuth();
 const {
   ensureWorld,
   expandRegion,
@@ -59,6 +63,87 @@ const {
   world,
   error: worldError
 } = useWorld();
+
+const {
+  open: linkAccountOpen,
+  isGuest,
+  maybeAutoShow: maybeShowLinkAccount,
+  show: showLinkAccount,
+  dismiss: dismissLinkAccount
+} = useLinkAccountPrompt();
+
+const settingsOpen = ref(false);
+const settingsRoot = ref<HTMLElement | null>(null);
+const disconnecting = ref(false);
+const disconnectConfirmOpen = ref(false);
+const supportOpen = ref(false);
+
+function toggleSettings() {
+  settingsOpen.value = !settingsOpen.value;
+}
+
+function closeSettings() {
+  settingsOpen.value = false;
+}
+
+function openLinkAccountFromSettings() {
+  closeSettings();
+  showLinkAccount();
+}
+
+function openSupportFromSettings() {
+  closeSettings();
+  supportOpen.value = true;
+}
+
+function askDisconnect() {
+  if (disconnecting.value) return;
+  if (isGuest.value) {
+    closeSettings();
+    disconnectConfirmOpen.value = true;
+    return;
+  }
+  void disconnect();
+}
+
+function cancelDisconnect() {
+  disconnectConfirmOpen.value = false;
+}
+
+function openLinkAccountFromDisconnect() {
+  cancelDisconnect();
+  showLinkAccount();
+}
+
+async function disconnect() {
+  if (disconnecting.value) return;
+  disconnecting.value = true;
+  disconnectConfirmOpen.value = false;
+  settingsOpen.value = false;
+  try {
+    await logoutFirebase();
+    world.value = null;
+    await navigateTo("/", { replace: true });
+  } finally {
+    disconnecting.value = false;
+  }
+}
+
+function onSettingsPointerDown(event: PointerEvent) {
+  if (!settingsOpen.value) return;
+  const root = settingsRoot.value;
+  if (root && event.target instanceof Node && root.contains(event.target)) {
+    return;
+  }
+  closeSettings();
+}
+
+onMounted(() => {
+  document.addEventListener("pointerdown", onSettingsPointerDown, true);
+});
+onBeforeUnmount(() => {
+  document.removeEventListener("pointerdown", onSettingsPointerDown, true);
+});
 
 const session = await ensureSession();
 if (!session?.pseudo) {
@@ -103,6 +188,20 @@ const destroying = ref(false);
 const nowTick = ref(Date.now());
 const isDevClient = import.meta.dev;
 const { hasNoAds, setDevNoAds } = useAds();
+const {
+  enabled: tiltEnabled,
+  setEnabled: setTiltEnabled,
+  authorizeFromUserGesture: authorizeTilt
+} = useDeviceTilt({ enabled: true, mouseFallback: true });
+
+async function toggleDeviceTilt() {
+  if (!tiltEnabled.value) {
+    setTiltEnabled(true);
+    await authorizeTilt();
+    return;
+  }
+  setTiltEnabled(false);
+}
 
 const {
   active: tutorialActive,
@@ -123,6 +222,8 @@ let tutorialHoleRaf: number | null = null;
 
 const wheelInteractive = ref(false);
 let wheelReadyTimer: ReturnType<typeof setTimeout> | null = null;
+/** Ancre écran de la roue = centre projeté de la tuile sélectionnée. */
+const wheelAnchor = ref<{ x: number; y: number } | null>(null);
 let tickTimer: ReturnType<typeof setInterval> | null = null;
 let refreshTimer: ReturnType<typeof setInterval> | null = null;
 let overlayRaf: number | null = null;
@@ -138,6 +239,14 @@ onMounted(() => {
   if (world.value) {
     window.setTimeout(() => startTutorial(), 700);
   }
+  // Popup compte après le tutoriel (ou si pas de tutoriel).
+  window.setTimeout(() => {
+    if (!tutorialActive.value) maybeShowLinkAccount(0);
+  }, 2800);
+});
+
+watch(tutorialActive, (on, wasOn) => {
+  if (wasOn && !on) maybeShowLinkAccount(900);
 });
 
 watch(tutorialActive, (on) => {
@@ -179,6 +288,7 @@ const buildingIcons: Record<PlaceableBuildingId, { icon: string; short: string }
   lumber_camp: { icon: "i-lucide-trees", short: "Camp" },
   farm: { icon: "i-lucide-wheat", short: "Ferme" },
   quarry: { icon: "i-lucide-pickaxe", short: "Carrière" },
+  fishing_hut: { icon: "i-lucide-fish", short: "Pêche" },
   house: { icon: "i-lucide-home", short: "Maison" }
 };
 
@@ -490,6 +600,7 @@ const selectedConstruction = computed(() => {
     buildingId !== "lumber_camp" &&
     buildingId !== "farm" &&
     buildingId !== "quarry" &&
+    buildingId !== "fishing_hut" &&
     buildingId !== "house"
   ) {
     return null;
@@ -568,7 +679,8 @@ function workersForBuilding(
   if (
     buildingId !== "lumber_camp" &&
     buildingId !== "farm" &&
-    buildingId !== "quarry"
+    buildingId !== "quarry" &&
+    buildingId !== "fishing_hut"
   ) {
     return null;
   }
@@ -608,7 +720,8 @@ const mapBadges = computed((): MapBadge[] => {
         buildingId == null ||
         buildingId === "lumber_camp" ||
         buildingId === "farm" ||
-        buildingId === "quarry";
+        buildingId === "quarry" ||
+        buildingId === "fishing_hut";
       if (isProductionBuilding) {
         out.push({
           key: `bonus:${key}`,
@@ -673,7 +786,9 @@ function collectOverlayTargets(): { q: number; r: number }[] {
   const targets: { q: number; r: number }[] = [{ ...START_VILLAGE }];
   const seen = new Set([`${START_VILLAGE.q},${START_VILLAGE.r}`]);
   for (const tile of tiles) {
-    if (!tile.buildingId && !isFusionBiome(tile.biome)) continue;
+    if (!tile.buildingId && !isFusionBiome(tile.biome)) {
+      continue;
+    }
     const key = `${tile.q},${tile.r}`;
     if (seen.has(key)) continue;
     seen.add(key);
@@ -701,10 +816,34 @@ function syncOverlayPositions() {
   overlayPositions.value = next;
 }
 
+function syncWheelAnchor() {
+  if (!anyWheelOpen.value) {
+    if (wheelAnchor.value !== null) wheelAnchor.value = null;
+    return;
+  }
+  const tile = selected.value;
+  const root = stage.value;
+  const point = tile ? preview.value?.projectTile(tile.q, tile.r) : null;
+  if (!tile || !point || !root) {
+    if (wheelAnchor.value !== null) wheelAnchor.value = null;
+    return;
+  }
+  const pad = 72;
+  const w = root.clientWidth;
+  const h = root.clientHeight;
+  const x = Math.min(w - pad, Math.max(pad, point.x));
+  const y = Math.min(h - pad, Math.max(pad, point.y));
+  const prev = wheelAnchor.value;
+  if (!prev || Math.abs(prev.x - x) > 0.25 || Math.abs(prev.y - y) > 0.25) {
+    wheelAnchor.value = { x, y };
+  }
+}
+
 function startOverlayLoop() {
   if (overlayRaf != null) return;
   const loop = () => {
     syncOverlayPositions();
+    syncWheelAnchor();
     overlayRaf = requestAnimationFrame(loop);
   };
   overlayRaf = requestAnimationFrame(loop);
@@ -729,10 +868,12 @@ const buildOptions = computed(() => {
   const tile = selected.value;
   const tiles = world.value?.tiles;
   if (!tile?.biome || !tiles) return [] as PlaceableBuildingId[];
+  const snap = tiles.find((entry) => entry.q === tile.q && entry.r === tile.r);
   return listBuildOptionsForTile({
     biome: tile.biome,
     hasVillage: tile.hasVillage,
-    existingBuildingId: tile.buildingId ?? null
+    existingBuildingId: tile.buildingId ?? null,
+    poiId: snap?.poiId ?? null
   });
 });
 
@@ -835,6 +976,25 @@ const selectedWorkerPanel = computed((): WorkerPanel | null => {
       canRemove: !assigning.value && assigned > 0
     };
   }
+  if (tile.buildingId === "fishing_hut") {
+    const stockFull = foodStockUi.value.level === "full";
+    return {
+      title: "Pêcheur",
+      hint: stockFull
+        ? "Stock nourriture plein — la pêche attend."
+        : "Assigne un habitant pour pêcher sur ce banc de poisson.",
+      count: assigned,
+      max,
+      rateLabel:
+        assigned > 0 && !stockFull
+          ? formatRatePerMinute(
+              assigned * FISHING_HUT_FOOD_RATE_PER_WORKER_PER_MINUTE * mult
+            )
+          : "0/min",
+      canAdd: !assigning.value && assigned < max && idlePop.value > 0,
+      canRemove: !assigning.value && assigned > 0
+    };
+  }
   return null;
 });
 
@@ -906,11 +1066,36 @@ const showBuildWheel = computed(
     !debugBiomeOpen.value
 );
 
-/** Bottom sheet ouvert uniquement si la tuile porte un bâtiment. */
+/** Bottom sheet : bâtiment, village, ou tuile biome (sans bâtiment). */
 const showBuildingSheet = computed(() => {
   const tile = selected.value;
-  if (!tile || showBuildWheel.value || debugBiomeOpen.value) return false;
-  return tile.hasVillage || tile.buildingId != null;
+  if (!tile || debugBiomeOpen.value) return false;
+  if (tile.hasVillage || tile.buildingId != null) return true;
+  return tile.biome != null;
+});
+
+/** Tuile biome libre (pas de bâtiment / village) — panneau d’info. */
+const showTileInfoSheet = computed(() => {
+  const tile = selected.value;
+  return Boolean(
+    showBuildingSheet.value &&
+      tile?.biome &&
+      !tile.hasVillage &&
+      !tile.buildingId
+  );
+});
+
+const selectedTileBiomeInfo = computed(() => {
+  const tile = selected.value;
+  if (!tile?.biome) return null;
+  return getBiomeDefinition(tile.biome) ?? null;
+});
+
+const selectedTilePoiInfo = computed(() => {
+  if (!showTileInfoSheet.value) return null;
+  const poiId = selectedWorldTile.value?.poiId;
+  if (!poiId) return null;
+  return getPoiDefinition(poiId) ?? null;
 });
 
 /** Hub debug (bug) quand la tuile a un biome mais pas de roue build / sheet. */
@@ -948,7 +1133,8 @@ const selectedBuildingTitle = computed(() => {
   const tile = selected.value;
   if (!tile) return "";
   if (tile.hasVillage) return "Village";
-  return buildingLabel(tile.buildingId) ?? "Bâtiment";
+  if (tile.buildingId) return buildingLabel(tile.buildingId) ?? "Bâtiment";
+  return selectedTileBiomeInfo.value?.label ?? "Tuile";
 });
 
 const canDestroySelectedBuilding = computed(() => {
@@ -1051,15 +1237,9 @@ watch(anyWheelOpen, (show) => {
 });
 
 const wheelStyle = computed(() => {
-  const tile = selected.value;
-  const root = stage.value;
-  if (!tile || tile.clientX == null || tile.clientY == null || !root) {
-    return { left: "50%", top: "50%" };
-  }
-  const rect = root.getBoundingClientRect();
-  const x = Math.min(rect.width - 72, Math.max(72, tile.clientX - rect.left));
-  const y = Math.min(rect.height - 72, Math.max(72, tile.clientY - rect.top));
-  return { left: `${x}px`, top: `${y}px` };
+  const anchor = wheelAnchor.value;
+  if (!anchor) return { left: "50%", top: "50%" };
+  return { left: `${anchor.x}px`, top: `${anchor.y}px` };
 });
 
 const BIOME_WHEEL_RADIUS = 56;
@@ -1675,15 +1855,58 @@ watch(
             >
               <UIcon name="i-lucide-newspaper" class="play-top-actions__icon" />
             </NuxtLink>
-            <button
-              type="button"
-              class="play-top-actions__btn play-top-actions__btn--disabled"
-              title="Réglages — bientôt"
-              aria-label="Réglages (indisponible)"
-              disabled
-            >
-              <UIcon name="i-lucide-settings" class="play-top-actions__icon" />
-            </button>
+            <div ref="settingsRoot" class="play-settings">
+              <button
+                type="button"
+                class="play-top-actions__btn"
+                :class="{ 'play-top-actions__btn--active': settingsOpen }"
+                title="Réglages"
+                aria-label="Réglages"
+                aria-haspopup="menu"
+                :aria-expanded="settingsOpen"
+                @click="toggleSettings"
+              >
+                <UIcon name="i-lucide-settings" class="play-top-actions__icon" />
+              </button>
+              <div
+                v-if="settingsOpen"
+                class="play-settings__menu"
+                role="menu"
+                aria-label="Réglages"
+              >
+                <ClientOnly>
+                  <button
+                    v-if="isGuest"
+                    type="button"
+                    class="play-settings__item"
+                    role="menuitem"
+                    @click="openLinkAccountFromSettings"
+                  >
+                    <UIcon name="i-lucide-cloud-upload" class="play-settings__item-icon" aria-hidden="true" />
+                    <span>Lier mon compte</span>
+                  </button>
+                </ClientOnly>
+                <button
+                  type="button"
+                  class="play-settings__item"
+                  role="menuitem"
+                  @click="openSupportFromSettings"
+                >
+                  <UIcon name="i-lucide-message-circle" class="play-settings__item-icon" aria-hidden="true" />
+                  <span>Aide & contact</span>
+                </button>
+                <button
+                  type="button"
+                  class="play-settings__item play-settings__item--danger"
+                  role="menuitem"
+                  :disabled="disconnecting"
+                  @click="askDisconnect"
+                >
+                  <UIcon name="i-lucide-log-out" class="play-settings__item-icon" aria-hidden="true" />
+                  <span>{{ disconnecting ? "Déconnexion…" : "Se déconnecter" }}</span>
+                </button>
+              </div>
+            </div>
           </nav>
 
           <div
@@ -1855,15 +2078,33 @@ watch(
       </div>
     </div>
 
-    <button
+    <div
       v-if="world"
-      type="button"
-      class="play-bottom-chrome pointer-events-auto absolute right-3 z-30 flex size-11 items-center justify-center rounded-full border border-[#1c2b28]/12 bg-white/80 text-[#2d5248] shadow-[0_8px_24px_rgb(28_43_40_/_0.1)] backdrop-blur-md transition hover:border-[#4a7c6f]/45 hover:text-[#1c2b28] active:scale-95"
-      aria-label="Recentrer la caméra"
-      @click="preview?.recenter()"
+      class="play-bottom-chrome pointer-events-none absolute right-3 z-30 flex flex-col items-end gap-2"
     >
-      <UIcon name="i-lucide-locate-fixed" class="size-5" />
-    </button>
+      <button
+        type="button"
+        class="pointer-events-auto flex size-11 items-center justify-center rounded-full border border-[#1c2b28]/12 bg-white/80 text-[#2d5248] shadow-[0_8px_24px_rgb(28_43_40_/_0.1)] backdrop-blur-md transition hover:border-[#4a7c6f]/45 hover:text-[#1c2b28] active:scale-95"
+        :class="tiltEnabled ? 'border-[#4a7c6f]/40 text-[#2d5248]' : 'opacity-70'"
+        :aria-label="
+          tiltEnabled
+            ? 'Désactiver le parallax (gyro)'
+            : 'Activer le parallax (gyro)'
+        "
+        :aria-pressed="tiltEnabled"
+        @click="toggleDeviceTilt"
+      >
+        <UIcon name="i-lucide-smartphone" class="size-5" />
+      </button>
+      <button
+        type="button"
+        class="pointer-events-auto flex size-11 items-center justify-center rounded-full border border-[#1c2b28]/12 bg-white/80 text-[#2d5248] shadow-[0_8px_24px_rgb(28_43_40_/_0.1)] backdrop-blur-md transition hover:border-[#4a7c6f]/45 hover:text-[#1c2b28] active:scale-95"
+        aria-label="Recentrer la caméra"
+        @click="preview?.recenter()"
+      >
+        <UIcon name="i-lucide-locate-fixed" class="size-5" />
+      </button>
+    </div>
 
     <Transition name="biome-wheel">
       <div
@@ -2103,7 +2344,7 @@ watch(
 
     <Transition name="building-sheet">
       <aside
-        v-if="showBuildingSheet && selected && economy"
+        v-if="showBuildingSheet && selected"
         ref="buildingSheet"
         class="building-sheet pointer-events-none absolute inset-x-0 bottom-0 z-50"
       >
@@ -2147,18 +2388,25 @@ watch(
               <p class="building-sheet__title truncate">
                 {{ selectedBuildingTitle }}
               </p>
-              <p v-if="selectedConstruction && !destroyConfirm" class="building-sheet__hint">
-                En construction · {{ selectedConstruction.label }} · 1 habitant réservé
-              </p>
-              <p v-else-if="selectedWorkerPanel && !destroyConfirm" class="building-sheet__hint">
-                {{ selectedWorkerPanel.hint }}
-              </p>
-              <p v-else-if="selected.hasVillage" class="building-sheet__hint">
-                Cœur de ton territoire.
-              </p>
-              <p v-else-if="destroyConfirm" class="building-sheet__hint">
-                Confirmation requise
-              </p>
+              <template v-if="showTileInfoSheet">
+                <p class="building-sheet__hint">
+                  {{ selectedTileBiomeInfo?.description }}
+                </p>
+              </template>
+              <template v-else>
+                <p v-if="selectedConstruction && !destroyConfirm" class="building-sheet__hint">
+                  En construction · {{ selectedConstruction.label }} · 1 habitant réservé
+                </p>
+                <p v-else-if="selectedWorkerPanel && !destroyConfirm" class="building-sheet__hint">
+                  {{ selectedWorkerPanel.hint }}
+                </p>
+                <p v-else-if="selected.hasVillage" class="building-sheet__hint">
+                  Cœur de ton territoire.
+                </p>
+                <p v-else-if="destroyConfirm" class="building-sheet__hint">
+                  Confirmation requise
+                </p>
+              </template>
             </div>
             <div class="flex shrink-0 items-center gap-1.5">
               <button
@@ -2191,6 +2439,18 @@ watch(
                 <UIcon name="i-lucide-x" class="size-4" />
               </button>
             </div>
+          </div>
+
+          <div
+            v-if="showTileInfoSheet && selectedTilePoiInfo"
+            class="mt-3 rounded-2xl border border-[#1c2b28]/10 bg-white/70 px-3 py-2.5"
+          >
+            <p class="text-sm font-semibold text-[#1c2b28]">
+              {{ selectedTilePoiInfo.label }}
+            </p>
+            <p class="mt-0.5 text-xs leading-relaxed text-[#3d524c]/90">
+              {{ selectedTilePoiInfo.description }}
+            </p>
           </div>
 
           <div
@@ -2303,5 +2563,74 @@ watch(
       @skip="skipTutorial"
       @finish="completeTutorial"
     />
+
+    <LinkAccountDialog
+      v-model:open="linkAccountOpen"
+      @dismiss="dismissLinkAccount"
+    />
+
+    <SupportReportDialog
+      v-model:open="supportOpen"
+      :world-id="world?.id ?? null"
+    />
+
+    <Teleport to="body">
+      <Transition name="play-disconnect-sheet">
+        <div
+          v-if="disconnectConfirmOpen && isGuest"
+          class="play-disconnect-sheet"
+          role="alertdialog"
+          aria-modal="true"
+          aria-labelledby="disconnect-warn-title"
+          aria-describedby="disconnect-warn-desc"
+        >
+          <button
+            type="button"
+            class="play-disconnect-sheet__backdrop"
+            aria-label="Fermer"
+            :disabled="disconnecting"
+            @click="cancelDisconnect"
+          />
+          <div class="play-disconnect-sheet__panel">
+            <div class="play-disconnect-sheet__handle" aria-hidden="true" />
+            <div class="play-disconnect-sheet__icon" aria-hidden="true">
+              <UIcon name="i-lucide-triangle-alert" class="size-7" />
+            </div>
+            <h2 id="disconnect-warn-title" class="play-disconnect-sheet__title">
+              Quitter en invité&nbsp;?
+            </h2>
+            <p id="disconnect-warn-desc" class="play-disconnect-sheet__body">
+              Tu n’as pas de compte lié. Toute ta progression (monde, bâtiments, ressources) sera perdue.
+            </p>
+            <div class="play-disconnect-sheet__actions">
+              <button
+                type="button"
+                class="play-disconnect-sheet__btn play-disconnect-sheet__btn--primary"
+                :disabled="disconnecting"
+                @click="cancelDisconnect"
+              >
+                Rester
+              </button>
+              <button
+                type="button"
+                class="play-disconnect-sheet__btn play-disconnect-sheet__btn--primary"
+                :disabled="disconnecting"
+                @click="openLinkAccountFromDisconnect"
+              >
+                Lier mon compte
+              </button>
+              <button
+                type="button"
+                class="play-disconnect-sheet__btn play-disconnect-sheet__btn--danger"
+                :disabled="disconnecting"
+                @click="disconnect"
+              >
+                {{ disconnecting ? "…" : "Quitter quand même" }}
+              </button>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
   </div>
 </template>

@@ -63,7 +63,9 @@ export const worldTiles = pgTable(
     /** Workers assignés sur ce site (0–1 pour extracteur niveau 1). */
     assignedWorkers: integer("assigned_workers").notNull().default(0),
     /** Worker par défaut déjà géré (évite réassigner si le joueur retire). */
-    defaultWorkerSeeded: boolean("default_worker_seeded").notNull().default(false)
+    defaultWorkerSeeded: boolean("default_worker_seeded").notNull().default(false),
+    /** POI naturel / landmark (ex. fish_bank). */
+    poiId: text("poi_id")
   },
   (table) => [primaryKey({ columns: [table.worldId, table.q, table.r] })]
 );

@@ -193,7 +193,11 @@ function loadNewsPosts(): NewsPost[] {
     });
   }
 
-  return posts.sort((a, b) => b.date.localeCompare(a.date));
+  return posts.sort((a, b) => {
+    const byDate = b.date.localeCompare(a.date);
+    if (byDate !== 0) return byDate;
+    return b.slug.localeCompare(a.slug);
+  });
 }
 
 export const newsPosts: NewsPost[] = loadNewsPosts();

@@ -21,6 +21,8 @@ const props = defineProps<{
   } | null;
   viewSize?: number;
   frameBiasY?: number;
+  /** Parallax gyro / souris (défaut true). */
+  deviceTilt?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -30,6 +32,19 @@ const emit = defineEmits<{
 const canvas = ref<HTMLCanvasElement | null>(null);
 let api: HexSceneApi | undefined;
 
+const tilt = useDeviceTilt({
+  enabled: props.deviceTilt !== false,
+  mouseFallback: true
+});
+
+watch(
+  () => props.deviceTilt,
+  (next) => {
+    if (next === false) tilt.setEnabled(false);
+    else if (next === true) tilt.setEnabled(true);
+  }
+);
+
 function mountScene(create = createHexScene) {
   api?.dispose();
   if (!canvas.value) return;
@@ -37,7 +52,8 @@ function mountScene(create = createHexScene) {
     onSelect: (tile) => emit("select", tile),
     initialWorld: props.initialWorld ?? undefined,
     viewSize: props.viewSize,
-    frameBiasY: props.frameBiasY
+    frameBiasY: props.frameBiasY,
+    getDeviceTilt: () => (tilt.enabled.value ? tilt.getTilt() : { x: 0, y: 0 })
   });
   if (import.meta.dev) {
     (globalThis as { __twHex?: HexSceneApi }).__twHex = api;
@@ -74,6 +90,9 @@ if (import.meta.hot) {
   import.meta.hot.accept("../renderer/createLumberCampMesh", () => {
     mountScene();
   });
+  import.meta.hot.accept("../renderer/createFishingHutMesh", () => {
+    mountScene();
+  });
   import.meta.hot.accept("../renderer/createHouseMesh", () => {
     mountScene();
   });
@@ -84,6 +103,12 @@ if (import.meta.hot) {
     mountScene();
   });
   import.meta.hot.accept("../renderer/createWaterDecor", () => {
+    mountScene();
+  });
+  import.meta.hot.accept("../renderer/createShoreEdgeDecor", () => {
+    mountScene();
+  });
+  import.meta.hot.accept("../renderer/createFishBankDecor", () => {
     mountScene();
   });
 }
@@ -106,7 +131,9 @@ defineExpose({
     api?.applyTileBiome(q, r, biome) ?? false,
   projectTile: (q: number, r: number) => api?.projectTile(q, r) ?? null,
   setTutorialHighlights: (coords: readonly HexCoord[]) =>
-    api?.setTutorialHighlights(coords)
+    api?.setTutorialHighlights(coords),
+  setDeviceTiltEnabled: (next: boolean) => tilt.setEnabled(next),
+  deviceTilt: tilt
 });
 </script>
 

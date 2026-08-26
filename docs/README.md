@@ -53,7 +53,7 @@ Le JavaScript est facultatif. Notes rapides et backlog kanban utilisent `localSt
 
 1. Copier le bloc `.decision.decision-template` dans `#decisions`.
 2. Retirer la classe `decision-template`.
-3. Remplacer `DEC-00X` par le prochain ID (`DEC-021`, …).
+3. Remplacer `DEC-00X` par le prochain ID (`DEC-024`, …).
 4. Remplir date, titre, statut, contexte, décision, raison, conséquences.
 
 ## Ajouter une phase

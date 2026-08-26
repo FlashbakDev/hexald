@@ -5,8 +5,10 @@ import {
   Color,
   CylinderGeometry,
   DirectionalLight,
+  Fog,
   Group,
   HemisphereLight,
+  LinearFilter,
   Mesh,
   MeshStandardMaterial,
   OrthographicCamera,
@@ -40,6 +42,7 @@ import { createForestDecorKit } from "./createForestDecor";
 import { createFusionDecorKit } from "./createFusionDecor";
 import { createFogCloudKit, FOG_CLOUD_LIFT } from "./createFogCloudKit";
 import { createFarmMesh } from "./createFarmMesh";
+import { createFishingHutMesh } from "./createFishingHutMesh";
 import { createHouseMesh } from "./createHouseMesh";
 import { createLumberCampMesh } from "./createLumberCampMesh";
 import { createQuarryMesh } from "./createQuarryMesh";
@@ -47,13 +50,19 @@ import {
   createMountainDecorKit,
   mountainChainDirs
 } from "./createMountainDecor";
+import { createMountainCloudDecorKit } from "./createMountainCloudDecor";
 import { createPlainsDecorKit } from "./createPlainsDecor";
 import {
   createShoreEdgeDecorKit,
   shoreKindForBiome
 } from "./createShoreEdgeDecor";
-import { createWaterDecorKit, createDeepWaterSurfaceTexture, isLandBiome, paintWaterMaterials } from "./createWaterDecor";
+import { createWaterDecorKit, createDeepWaterSurfaceTexture, createWaterHexGeometry, isLandBiome, paintWaterMaterials } from "./createWaterDecor";
+import { createFishBankDecorKit } from "./createFishBankDecor";
+import { createCowHerdDecorKit } from "./createCowHerdDecor";
+import { createIronDepositDecorKit } from "./createIronDepositDecor";
 import { createVillageMesh } from "./createVillageMesh";
+import type { PoiId } from "@hexald/shared";
+import { poiAllowedOnBiome } from "@hexald/content";
 
 const HEX_SIZE = 1;
 const HEX_HEIGHT = 0.28;
@@ -79,18 +88,29 @@ const VIEW_DEFAULT = 6.8;
 const HOVER_CURSOR = "url('/cursors/tile.svg') 16 16, pointer";
 const CAMERA_OFFSET = new Vector3(7.5, 10, 8.5);
 
-const biomePalette: Record<BiomeId, { top: number; side: number }> = {
-  forest: { top: 0x62c46f, side: 0x2a7040 },
-  plains: { top: 0x8fce6e, side: 0x4a8a3a },
-  mountain: { top: 0xd0d7e2, side: 0x6b7586 },
-  water: { top: 0x62bfe8, side: 0x2f86b5 },
-  forest_plains: { top: 0xa8c45e, side: 0x6a8a38 },
-  plains_mountain: { top: 0xc4b894, side: 0x8a7a5c },
-  forest_mountain: { top: 0x7a9a7e, side: 0x4a6050 }
+/** Surface hex : face claire, ombre de surface, flanc (3 nuances). */
+type BiomeSurface = { top: number; topShade: number; side: number };
+
+const biomePalette: Record<BiomeId, BiomeSurface> = {
+  // Forêt = sauge sombre (canopy)
+  forest: { top: 0x4f7d62, topShade: 0x3a614c, side: 0x2a4538 },
+  // Plaine = olive clair / herbe ouverte
+  plains: { top: 0xa3b87a, topShade: 0x869a62, side: 0xa09060 },
+  mountain: { top: 0xe6eaf0, topShade: 0xb0bac8, side: 0x556070 },
+  water: { top: 0x6ab0c8, topShade: 0x3f88a0, side: 0x2d6a80 },
+  // Lisière = vert moyen clair (entre forêt et plaine)
+  forest_plains: { top: 0x7a9a6e, topShade: 0x5e8260, side: 0x526848 },
+  plains_mountain: { top: 0xb8c88a, topShade: 0x9aaa70, side: 0x7a8a60 },
+  // Haute forêt = gris-mousse (roche + mousse)
+  forest_mountain: { top: 0x6e8480, topShade: 0x5a6e72, side: 0x455058 }
 };
 
-const emptyPalette = { top: 0xe4ece6, side: 0x7a8a82 };
-const revealFootprintPalette = { top: 0xd0decc, side: 0x6a7a55 };
+const emptyPalette: BiomeSurface = {
+  top: 0xeef6f0,
+  topShade: 0xdce8e0,
+  side: 0x9ab0a4
+};
+const revealFootprintPalette = { top: 0xdcecd4, side: 0x7a9a68 };
 
 type HexSpawnAnim = {
   /** `performance.now()` au début de la génération de région. */
@@ -109,6 +129,7 @@ type HexTile = {
   /** Quartier / village posé : le décor de biome d’origine est retiré. */
   hasVillage: boolean;
   buildingId: BuildingId | null;
+  poiId: PoiId | null;
   isRegionCenter: boolean;
   decor: Group | null;
   buildingMesh: Group | null;
@@ -123,6 +144,7 @@ type TileState = {
   r: number;
   biome: BiomeId;
   buildingId: BuildingId | null;
+  poiId: PoiId | null;
   isRegionCenter: boolean;
   hasVillage: boolean;
 };
@@ -201,8 +223,14 @@ function isFusionDecorBiome(biome: BiomeId): biome is FusionBiomeId {
   );
 }
 
-function tileMeshHeight(biome: BiomeId) {
-  return biome === "water" ? WATER_HEIGHT : HEX_HEIGHT;
+function tileMeshHeight(biome: BiomeId, poiId: PoiId | null = null) {
+  if (biome === "water") return WATER_HEIGHT;
+  // Gisement = sol plat + tas de cailloux (pas le relief montagne).
+  if (biome === "mountain" && poiId === "iron_deposit") return HEX_HEIGHT;
+  if (biome === "mountain") return HEX_HEIGHT * 1.38;
+  if (biome === "forest_mountain") return HEX_HEIGHT * 1.18;
+  if (biome === "plains" || biome === "forest_plains") return HEX_HEIGHT * 0.94;
+  return HEX_HEIGHT;
 }
 
 type Aabb = {
@@ -273,7 +301,17 @@ export type HexSceneOptions = {
     tiles: readonly WorldTileSnapshot[];
     regions: readonly WorldRegionSnapshot[];
   };
+  /**
+   * Parallax cosmétique (gyro / souris). x/y ∈ [-1, 1].
+   * Appliqué uniquement au render — le picking garde la caméra logique.
+   */
+  getDeviceTilt?: () => { x: number; y: number };
 } & HexSceneFraming;
+
+/** Décalage monde max pour le parallax gyro (unités scène) — subtil. */
+const TILT_POS_STRENGTH = 0.28;
+const TILT_LOOK_STRENGTH = 0.14;
+const TILT_SUN_STRENGTH = 0.45;
 
 function tileVariation(q: number, r: number) {
   return (Math.abs(q * 3 + r * 7) % 5) / 5 - 0.4;
@@ -290,13 +328,26 @@ function hexNoise(q: number, r: number, seed: number) {
 
 function paintMaterials(
   materials: MeshStandardMaterial[],
-  top: number,
-  side: number,
+  surface: BiomeSurface,
   variation: number
 ) {
-  materials[0].color.setHex(side).offsetHSL(variation * 0.02, 0, variation * 0.05);
-  materials[1].color.setHex(top).offsetHSL(variation * 0.03, variation * 0.05, variation * 0.04);
-  materials[2].color.copy(materials[0].color);
+  const t = Math.min(1, Math.max(0, 0.4 + variation * 0.55));
+  // Flanc
+  materials[0].color
+    .setHex(surface.side)
+    .offsetHSL(variation * 0.015, variation * 0.04, variation * 0.06);
+  materials[0].roughness = 0.9;
+  // Dessus : mélange top ↔ topShade (nuance claire/foncée selon la tuile)
+  materials[1].color
+    .setHex(surface.top)
+    .lerp(new Color(surface.topShade), t);
+  materials[1].color.offsetHSL(variation * 0.02, variation * 0.06, variation * 0.03);
+  materials[1].roughness = 0.68;
+  // Base : flanc assombri (3ᵉ nuance)
+  materials[2].color
+    .setHex(surface.side)
+    .offsetHSL(0, -0.03, -0.14 + variation * 0.04);
+  materials[2].roughness = 0.94;
 }
 
 function paintEmptyMaterials(
@@ -311,16 +362,16 @@ function paintEmptyMaterials(
   const palette = kind === "reveal-footprint" ? revealFootprintPalette : emptyPalette;
   materials[0].color.setHex(palette.side).offsetHSL(hue * 0.03, 0, light * 0.07);
   materials[1].color.setHex(palette.top).offsetHSL(hue * 0.035, sat * 0.07, light * 0.11);
-  materials[2].color.copy(materials[0].color);
+  materials[2].color.copy(materials[0].color).offsetHSL(0, 0, -0.1);
 }
 
-function createMaterials(top: number, side: number, variation: number) {
+function createMaterials(surface: BiomeSurface, variation: number) {
   const materials = [
     new MeshStandardMaterial({ roughness: 0.9, metalness: 0.02 }),
     new MeshStandardMaterial({ roughness: 0.68, metalness: 0.05 }),
     new MeshStandardMaterial({ roughness: 0.92, metalness: 0.02 })
   ];
-  paintMaterials(materials, top, side, variation);
+  paintMaterials(materials, surface, variation);
   return materials;
 }
 
@@ -332,12 +383,12 @@ function createPlainsGrassTexture() {
   canvasEl.height = size;
   const ctx = canvasEl.getContext("2d");
   if (!ctx) throw new Error("2d context unavailable");
-  ctx.fillStyle = "#f4faf0";
+  ctx.fillStyle = "#c8d4b4";
   ctx.fillRect(0, 0, size, size);
   for (let i = 0; i < 110; i += 1) {
     const x = Math.random() * size;
     const y = Math.random() * size;
-    ctx.strokeStyle = `rgba(55, 110, 40, ${0.035 + Math.random() * 0.05})`;
+    ctx.strokeStyle = `rgba(70, 100, 55, ${0.06 + Math.random() * 0.08})`;
     ctx.lineWidth = 0.7 + Math.random() * 0.5;
     ctx.lineCap = "round";
     ctx.beginPath();
@@ -405,21 +456,67 @@ function hexesCoveringAabb(bounds: Aabb): HexCoord[] {
   return cells;
 }
 
-const EMPTY_GROUND = 0xb8c9c0;
+/** Horizon / fog distant — sauge (pas gris neutre). */
+const SKY_FOG = 0xb5cfc2;
+const SKY_ZENITH = "#eaf6f0";
+const SKY_MID = "#d4e8de";
+const SKY_HORIZON = "#b5cfc2";
 const ORIGIN = new Vector3();
+
+/** Fond dégradé ciel clair → horizon sauge (texture 1D pour scene.background). */
+function createSkyGradientTexture() {
+  const canvasEl = document.createElement("canvas");
+  canvasEl.width = 2;
+  canvasEl.height = 256;
+  const ctx = canvasEl.getContext("2d");
+  if (!ctx) throw new Error("2d context unavailable");
+  const gradient = ctx.createLinearGradient(0, 0, 0, 256);
+  gradient.addColorStop(0, SKY_ZENITH);
+  gradient.addColorStop(0.42, SKY_MID);
+  gradient.addColorStop(1, SKY_HORIZON);
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, 2, 256);
+  const texture = new CanvasTexture(canvasEl);
+  texture.colorSpace = SRGBColorSpace;
+  texture.magFilter = LinearFilter;
+  texture.minFilter = LinearFilter;
+  texture.needsUpdate = true;
+  return texture;
+}
 
 export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptions = {}): HexSceneApi {
   const scene = new Scene();
-  scene.background = new Color(EMPTY_GROUND);
+  const skyTexture = createSkyGradientTexture();
+  scene.background = skyTexture;
+  // Brume lointaine teintée sauge (ortho : distances caméra typiques ~12–40).
+  scene.fog = new Fog(SKY_FOG, 16, 48);
 
   const lookTarget = new Vector3();
   const camera = new OrthographicCamera(-1, 1, 1, -1, 0.1, 200);
+  const tiltLookScratch = new Vector3();
+  const tiltPosScratch = new Vector3();
+  const sunBase = new Vector3(5.5, 12, 3.5);
 
   const applyCamera = () => {
     camera.position.copy(lookTarget).add(CAMERA_OFFSET);
     camera.lookAt(lookTarget);
     // Requis pour unproject pendant le pan/pinch : sinon matrixWorld reste
     // stale entre deux frames et le grab-pan accélère (surtout Safari iOS).
+    camera.updateMatrixWorld();
+  };
+
+  /** Caméra visuelle uniquement (gyro) — ne pas laisser après le render. */
+  const applyCameraTilted = (tiltX: number, tiltY: number) => {
+    const ox = tiltX * TILT_POS_STRENGTH;
+    const oz = tiltY * TILT_POS_STRENGTH;
+    tiltPosScratch.set(ox, Math.abs(tiltX) * 0.02 + Math.abs(tiltY) * 0.015, oz);
+    camera.position.copy(lookTarget).add(CAMERA_OFFSET).add(tiltPosScratch);
+    tiltLookScratch.set(
+      lookTarget.x - tiltX * TILT_LOOK_STRENGTH,
+      lookTarget.y,
+      lookTarget.z - tiltY * TILT_LOOK_STRENGTH
+    );
+    camera.lookAt(tiltLookScratch);
     camera.updateMatrixWorld();
   };
 
@@ -437,17 +534,21 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
     alpha: false
   });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.outputColorSpace = SRGBColorSpace;
   renderer.toneMapping = ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.12;
+  // Un peu plus haut : les meshes flat (hex / low-poly) gagnent en présence.
+  renderer.toneMappingExposure = 1.28;
 
-  scene.add(new HemisphereLight(0xf4efe4, 0x6d8a6a, 0.95));
-  scene.add(new AmbientLight(0xf2efe6, 0.28));
-  const sun = new DirectionalLight(0xfff1d2, 1.05);
-  sun.position.set(4, 10, 2);
+  // Ciel clair + sol chaud ; soleil directionnel soft.
+  scene.add(new HemisphereLight(0xfff8f0, 0xd2b48c, 0.95));
+  scene.add(new AmbientLight(0xfff5eb, 0.22));
+  const sun = new DirectionalLight(0xffefd0, 0.88);
+  sun.position.copy(sunBase);
+  sun.castShadow = false;
   scene.add(sun);
 
   const biomeGeometry = new CylinderGeometry(HEX_SIZE, HEX_SIZE, HEX_HEIGHT, 6);
-  const waterGeometry = new CylinderGeometry(HEX_SIZE, HEX_SIZE, WATER_HEIGHT, 6);
+  const waterGeometry = createWaterHexGeometry(HEX_SIZE, WATER_HEIGHT);
   const emptyGeometry = new CylinderGeometry(HEX_SIZE, HEX_SIZE, EMPTY_HEIGHT, 6);
   const biomeTiles: HexTile[] = [];
   const tilesByMesh = new Map<Mesh, HexTile>();
@@ -593,14 +694,20 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
   farmKit.group.position.y = HEX_HEIGHT / 2;
   const quarryKit = createQuarryMesh();
   quarryKit.group.position.y = HEX_HEIGHT / 2;
+  const fishingHutKit = createFishingHutMesh();
+  fishingHutKit.group.position.y = HEX_HEIGHT / 2;
   const houseKit = createHouseMesh();
   houseKit.group.position.y = HEX_HEIGHT / 2;
   const forestDecor = createForestDecorKit();
   const plainsDecor = createPlainsDecorKit();
   const mountainDecor = createMountainDecorKit();
+  const mountainClouds = createMountainCloudDecorKit();
   const fusionDecor = createFusionDecorKit();
   const shoreEdges = createShoreEdgeDecorKit();
   const waterDecor = createWaterDecorKit();
+  const fishBankDecor = createFishBankDecorKit();
+  const cowHerdDecor = createCowHerdDecorKit();
+  const ironDepositDecor = createIronDepositDecorKit();
   const deepWaterTexture = createDeepWaterSurfaceTexture();
   const plainsGrassTexture = createPlainsGrassTexture();
   const tilesByKey = new Map<string, HexTile>();
@@ -612,7 +719,8 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
     r: number,
     biome: BiomeId,
     isRegionCenter: boolean,
-    buildingId: BuildingId | null = null
+    buildingId: BuildingId | null = null,
+    poiId: PoiId | null = null
   ): TileState => {
     const key = hexKey(q, r);
     const state: TileState = {
@@ -620,6 +728,7 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
       r,
       biome,
       buildingId: q === 0 && r === 0 ? null : buildingId,
+      poiId,
       isRegionCenter,
       hasVillage: q === 0 && r === 0
     };
@@ -635,7 +744,8 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
   };
 
   const attachDecor = (tile: HexTile, decor: Group) => {
-    decor.position.y = tileMeshHeight(tile.biome) / 2;
+    // Local Y = demi-hauteur de la géométrie (le scale.y du mesh gère le relief).
+    decor.position.y = tile.biome === "water" ? WATER_HEIGHT / 2 : HEX_HEIGHT / 2;
     tile.mesh.add(decor);
     tile.decor = decor;
   };
@@ -688,7 +798,39 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
       depth > 0.25 ? deepWaterTexture : null
     );
     clearBiomeDecor(tile);
-    if (tile.hasVillage || tile.buildingId) return;
+    if (tile.hasVillage) return;
+
+    // Cabane de pêcheur : garder rivage + banc de poissons sous le bâtiment.
+    if (tile.buildingId === "fishing_hut") {
+      if (tile.poiId !== "fish_bank") return;
+      const group = new Group();
+      const landDirs = neighborDirsWhere(tile.q, tile.r, isLandBiome);
+      if (landDirs.length > 0) {
+        group.add(shoreEdges.createWaterEdges(landDirs));
+      }
+      const fish = fishBankDecor.createForTile(tile.q, tile.r);
+      group.add(fish);
+      group.userData.isFishBank = true;
+      group.userData.fishBank = fish;
+      attachDecor(tile, group);
+      return;
+    }
+
+    if (tile.buildingId) return;
+
+    if (tile.poiId === "fish_bank") {
+      const group = new Group();
+      const landDirs = neighborDirsWhere(tile.q, tile.r, isLandBiome);
+      if (landDirs.length > 0) {
+        group.add(shoreEdges.createWaterEdges(landDirs));
+      }
+      const fish = fishBankDecor.createForTile(tile.q, tile.r);
+      group.add(fish);
+      group.userData.isFishBank = true;
+      group.userData.fishBank = fish;
+      attachDecor(tile, group);
+      return;
+    }
 
     if (depth >= 1) {
       attachDecor(tile, waterDecor.createDeepSurface(tile.q, tile.r, "deep"));
@@ -713,8 +855,19 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
   };
 
   const refreshBiomeDecor = (tile: HexTile) => {
-    // Quartier / village / bâtiment : pas de décor d’origine.
-    if (tile.hasVillage || tile.buildingId) {
+    if (tile.hasVillage) {
+      clearBiomeDecor(tile);
+      return;
+    }
+
+    // Cabane de pêcheur : décor eau / banc conservé sous le mesh.
+    if (tile.buildingId === "fishing_hut" && tile.biome === "water") {
+      refreshWaterLook(tile);
+      return;
+    }
+
+    // Autres bâtiments : pas de décor d’origine (ferme efface le troupeau).
+    if (tile.buildingId) {
       clearBiomeDecor(tile);
       return;
     }
@@ -734,12 +887,30 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
     } else if (isPlainsDecorBiome(tile.biome)) {
       group.add(plainsDecor.createForTile(tile.q, tile.r));
       hasContent = true;
+      if (tile.poiId === "cow_herd") {
+        const cows = cowHerdDecor.createForTile(tile.q, tile.r);
+        group.add(cows);
+        group.userData.isCowHerd = true;
+        group.userData.cowHerd = cows;
+      }
     } else if (isMountainDecorBiome(tile.biome)) {
-      const chainDirs = mountainChainDirs(tile.q, tile.r, (cell) => {
-        const neighbor = biomesByKey.get(hexKey(cell.q, cell.r));
-        return neighbor != null && isMountainDecorBiome(neighbor);
-      });
-      group.add(mountainDecor.createForTile({ q: tile.q, r: tile.r, chainDirs }));
+      if (tile.poiId === "iron_deposit") {
+        // Remplace le pic : tas de cailloux + veine brillante.
+        const iron = ironDepositDecor.createForTile(tile.q, tile.r);
+        group.add(iron);
+        group.userData.isIronDeposit = true;
+        group.userData.ironDeposit = iron;
+      } else {
+        const chainDirs = mountainChainDirs(tile.q, tile.r, (cell) => {
+          const neighbor = biomesByKey.get(hexKey(cell.q, cell.r));
+          return neighbor != null && isMountainDecorBiome(neighbor);
+        });
+        group.add(mountainDecor.createForTile({ q: tile.q, r: tile.r, chainDirs }));
+        const clouds = mountainClouds.createForTile(tile.q, tile.r);
+        group.add(clouds);
+        group.userData.hasMountainClouds = true;
+        group.userData.mountainClouds = clouds;
+      }
       hasContent = true;
     } else if (isFusionDecorBiome(tile.biome)) {
       group.add(fusionDecor.createForTile(tile.q, tile.r, tile.biome));
@@ -797,12 +968,14 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
           ? farmKit
           : buildingId === "quarry"
             ? quarryKit
-            : buildingId === "house"
-              ? houseKit
-              : null;
+            : buildingId === "fishing_hut"
+              ? fishingHutKit
+              : buildingId === "house"
+                ? houseKit
+                : null;
     if (!kit) return;
     const instance = kit.group.clone(true);
-    instance.position.y = tileMeshHeight(tile.biome) / 2;
+    instance.position.y = tile.biome === "water" ? WATER_HEIGHT / 2 : HEX_HEIGHT / 2;
     tile.mesh.add(instance);
     tile.buildingMesh = instance;
   };
@@ -813,7 +986,8 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
     biome: BiomeId,
     isRegionCenter: boolean,
     spawn: HexSpawnAnim | null = null,
-    buildingId: BuildingId | null = null
+    buildingId: BuildingId | null = null,
+    poiId: PoiId | null = null
   ) => {
     const key = hexKey(q, r);
     const existingEmpty = emptyByKey.get(key);
@@ -832,7 +1006,7 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
 
     const variation = tileVariation(q, r) + (isRegionCenter ? 0.12 : 0);
     const palette = biomePalette[biome];
-    const materials = createMaterials(palette.top, palette.side, variation);
+    const materials = createMaterials(palette, variation);
     if (biome === "plains") {
       materials[1].map = plainsGrassTexture;
       materials[1].roughness = 0.82;
@@ -841,8 +1015,11 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
     if (biome === "water") {
       paintWaterMaterials(materials, 0, null);
     }
-    const height = tileMeshHeight(biome);
+    const height = tileMeshHeight(biome, poiId);
     const mesh = new Mesh(biome === "water" ? waterGeometry : biomeGeometry, materials);
+    if (biome !== "water") {
+      mesh.scale.y = height / HEX_HEIGHT;
+    }
     const { x, z } = axialToWorld(q, r);
     const restY = height / 2;
     mesh.position.set(x, spawn ? restY - SPAWN_DEPTH : restY, z);
@@ -859,6 +1036,7 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
       biome,
       hasVillage: q === 0 && r === 0,
       buildingId: q === 0 && r === 0 ? null : buildingId,
+      poiId,
       isRegionCenter,
       decor: null,
       buildingMesh: null,
@@ -868,14 +1046,18 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
     biomeTiles.push(tile);
     tilesByMesh.set(mesh, tile);
     tilesByKey.set(key, tile);
-    registerTileState(q, r, biome, isRegionCenter, buildingId);
+    registerTileState(q, r, biome, isRegionCenter, buildingId, poiId);
 
     if (tile.hasVillage) {
       clearBiomeDecor(tile);
       mesh.add(village.group);
     } else if (tile.buildingId) {
-      clearBiomeDecor(tile);
       attachBuildingMesh(tile, tile.buildingId);
+      if (tile.buildingId === "fishing_hut") {
+        refreshWaterLook(tile);
+      } else {
+        clearBiomeDecor(tile);
+      }
     } else {
       refreshBiomeDecor(tile);
     }
@@ -888,7 +1070,11 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
         tiles: new Map(
           options.initialWorld.tiles.map((tile) => [
             hexKey(tile.q, tile.r),
-            { biome: tile.biome, buildingId: (tile.buildingId ?? null) as BuildingId | null }
+            {
+              biome: tile.biome,
+              buildingId: (tile.buildingId ?? null) as BuildingId | null,
+              poiId: (tile.poiId ?? null) as PoiId | null
+            }
           ] as const)
         ),
         regions: options.initialWorld.regions.map((region) => ({
@@ -900,7 +1086,11 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
         tiles: new Map(
           [...startingLocal.tiles.entries()].map(([key, biome]) => [
             key,
-            { biome, buildingId: null as BuildingId | null }
+            {
+              biome,
+              buildingId: null as BuildingId | null,
+              poiId: null as PoiId | null
+            }
           ])
         ),
         regions: startingLocal.regions
@@ -918,7 +1108,8 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
       r!,
       entry.biome,
       regionCenterKeys.has(key),
-      entry.buildingId
+      entry.buildingId,
+      entry.poiId
     );
   }
   // GPU streamé au premier `syncBiomeTiles` (viewDirty) — pas tout le monde d’un coup.
@@ -935,7 +1126,7 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
   };
 
   const createEmptyMesh = () => {
-    const materials = createMaterials(emptyPalette.top, emptyPalette.side, 0);
+    const materials = createMaterials(emptyPalette, 0);
     const mesh = new Mesh(emptyGeometry, materials);
     scene.add(mesh);
     return mesh;
@@ -1247,7 +1438,8 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
       state.biome,
       state.isRegionCenter,
       spawn,
-      state.buildingId
+      state.buildingId,
+      state.poiId
     );
     refreshDecorAround(state.q, state.r);
     return tile;
@@ -1686,12 +1878,14 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
       .sort((a, b) => a.delayMs - b.delayMs);
 
     for (const { cell, delayMs } of timed) {
+      const poiId = (cell.poiId ?? null) as PoiId | null;
       registerTileState(
         cell.q,
         cell.r,
         cell.biome,
         cell.q === center.q && cell.r === center.r,
-        (cell.buildingId ?? null) as BuildingId | null
+        (cell.buildingId ?? null) as BuildingId | null,
+        poiId
       );
       // Expansion sous les yeux : toujours spawner le GPU (anim vague).
       spawnBiomeTile(
@@ -1700,7 +1894,8 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
         cell.biome,
         cell.q === center.q && cell.r === center.r,
         { t0, delayMs },
-        (cell.buildingId ?? null) as BuildingId | null
+        (cell.buildingId ?? null) as BuildingId | null,
+        poiId
       );
     }
     for (const cell of tiles) {
@@ -1720,11 +1915,22 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
     const state = tileStatesByKey.get(key);
     if (!state || state.hasVillage || state.buildingId) return false;
     state.buildingId = buildingId;
+    // Ferme / carrière : POI « temporaire » effacés (étable / mine viendront plus tard).
+    if (state.poiId === "cow_herd" || state.poiId === "iron_deposit") {
+      state.poiId = null;
+    }
 
     const tile = tilesByKey.get(key) ?? ensureBiomeGpu(state, null);
     tile.buildingId = buildingId;
-    clearBiomeDecor(tile);
+    if (tile.poiId === "cow_herd" || tile.poiId === "iron_deposit") {
+      tile.poiId = null;
+    }
     attachBuildingMesh(tile, buildingId);
+    if (buildingId === "fishing_hut") {
+      refreshWaterLook(tile);
+    } else {
+      clearBiomeDecor(tile);
+    }
     viewDirty = true;
     hoverDirty = true;
     emitSelection(tile.mesh, biomePayload(tile, { clientX: lastClientX, clientY: lastClientY }));
@@ -1764,6 +1970,7 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
     const wasCenter = state.isRegionCenter;
     state.biome = biome;
     state.buildingId = null;
+    if (!poiAllowedOnBiome(state.poiId, biome)) state.poiId = null;
     biomesByKey.set(key, biome);
 
     const old = tilesByKey.get(key);
@@ -1784,7 +1991,7 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
       if (index >= 0) biomeTiles.splice(index, 1);
     }
 
-    const tile = spawnBiomeTile(q, r, biome, wasCenter, null, null);
+    const tile = spawnBiomeTile(q, r, biome, wasCenter, null, null, state.poiId);
     refreshDecorAround(q, r);
     refreshAllWaterLooks();
     viewDirty = true;
@@ -1795,15 +2002,18 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
 
   const projectScratch = new Vector3();
   const projectTile = (q: number, r: number): HexScreenPoint | null => {
-    const { x, z } = axialToWorld(q, r);
-    const state = tileStatesByKey.get(hexKey(q, r));
-    if (!state) return null;
-    const tile = tilesByKey.get(hexKey(q, r));
-    const restY = tile?.restY ?? tileMeshHeight(state.biome) / 2;
-    const lift = 0.52;
-    projectScratch.set(x, restY + lift, z);
-    projectScratch.project(camera);
     const { width, height } = canvasSize();
+    if (width < 1 || height < 1) return null;
+    const { x, z } = axialToWorld(q, r);
+    const key = hexKey(q, r);
+    const state = tileStatesByKey.get(key);
+    const tile = tilesByKey.get(key);
+    const restY =
+      tile?.restY ??
+      (state ? tileMeshHeight(state.biome, state.poiId) / 2 : EMPTY_HEIGHT / 2);
+    // Légèrement au-dessus du centre volume pour viser le centre visuel de la face.
+    projectScratch.set(x, restY + 0.52, z);
+    projectScratch.project(camera);
     const sx = (projectScratch.x * 0.5 + 0.5) * width;
     const sy = (-projectScratch.y * 0.5 + 0.5) * height;
     const visible =
@@ -1976,7 +2186,57 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
       if (fog.visible) fogKit.animate(fog, now);
     }
 
+    village.animate(now);
+
+    for (const tile of biomeTiles) {
+      const decor = tile.decor;
+      if (!decor) continue;
+      if (decor.userData.isFishBank) {
+        const root = (decor.userData.fishBank as Group | undefined) ?? decor;
+        fishBankDecor.animate(root, now);
+      }
+      if (decor.userData.isCowHerd) {
+        const root = (decor.userData.cowHerd as Group | undefined) ?? decor;
+        cowHerdDecor.animate(root, now);
+      }
+      if (decor.userData.isIronDeposit) {
+        const root = (decor.userData.ironDeposit as Group | undefined) ?? decor;
+        ironDepositDecor.animate(root, now);
+      }
+      if (decor.userData.hasMountainClouds) {
+        const root = (decor.userData.mountainClouds as Group | undefined) ?? decor;
+        mountainClouds.animate(root, now);
+      }
+      if (decor.userData.hasShoreWaves) {
+        shoreEdges.animate(decor, now);
+      } else {
+        for (const child of decor.children) {
+          if (child.userData.hasShoreWaves) {
+            shoreEdges.animate(child as Group, now);
+          }
+        }
+      }
+    }
+
+    // Parallax gyro / souris : render only, restore logical cam for picking.
+    const tilt = options.getDeviceTilt?.() ?? { x: 0, y: 0 };
+    const tx = Number.isFinite(tilt.x) ? Math.min(1, Math.max(-1, tilt.x)) : 0;
+    const ty = Number.isFinite(tilt.y) ? Math.min(1, Math.max(-1, tilt.y)) : 0;
+    if (tx !== 0 || ty !== 0) {
+      applyCameraTilted(tx, ty);
+      sun.position.set(
+        sunBase.x + tx * TILT_SUN_STRENGTH,
+        sunBase.y,
+        sunBase.z + ty * TILT_SUN_STRENGTH * 0.65
+      );
+    }
+
     renderer.render(scene, camera);
+
+    if (tx !== 0 || ty !== 0) {
+      applyCamera();
+      sun.position.copy(sunBase);
+    }
   };
 
   canvas.style.touchAction = "none";
@@ -2024,13 +2284,18 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
       lumberCampKit.dispose();
       farmKit.dispose();
       quarryKit.dispose();
+      fishingHutKit.dispose();
       houseKit.dispose();
       forestDecor.dispose();
       plainsDecor.dispose();
       mountainDecor.dispose();
+      mountainClouds.dispose();
       fusionDecor.dispose();
       shoreEdges.dispose();
       waterDecor.dispose();
+      fishBankDecor.dispose();
+      cowHerdDecor.dispose();
+      ironDepositDecor.dispose();
       deepWaterTexture.dispose();
       plainsGrassTexture.dispose();
       biomeGeometry.dispose();
@@ -2040,6 +2305,7 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
       plusMaterial.dispose();
       plusTexture.dispose();
       fogKit.dispose();
+      skyTexture.dispose();
       for (const tile of biomeTiles) {
         for (const material of tile.materials) material.dispose();
       }

@@ -1,4 +1,4 @@
-import type { BiomeId, BuildingId, ResourceId, WorkerJob } from "@hexald/shared";
+import type { BiomeId, BuildingId, PoiId, ResourceId, WorkerJob } from "@hexald/shared";
 
 export type BuildingStatus = "mvp" | "planned" | "later";
 
@@ -7,7 +7,7 @@ export type BuildingRole = "extractor" | "processor" | "settlement" | "special";
 export type BuildingDefinition = {
   id: BuildingId;
   label: string;
-  /** Biome requis ; `"any"` = toute tuile constructible (pas l’eau pure). */
+  /** Biome requis ; `"any"` = toute tuile constructible (pas l’eau pure, sauf terrain water). */
   terrain: BiomeId | "any";
   input: ResourceId | "workers" | null;
   output: ResourceId | "population" | "prestige" | null;
@@ -31,6 +31,8 @@ export type BuildingDefinition = {
   workerJob?: WorkerJob;
   /** Bonus de plafond pop une fois le bâtiment achevé (ex. maison +1). */
   populationCapBonus?: number;
+  /** POI requis sur la tuile (ex. banc de poisson). */
+  requiredPoiId?: PoiId;
 };
 export const buildings: BuildingDefinition[] = [
   {
@@ -86,7 +88,8 @@ export const buildings: BuildingDefinition[] = [
     buildDurationMs: 60_000,
     maxWorkers: 1,
     ratePerWorkerPerMinute: 5,
-    workerJob: "miner"
+    workerJob: "miner",
+    requiredPoiId: "iron_deposit"
   },
   {
     id: "farm",
@@ -141,6 +144,23 @@ export const buildings: BuildingDefinition[] = [
     maxWorkers: 1,
     ratePerWorkerPerMinute: 5,
     workerJob: "quarrier"
+  },
+  {
+    id: "fishing_hut",
+    label: "Cabane de pêcheur",
+    terrain: "water",
+    input: "workers",
+    output: "food",
+    hexSize: 1,
+    status: "mvp",
+    role: "extractor",
+    placeable: true,
+    woodCost: 20,
+    buildDurationMs: 60_000,
+    maxWorkers: 1,
+    ratePerWorkerPerMinute: 2,
+    workerJob: "fisher",
+    requiredPoiId: "fish_bank"
   },
   {
     id: "house",
@@ -212,9 +232,14 @@ export type PlaceableBuildingId =
   | "lumber_camp"
   | "farm"
   | "quarry"
+  | "fishing_hut"
   | "house";
 
-export type PlaceableExtractorId = "lumber_camp" | "farm" | "quarry";
+export type PlaceableExtractorId =
+  | "lumber_camp"
+  | "farm"
+  | "quarry"
+  | "fishing_hut";
 
 /** Dérivé du catalogue (`placeable: true`). */
 export const PLACEABLE_BUILDINGS: readonly PlaceableBuildingId[] =
@@ -229,6 +254,7 @@ const EXPECTED_PLACEABLES: readonly PlaceableBuildingId[] = [
   "lumber_camp",
   "farm",
   "quarry",
+  "fishing_hut",
   "house"
 ];
 

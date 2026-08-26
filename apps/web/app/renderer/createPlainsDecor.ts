@@ -36,12 +36,12 @@ export function createPlainsDecorKit() {
   const materials: Material[] = [];
 
   const grassA = new MeshStandardMaterial({
-    color: 0x6aad4e,
+    color: 0x6e9a68,
     roughness: 0.9,
     metalness: 0
   });
   const grassB = new MeshStandardMaterial({
-    color: 0x7fbe5c,
+    color: 0x82ae78,
     roughness: 0.88,
     metalness: 0
   });

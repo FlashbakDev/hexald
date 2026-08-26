@@ -1,4 +1,4 @@
-import type { BiomeId, HexCoord, PrimaryBiomeId, Region } from "@hexald/shared";
+import type { BiomeId, HexCoord, PoiId, PrimaryBiomeId, Region } from "@hexald/shared";
 import {
   HEX_DIRECTIONS,
   cubeDistance,
@@ -6,6 +6,11 @@ import {
   hexNeighbors,
   regionCells
 } from "@hexald/shared";
+import {
+  FISH_BANK_SPAWN_CHANCE,
+  COW_HERD_SPAWN_CHANCE,
+  IRON_DEPOSIT_SPAWN_CHANCE
+} from "@hexald/content";
 
 export const START_REGION_CENTER: HexCoord = { q: 0, r: 0 };
 export const START_REGION_BIOME: PrimaryBiomeId = "forest";
@@ -221,9 +226,114 @@ export function resolveCellBiome(
   return fusionBiome(regionBiome, other, random);
 }
 
-export type GeneratedTile = HexCoord & { biome: BiomeId };
+export type GeneratedTile = HexCoord & {
+  biome: BiomeId;
+  poiId?: PoiId | null;
+};
 
-/** Crée uniquement les hex encore non révélés de l’empreinte. */
+/** True si la tuile touche au moins un voisin terre (pas eau). */
+export function tileTouchesLand(
+  tiles: ReadonlyMap<string, BiomeId>,
+  q: number,
+  r: number
+): boolean {
+  for (const neighbor of hexNeighbors({ q, r })) {
+    const biome = tiles.get(hexKey(neighbor.q, neighbor.r));
+    if (biome && !isWaterBiome(biome)) return true;
+  }
+  return false;
+}
+
+/**
+ * Pose au plus un banc de poisson sur une eau côtière **nouvellement** créée.
+ * Nécessite la carte complète (existante + créées) pour détecter le rivage.
+ */
+export function assignCoastalFishBanks(
+  existingTiles: ReadonlyMap<string, BiomeId>,
+  created: GeneratedTile[],
+  random: () => number = Math.random
+): GeneratedTile[] {
+  if (created.length === 0) return created;
+
+  const merged = new Map(existingTiles);
+  for (const tile of created) {
+    merged.set(hexKey(tile.q, tile.r), tile.biome);
+  }
+
+  const candidates = created.filter(
+    (tile) =>
+      isWaterBiome(tile.biome) && tileTouchesLand(merged, tile.q, tile.r)
+  );
+  if (candidates.length === 0) {
+    return created.map((tile) => ({ ...tile, poiId: tile.poiId ?? null }));
+  }
+
+  const withNull = created.map((tile) => ({ ...tile, poiId: tile.poiId ?? null }));
+  if (random() >= FISH_BANK_SPAWN_CHANCE) return withNull;
+
+  const pick = candidates[Math.floor(random() * candidates.length)];
+  if (!pick) return withNull;
+
+  return withNull.map((tile) =>
+    tile.q === pick.q && tile.r === pick.r
+      ? { ...tile, poiId: "fish_bank" as const }
+      : tile
+  );
+}
+
+/**
+ * Pose au plus un troupeau sur une plaine **nouvellement** créée.
+ */
+export function assignPlainsCowHerds(
+  created: GeneratedTile[],
+  random: () => number = Math.random
+): GeneratedTile[] {
+  if (created.length === 0) return created;
+
+  const withPoi = created.map((tile) => ({ ...tile, poiId: tile.poiId ?? null }));
+  const candidates = withPoi.filter(
+    (tile) => tile.biome === "plains" && tile.poiId == null
+  );
+  if (candidates.length === 0) return withPoi;
+  if (random() >= COW_HERD_SPAWN_CHANCE) return withPoi;
+
+  const pick = candidates[Math.floor(random() * candidates.length)];
+  if (!pick) return withPoi;
+
+  return withPoi.map((tile) =>
+    tile.q === pick.q && tile.r === pick.r
+      ? { ...tile, poiId: "cow_herd" as const }
+      : tile
+  );
+}
+
+/**
+ * Pose au plus un gisement de fer sur une montagne **nouvellement** créée.
+ */
+export function assignMountainIronDeposits(
+  created: GeneratedTile[],
+  random: () => number = Math.random
+): GeneratedTile[] {
+  if (created.length === 0) return created;
+
+  const withPoi = created.map((tile) => ({ ...tile, poiId: tile.poiId ?? null }));
+  const candidates = withPoi.filter(
+    (tile) => tile.biome === "mountain" && tile.poiId == null
+  );
+  if (candidates.length === 0) return withPoi;
+  if (random() >= IRON_DEPOSIT_SPAWN_CHANCE) return withPoi;
+
+  const pick = candidates[Math.floor(random() * candidates.length)];
+  if (!pick) return withPoi;
+
+  return withPoi.map((tile) =>
+    tile.q === pick.q && tile.r === pick.r
+      ? { ...tile, poiId: "iron_deposit" as const }
+      : tile
+  );
+}
+
+/** Crée uniquement les hex encore non révélés de l’empreinte (+ POI naturels). */
 export function generateRegionTiles(
   tiles: ReadonlyMap<string, BiomeId>,
   center: HexCoord,
@@ -251,5 +361,8 @@ export function generateRegionTiles(
     });
   }
 
-  return created;
+  return assignMountainIronDeposits(
+    assignPlainsCowHerds(assignCoastalFishBanks(tiles, created, random), random),
+    random
+  );
 }

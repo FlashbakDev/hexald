@@ -16,7 +16,9 @@
     "@hexald/db": "workspace:*",
     "@hexald/game-core": "workspace:*",
     "@hexald/shared": "workspace:*",
-    "fastify": "^5.6.0"
+    "fastify": "^5.6.0",
+    "firebase-admin": "^14.3.0",
+    "resend": "^6.24.0"
   },
   "devDependencies": {
     "@types/node": "^24.3.0",

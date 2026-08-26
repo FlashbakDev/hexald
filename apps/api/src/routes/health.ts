@@ -8,7 +8,7 @@ export async function healthRoutes(app: FastifyInstance) {
     content: "/v1/content",
     worlds: "GET|POST /v1/worlds, GET /v1/worlds/:id, POST /v1/worlds/:id/actions",
     session: "POST /v1/session, POST /v1/session/pseudo, GET /v1/session/pseudo/available",
-    admin: "GET /v1/admin/overview"
+    admin: "GET /v1/admin/overview, POST /v1/admin/test-mail (dev)"
   }));
 
   app.get("/health", async () => {

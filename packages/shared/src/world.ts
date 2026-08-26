@@ -1,4 +1,4 @@
-import type { BiomeId, BuildingId, PrimaryBiomeId, ResourceId } from "./ids.ts";
+import type { BiomeId, BuildingId, PoiId, PrimaryBiomeId, ResourceId } from "./ids.ts";
 import type { HexCoord } from "./hex.ts";
 
 export type WorldTileSnapshot = {
@@ -14,6 +14,8 @@ export type WorldTileSnapshot = {
   constructionCompletesAt?: string | null;
   /** Workers assignés (0–1 par extracteur niveau 1). */
   assignedWorkers?: number;
+  /** POI naturel / landmark (ex. banc de poisson). */
+  poiId?: PoiId | null;
 };
 
 export type WorldRegionSnapshot = {
@@ -21,7 +23,7 @@ export type WorldRegionSnapshot = {
   biome: BiomeId;
 };
 
-export type ExtractorJob = "woodcutter" | "farmer" | "quarrier";
+export type ExtractorJob = "woodcutter" | "farmer" | "quarrier" | "fisher";
 
 /** Ligne d’inventaire générique (API / client). */
 export type InventoryStockSnapshot = {
@@ -39,14 +41,17 @@ export type WorldEconomySnapshot = {
   woodcutters: number;
   farmers: number;
   quarriers: number;
+  fishers: number;
 
   lumberCampMaxWorkers: number;
   farmMaxWorkers: number;
   quarryMaxWorkers: number;
+  fishingHutMaxWorkers: number;
 
   hasLumberCamp: boolean;
   hasFarm: boolean;
   hasQuarry: boolean;
+  hasFishingHut: boolean;
 
   /** Inventaire générique — source de vérité pour craft / nouvelles ressources. */
   stocks: InventoryStockSnapshot[];
@@ -122,7 +127,12 @@ export type AssignWorkersRequest = {
 };
 
 /** Bâtiments posables — aligné sur le catalogue content. */
-export type PlaceableBuildingId = "lumber_camp" | "farm" | "quarry" | "house";
+export type PlaceableBuildingId =
+  | "lumber_camp"
+  | "farm"
+  | "quarry"
+  | "fishing_hut"
+  | "house";
 
 export type BuildRequest = {
   buildingId: PlaceableBuildingId;

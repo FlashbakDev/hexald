@@ -24,10 +24,16 @@ export function maxWorkersForBuilding(buildingId: BuildingId): number {
 export function workerTotalsFromTiles(
   tiles: readonly TileWorkerState[],
   now: number
-): { woodcutters: number; farmers: number; quarriers: number } {
+): {
+  woodcutters: number;
+  farmers: number;
+  quarriers: number;
+  fishers: number;
+} {
   let woodcutters = 0;
   let farmers = 0;
   let quarriers = 0;
+  let fishers = 0;
 
   for (const tile of tiles) {
     if (!tile.buildingId || !isPlaceableExtractor(tile.buildingId)) continue;
@@ -35,10 +41,11 @@ export function workerTotalsFromTiles(
     const workers = clampTileWorkers(tile.assignedWorkers ?? 0, tile.buildingId);
     if (tile.buildingId === "lumber_camp") woodcutters += workers;
     else if (tile.buildingId === "farm") farmers += workers;
+    else if (tile.buildingId === "fishing_hut") fishers += workers;
     else quarriers += workers;
   }
 
-  return { woodcutters, farmers, quarriers };
+  return { woodcutters, farmers, quarriers, fishers };
 }
 
 /** Workers engagés sur un site (chantier ou bâtiment achevé) — hors pool HDV. */
@@ -139,9 +146,10 @@ export function assignWorkersAtTile(
 
 export function extractorJobForBuildingId(
   buildingId: PlaceableExtractorId
-): "woodcutter" | "farmer" | "quarrier" {
+): "woodcutter" | "farmer" | "quarrier" | "fisher" {
   if (buildingId === "lumber_camp") return "woodcutter";
   if (buildingId === "farm") return "farmer";
+  if (buildingId === "fishing_hut") return "fisher";
   return "quarrier";
 }
 

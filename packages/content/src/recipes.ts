@@ -37,7 +37,8 @@ export const chains: ProductionChain[] = [
     steps: [
       { buildingId: "farm", input: null, output: "wheat" },
       { buildingId: "mill", input: "wheat", output: "flour" },
-      { buildingId: "bakery", input: "flour", output: "food" }
+      { buildingId: "bakery", input: "flour", output: "food" },
+      { buildingId: "fishing_hut", input: null, output: "food" }
     ]
   },
   {

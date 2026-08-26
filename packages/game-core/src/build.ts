@@ -10,8 +10,8 @@ import {
   type PlaceableBuildingId,
   type PlaceableExtractorId
 } from "@hexald/content";
-import type { BiomeId, BuildingId, HexCoord, PrimaryBiomeId } from "@hexald/shared";
-import { biomeInfluences, isBuildableBiome } from "./world.ts";
+import type { BiomeId, BuildingId, HexCoord, PoiId, PrimaryBiomeId } from "@hexald/shared";
+import { biomeInfluences, isBuildableBiome, isWaterBiome } from "./world.ts";
 
 export type BuildPlacementInput = {
   buildingId: BuildingId;
@@ -19,6 +19,7 @@ export type BuildPlacementInput = {
   biome: BiomeId;
   hasVillage: boolean;
   existingBuildingId: BuildingId | null;
+  poiId?: PoiId | null;
 };
 
 export type BuildPlacementResult =
@@ -29,6 +30,7 @@ export type BuildPlacementResult =
         | "unknown_building"
         | "not_buildable"
         | "wrong_terrain"
+        | "missing_poi"
         | "tile_occupied"
         | "has_village";
     };
@@ -69,25 +71,38 @@ export function terrainAllowsBuilding(
   terrain: BuildingDefinition["terrain"],
   biome: BiomeId
 ): boolean {
+  if (terrain === "water") return isWaterBiome(biome);
   if (!isBuildableBiome(biome)) return false;
   if (terrain === "any") return true;
   if (terrain === biome) return true;
   return biomeInfluences(biome).includes(terrain as PrimaryBiomeId);
 }
 
-/** Bâtiments posables sur ce biome (bois / pop libre : UI + spend côté API). */
+function poiAllowsBuilding(
+  definition: BuildingDefinition,
+  poiId: PoiId | null | undefined
+): boolean {
+  if (!definition.requiredPoiId) return true;
+  return poiId === definition.requiredPoiId;
+}
+
+/** Bâtiments posables sur ce biome (+ POI) — bois / pop libre : UI + spend côté API. */
 export function listBuildOptionsForTile(input: {
   biome: BiomeId;
   hasVillage: boolean;
   existingBuildingId: BuildingId | null;
+  poiId?: PoiId | null;
 }): PlaceableBuildingId[] {
   if (input.hasVillage || input.existingBuildingId) return [];
-  if (!isBuildableBiome(input.biome)) return [];
 
   return listPlaceableBuildings()
     .filter((definition) => {
       if (!isPlaceableBuildingId(definition.id)) return false;
-      return terrainAllowsBuilding(definition.terrain, input.biome);
+      if (!terrainAllowsBuilding(definition.terrain, input.biome)) return false;
+      if (!poiAllowsBuilding(definition, input.poiId)) return false;
+      // Les bâtiments « terre » restent exclus de l’eau pure.
+      if (isWaterBiome(input.biome) && definition.terrain !== "water") return false;
+      return true;
     })
     .map((definition) => definition.id as PlaceableBuildingId);
 }
@@ -112,12 +127,26 @@ export function validateBuildPlacement(
     return { ok: false, reason: "tile_occupied" };
   }
 
-  if (!isBuildableBiome(input.biome)) {
+  if (!terrainAllowsBuilding(definition.terrain, input.biome)) {
+    return { ok: false, reason: "wrong_terrain" };
+  }
+
+  if (!poiAllowsBuilding(definition, input.poiId)) {
+    return { ok: false, reason: "missing_poi" };
+  }
+
+  // Eau : uniquement bâtiments terrain water (cabane de pêcheur).
+  if (isWaterBiome(input.biome) && definition.terrain !== "water") {
     return { ok: false, reason: "not_buildable" };
   }
 
-  if (!terrainAllowsBuilding(definition.terrain, input.biome)) {
+  // Terre : pas de bâtiment water.
+  if (!isWaterBiome(input.biome) && definition.terrain === "water") {
     return { ok: false, reason: "wrong_terrain" };
+  }
+
+  if (!isWaterBiome(input.biome) && !isBuildableBiome(input.biome)) {
+    return { ok: false, reason: "not_buildable" };
   }
 
   return {

@@ -4,7 +4,8 @@ export type {
   FusionBiomeId,
   ResourceId,
   BuildingId,
-  WorkerJob
+  WorkerJob,
+  PoiId
 } from "./ids.ts";
 export {
   HEX_DIRECTIONS,
@@ -42,12 +43,30 @@ export type {
   PlaceableBuildingId,
   ExtractorJob
 } from "./world.ts";
-export type { SessionSnapshot } from "./session.ts";
+export type {
+  SessionSnapshot,
+  FirebaseSessionOutcome,
+  FirebaseSessionResult
+} from "./session.ts";
+export {
+  SUPPORT_CATEGORIES,
+  SUPPORT_MESSAGE_MIN,
+  SUPPORT_MESSAGE_MAX,
+  isSupportCategory,
+  type SupportCategory,
+  type SupportReportRequest,
+  type SupportReportResult
+} from "./support.ts";
 export {
   PSEUDO_MIN_LENGTH,
   PSEUDO_MAX_LENGTH,
   PSEUDO_PATTERN,
+  GUEST_HISTORICAL_NAMES,
   normalizePseudo,
+  sanitizePseudoCandidate,
+  suggestPseudoFromIdentity,
+  pseudoCandidateWithSuffix,
+  suggestRandomGuestPseudo,
   validatePseudo,
   type PseudoValidation
 } from "./pseudo.ts";

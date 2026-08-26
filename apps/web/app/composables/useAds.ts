@@ -27,8 +27,14 @@ export function useAds() {
 
   /** Future: set from GET /me → entitlements.noAds */
   const backendNoAds = useState("ads-backend-no-ads", () => false);
-  /** Dev-only simulation persisted in localStorage */
-  const devNoAds = useState("ads-dev-no-ads", () => readDevNoAds());
+  /** Dev-only simulation persisted in localStorage (lu après mount). */
+  const devNoAds = useState("ads-dev-no-ads", () => false);
+
+  if (import.meta.client) {
+    onMounted(() => {
+      devNoAds.value = readDevNoAds();
+    });
+  }
 
   const hasNoAds = computed(
     () => backendNoAds.value || (import.meta.dev && devNoAds.value)

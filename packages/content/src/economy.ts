@@ -56,6 +56,7 @@ import {
 export const LUMBER_CAMP_MAX_WORKERS = buildingMaxWorkersFromCatalog("lumber_camp") || 1;
 export const FARM_MAX_WORKERS = buildingMaxWorkersFromCatalog("farm") || 1;
 export const QUARRY_MAX_WORKERS = buildingMaxWorkersFromCatalog("quarry") || 1;
+export const FISHING_HUT_MAX_WORKERS = buildingMaxWorkersFromCatalog("fishing_hut") || 1;
 
 export const WOOD_RATE_PER_WORKER_PER_MINUTE =
   buildingRateFromCatalog("lumber_camp") || 5;
@@ -63,6 +64,8 @@ export const WHEAT_RATE_PER_WORKER_PER_MINUTE =
   buildingRateFromCatalog("farm") || 5;
 export const STONE_RATE_PER_WORKER_PER_MINUTE =
   buildingRateFromCatalog("quarry") || 5;
+export const FISHING_HUT_FOOD_RATE_PER_WORKER_PER_MINUTE =
+  buildingRateFromCatalog("fishing_hut") || 2;
 
 
 /** @deprecated Préférer TOWN_HALL_BASE_STORAGE (+ bonus bâtiments). Placeholders v0. */

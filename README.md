@@ -63,6 +63,12 @@ Variables utiles dans `.env` :
 | `DATABASE_URL` | Connexion PostgreSQL |
 | `SESSION_SECRET` | Secret de signature du cookie anonyme (`tw_sid`, min. 32 caractères) |
 | `CORS_ORIGINS` | Origines autorisées (credentials), séparées par des virgules |
+| `FIREBASE_PROJECT_ID` | Projet Firebase (Admin) |
+| `FIREBASE_CLIENT_EMAIL` | Service account email |
+| `FIREBASE_PRIVATE_KEY` | Clé privée service account (`\n` pour les retours ligne) |
+| `RESEND_API_KEY` | Clé [Resend](https://resend.com) pour les reports (Aide & contact) |
+| `SUPPORT_TO` | Destinataire (défaut `contact@hexald.com`) |
+| `SUPPORT_FROM` | Expéditeur vérifié chez Resend (ex. `Hexald <noreply@hexald.com>`) |
 
 | Script | Rôle |
 | --- | --- |
@@ -93,6 +99,8 @@ Pour rester en localhost uniquement : `pnpm --filter @hexald/api dev -- --host 1
 | `GET` | `/health` | Santé du process (+ ping DB) |
 | `POST` | `/v1/session` | Crée / renouvelle la session anonyme (cookie `tw_sid`) |
 | `GET` | `/v1/session` | Session courante (`401` si absente) |
+| `DELETE` | `/v1/session` | Déconnexion (clear cookie) |
+| `POST` | `/v1/session/firebase` | Lie / crée un joueur via idToken Firebase (DEC-024) |
 | `POST` | `/v1/session/pseudo` | Claim un pseudo unique (3–20, lettres/chiffres/_) |
 | `GET` | `/v1/content` | Catalogue data-driven (`content`) |
 | `GET` | `/v1/worlds` | Liste les mondes du joueur courant |
@@ -102,7 +110,7 @@ Pour rester en localhost uniquement : `pnpm --filter @hexald/api dev -- --host 1
 | `POST` | `/v1/worlds/:id/buildings/destroy` | Démolit un bâtiment (hors village) |
 | `GET` | `/v1/admin/overview` | Stats admin (sans auth pour l’instant) |
 
-La session anonyme est un cookie httpOnly signé. Les mondes appartiennent au `playerId` de la session.
+La session est un cookie httpOnly signé. Départ en **invité** ; optionnel : lien Google / email (Firebase) qui conserve le même `playerId` / monde. Les mondes appartiennent au `playerId` de la session.
 
 Mutations monde : `SELECT … FOR UPDATE` (`withWorldLock`) sérialise les écritures concurrentes (multi-onglets / bots). Timeout 3 s → `429 world_busy`.
 
@@ -112,9 +120,11 @@ Renderer : streaming GPU des tuiles biome (`syncBiomeTiles`) — état logique c
 
 UI admin (dev) : [`/admin`](http://127.0.0.1:9089/admin).
 
-Économie live : pop + food/croissance (DEC-016–017), extracteurs posés (bois / blé / pierre), inventaire générique, bonus fusion +20&nbsp;% (DEC-019).
+Économie live : pop + food/croissance (DEC-016–017), extracteurs posés (bois / blé / pierre / **pêche**), inventaire générique, bonus fusion +20&nbsp;% (DEC-019). Banc de poisson (`fish_bank`) + cabane de pêcheur (DEC-021 / 023).
 
 Expansion de région (DEC-020) : coût en **éclats de monde** (`worldshard`) = `hop` (1 voisin, 2 au rang suivant…). Prod hôtel de ville : 1 / 15&nbsp;min, cap 5, départ 1. `409 insufficient_resources` si stock insuffisant. (DEC-015 bois supersédé.)
+
+Comptes (DEC-024) : Firebase Auth côté client + Admin côté API. Configurer `apps/api/.env` et `apps/web/.env` (voir les `.env.example`).
 
 `ads.txt` : [`apps/web/public/ads.txt`](apps/web/public/ads.txt).
 
@@ -155,11 +165,26 @@ pnpm dev:web
 
 | Route | Rôle |
 | --- | --- |
-| `/` | Landing : pseudo + CTA Jouer |
+| `/` | Landing : pseudo + CTA Jouer (+ connexion Firebase si configuré) |
 | `/play` | Écran de jeu (session + pseudo requis) |
+| `/news` | Actualités / patch notes joueurs |
+| `/privacy`, `/terms`, `/cookies`, `/legals` | Pages légales |
 | `/admin` | Stats joueurs / mondes / présence (sans auth) |
 | `/poc` | Grille hexagonale plein écran (dev) |
 | `/backend/**` | Proxy vers l’API Fastify `:9088` |
+
+### Firebase (web)
+
+Copier [`apps/web/.env.example`](apps/web/.env.example) → `apps/web/.env` :
+
+```text
+NUXT_PUBLIC_FIREBASE_API_KEY=
+NUXT_PUBLIC_FIREBASE_AUTH_DOMAIN=
+NUXT_PUBLIC_FIREBASE_PROJECT_ID=
+NUXT_PUBLIC_FIREBASE_APP_ID=
+```
+
+Ajouter les domaines autorisés dans Firebase Console (localhost, IP LAN, prod). Desktop = popup Google ; mobile = redirect.
 
 ### PWA
 
@@ -167,4 +192,4 @@ Installable via `@vite-pwa/nuxt` (manifest + service worker). **Pas de jeu hors 
 
 Le shell est précaché uniquement pour pouvoir afficher ce message à l’ouverture hors ligne. Le SW n’est pas actif en `nuxt dev` (`pwa.devOptions.enabled: false`) — tester via `pnpm --filter @hexald/web build` + `preview` (HTTPS ou localhost).
 
-Icônes : `apps/web/public/pwa/pwa-192x192.png`, `pwa-512x512.png`.
+Icônes : `apps/web/public/icon.png` (fond transparent), `pwa/pwa-192x192.png`, `pwa/pwa-512x512.png`, `pwa/pwa-512x512-maskable.png` (fond menthe pour Android).

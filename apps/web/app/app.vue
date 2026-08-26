@@ -4,6 +4,8 @@
     <NuxtLayout>
       <NuxtPage />
     </NuxtLayout>
-    <OfflineBlocker />
+    <ClientOnly>
+      <OfflineBlocker />
+    </ClientOnly>
   </UApp>
 </template>

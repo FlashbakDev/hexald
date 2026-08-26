@@ -12,6 +12,14 @@ const online = useNetworkStatus();
     aria-describedby="offline-desc"
   >
     <div class="offline-blocker__card">
+      <img
+        class="offline-blocker__icon"
+        src="/icon.png"
+        width="64"
+        height="64"
+        alt=""
+        aria-hidden="true"
+      />
       <p class="offline-blocker__brand font-display">Hexald</p>
       <h1 id="offline-title" class="offline-blocker__title font-display">
         Connexion requise

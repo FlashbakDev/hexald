@@ -1,12 +1,12 @@
 import {
   BoxGeometry,
+  BufferGeometry,
   CanvasTexture,
   CylinderGeometry,
   Group,
   Mesh,
   MeshStandardMaterial,
   SRGBColorSpace,
-  type BufferGeometry,
   type Material,
   type Texture
 } from "three";
@@ -51,11 +51,11 @@ function unitToward(dirIndex: number) {
   return { x: x / len, z: z / len, yaw: Math.atan2(x, z) };
 }
 
-/** Eau en contact avec la terre. */
-export const WATER_COASTAL = { top: 0x62bfe8, side: 0x2f86b5 };
+/** Mer côtière — turquoise pastel. */
+export const WATER_COASTAL = { top: 0x7adef5, side: 0x4abfd9 };
 
-/** Mer au large. */
-export const WATER_DEEP = { top: 0x3a9fd0, side: 0x1f6f9a };
+/** Mer au large — bleu vif doux. */
+export const WATER_DEEP = { top: 0x4ec4e8, side: 0x2e96c0 };
 
 export function isLandBiome(biome: BiomeId) {
   return biome !== "water";
@@ -67,7 +67,41 @@ export function waterTopColorForDepth(depth: number) {
 }
 
 /**
+ * Hex d’eau : uniquement face top + lit (pas de parois latérales).
+ * Les indices matériau restent 1 = top, 2 = bottom (0 inutilisé).
+ */
+export function createWaterHexGeometry(radius: number, height: number) {
+  const src = new CylinderGeometry(radius, radius, height, 6);
+  const top = src.groups[1];
+  const bottom = src.groups[2];
+  if (!src.index || !top || !bottom) {
+    src.dispose();
+    throw new Error("water hex geometry: unexpected cylinder groups");
+  }
+
+  const indices: number[] = [];
+  for (let i = top.start; i < top.start + top.count; i++) {
+    indices.push(src.index.getX(i));
+  }
+  for (let i = bottom.start; i < bottom.start + bottom.count; i++) {
+    indices.push(src.index.getX(i));
+  }
+
+  const geo = new BufferGeometry();
+  geo.setAttribute("position", src.getAttribute("position").clone());
+  geo.setAttribute("normal", src.getAttribute("normal").clone());
+  const uv = src.getAttribute("uv");
+  if (uv) geo.setAttribute("uv", uv.clone());
+  geo.setIndex(indices);
+  geo.addGroup(0, top.count, 1);
+  geo.addGroup(top.count, bottom.count, 2);
+  src.dispose();
+  return geo;
+}
+
+/**
  * Teinte d’eau selon un facteur de profondeur 0→1 (côte → large).
+ * Haut transparent ; bas opaque uni. Les côtés (si présents) restent invisibles.
  */
 export function paintWaterMaterials(
   materials: MeshStandardMaterial[],
@@ -75,9 +109,13 @@ export function paintWaterMaterials(
   surfaceMap?: Texture | null
 ) {
   const t = Math.min(1, Math.max(0, depth));
-  materials[0].color.setHex(lerpHexColor(WATER_COASTAL.side, WATER_DEEP.side, t));
-  materials[1].color.setHex(lerpHexColor(WATER_COASTAL.top, WATER_DEEP.top, t));
-  materials[2].color.copy(materials[0].color);
+  const side = lerpHexColor(WATER_COASTAL.side, WATER_DEEP.side, t);
+  const top = lerpHexColor(WATER_COASTAL.top, WATER_DEEP.top, t);
+  const bed = lerpHexColor(0x2a7a98, 0x1a5a78, t);
+
+  materials[0].color.setHex(side);
+  materials[1].color.setHex(top);
+  materials[2].color.setHex(bed);
 
   if (t > 0.25 && surfaceMap) {
     materials[1].map = surfaceMap;
@@ -85,10 +123,28 @@ export function paintWaterMaterials(
     materials[1].map = null;
   }
 
-  materials[1].roughness = 0.34 - t * 0.1;
-  materials[1].metalness = 0.26 + t * 0.12;
-  materials[0].roughness = 0.48 - t * 0.1;
-  materials[0].metalness = 0.1 + t * 0.08;
+  // Parois : totalement invisibles (géométrie sans côtés, ceinture de sécurité).
+  materials[0].transparent = true;
+  materials[0].opacity = 0;
+  materials[0].depthWrite = false;
+  materials[0].colorWrite = false;
+  materials[0].map = null;
+
+  materials[1].transparent = true;
+  materials[1].opacity = 0.38 + t * 0.22;
+  materials[1].depthWrite = false;
+  materials[1].colorWrite = true;
+  materials[1].roughness = 0.28 - t * 0.08;
+  materials[1].metalness = 0.22 + t * 0.1;
+
+  materials[2].transparent = false;
+  materials[2].opacity = 1;
+  materials[2].depthWrite = true;
+  materials[2].colorWrite = true;
+  materials[2].roughness = 0.92;
+  materials[2].metalness = 0.04;
+  materials[2].map = null;
+
   materials[0].needsUpdate = true;
   materials[1].needsUpdate = true;
   materials[2].needsUpdate = true;

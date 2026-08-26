@@ -69,66 +69,66 @@ export function createShoreEdgeDecorKit() {
   const materials: Material[] = [];
 
   const sandDry = new MeshStandardMaterial({
-    color: 0xe8d9b0,
+    color: 0xffe9b8,
     roughness: 0.95,
     metalness: 0.01
   });
   const sandMid = new MeshStandardMaterial({
-    color: 0xd4c08a,
+    color: 0xf5d78a,
     roughness: 0.93,
     metalness: 0.02
   });
   const sandWet = new MeshStandardMaterial({
-    color: 0xb8a474,
+    color: 0xe8c878,
     roughness: 0.78,
     metalness: 0.04
   });
   const foam = new MeshStandardMaterial({
-    color: 0xf2fafc,
-    roughness: 0.45,
-    metalness: 0.05,
-    transparent: true,
-    opacity: 0.55
-  });
-  const foamSoft = new MeshStandardMaterial({
-    color: 0xd8eef4,
-    roughness: 0.55,
+    color: 0xffffff,
+    roughness: 0.4,
     metalness: 0.04,
     transparent: true,
-    opacity: 0.32
+    opacity: 0.62
+  });
+  const foamSoft = new MeshStandardMaterial({
+    color: 0xe8f8ff,
+    roughness: 0.5,
+    metalness: 0.03,
+    transparent: true,
+    opacity: 0.38
   });
   const driftwood = new MeshStandardMaterial({
-    color: 0x8a6e4e,
+    color: 0xc49a6c,
     roughness: 0.92,
     metalness: 0.02
   });
   const shell = new MeshStandardMaterial({
-    color: 0xf0e6d8,
+    color: 0xfff0e4,
     roughness: 0.7,
     metalness: 0.08
   });
   const rock = new MeshStandardMaterial({
-    color: 0x6a7380,
+    color: 0xa8b4c4,
     roughness: 0.96,
     metalness: 0.04
   });
   const rockDark = new MeshStandardMaterial({
-    color: 0x4a5560,
+    color: 0x7a8898,
     roughness: 0.97,
     metalness: 0.03
   });
   const reed = new MeshStandardMaterial({
-    color: 0x6a9a58,
+    color: 0x5a9a68,
     roughness: 0.9,
     metalness: 0.01
   });
   const trunk = new MeshStandardMaterial({
-    color: 0x5a3d28,
+    color: 0xa86a42,
     roughness: 0.95,
     metalness: 0.02
   });
   const foliage = new MeshStandardMaterial({
-    color: 0x3d8a52,
+    color: 0x4a9a68,
     roughness: 0.88,
     metalness: 0.02
   });
@@ -191,13 +191,21 @@ export function createShoreEdgeDecorKit() {
     sx: number,
     sy: number,
     sz: number,
-    yaw: number
+    yaw: number,
+    wave?: { phase: number }
   ) {
     const mesh = new Mesh(geometry, material);
     mesh.position.set(x, y, z);
     mesh.scale.set(sx, sy, sz);
     mesh.rotation.y = yaw;
     disableRaycast(mesh);
+    if (wave) {
+      mesh.userData.isWave = true;
+      mesh.userData.baseY = y;
+      mesh.userData.baseSx = sx;
+      mesh.userData.baseSz = sz;
+      mesh.userData.phase = wave.phase;
+    }
     group.add(mesh);
   }
 
@@ -465,7 +473,9 @@ export function createShoreEdgeDecorKit() {
       (continuity.hasPrev ? 0.1 : 0.04) +
       (continuity.hasNext ? 0.1 : 0.04);
 
-    addMesh(group, foamBand, foam, ux * 0.7, 0.006, uz * 0.7, along, 1, 1, yaw);
+    addMesh(group, foamBand, foam, ux * 0.7, 0.006, uz * 0.7, along, 1, 1, yaw, {
+      phase: (h % 1000) * 0.01
+    });
     addMesh(
       group,
       foamBand,
@@ -476,7 +486,8 @@ export function createShoreEdgeDecorKit() {
       along * 0.9,
       1,
       1.25,
-      yaw
+      yaw,
+      { phase: (h % 1000) * 0.01 + 0.8 }
     );
 
     for (let i = 0; i < 4; i++) {
@@ -494,20 +505,46 @@ export function createShoreEdgeDecorKit() {
         0.9 + (i % 3) * 0.15,
         1,
         0.9 + (i % 2) * 0.2,
-        yaw + i * 0.5
+        yaw + i * 0.5,
+        { phase: ((h >>> (i * 3)) % 64) * 0.1 + i }
       );
     }
   }
 
   function addFoamCorner(group: Group, dirA: number, dirB: number) {
     const { x: vx, z: vz, yaw } = vertexBetween(dirA, dirB);
-    addMesh(group, cornerPadSm, foam, vx * 0.72, 0.006, vz * 0.72, 1.1, 1, 1.1, yaw);
-    addMesh(group, foamCurl, foamSoft, vx * 0.64, 0.007, vz * 0.64, 1.2, 1, 1.2, yaw + 0.4);
+    addMesh(
+      group,
+      cornerPadSm,
+      foam,
+      vx * 0.72,
+      0.006,
+      vz * 0.72,
+      1.1,
+      1,
+      1.1,
+      yaw,
+      { phase: dirA * 0.7 }
+    );
+    addMesh(
+      group,
+      foamCurl,
+      foamSoft,
+      vx * 0.64,
+      0.007,
+      vz * 0.64,
+      1.2,
+      1,
+      1.2,
+      yaw + 0.4,
+      { phase: dirB * 0.9 + 1.2 }
+    );
   }
 
   /** Écume côté mer (toute terre adjacente). */
   function createWaterEdges(dirIndices: readonly number[]) {
     const group = new Group();
+    group.userData.hasShoreWaves = true;
     const set = new Set(dirIndices);
 
     for (const dirIndex of dirIndices) {
@@ -522,9 +559,25 @@ export function createShoreEdgeDecorKit() {
     return group;
   }
 
+  const animate = (root: Group, nowMs: number) => {
+    const t = nowMs * 0.001;
+    root.traverse((obj) => {
+      if (!obj.userData.isWave || !(obj instanceof Mesh)) return;
+      const phase = (obj.userData.phase as number) ?? 0;
+      const pulse = 0.5 + 0.5 * Math.sin(t * 2.4 + phase);
+      const baseY = (obj.userData.baseY as number) ?? 0;
+      const baseSx = (obj.userData.baseSx as number) ?? 1;
+      const baseSz = (obj.userData.baseSz as number) ?? 1;
+      obj.position.y = baseY + pulse * 0.012;
+      obj.scale.x = baseSx * (0.88 + pulse * 0.24);
+      obj.scale.z = baseSz * (0.82 + pulse * 0.32);
+    });
+  };
+
   return {
     createLandEdges,
     createWaterEdges,
+    animate,
     dispose() {
       for (const g of geometries) g.dispose();
       for (const m of materials) m.dispose();

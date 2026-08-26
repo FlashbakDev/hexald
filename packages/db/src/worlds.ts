@@ -1,5 +1,5 @@
 import { and, desc, eq, sql } from "drizzle-orm";
-import type { BiomeId, BuildingId, ResourceId } from "@hexald/shared";
+import type { BiomeId, BuildingId, PoiId, ResourceId } from "@hexald/shared";
 import type { Database, WorldDb } from "./client.ts";
 import {
   worldInventory,
@@ -16,6 +16,7 @@ export type WorldTileRow = {
   constructionCompletesAt: Date | null;
   assignedWorkers: number;
   defaultWorkerSeeded: boolean;
+  poiId: PoiId | null;
 };
 
 export type WorldRegionRow = {
@@ -228,7 +229,8 @@ export async function insertWorldWithTerrain(
           buildingId: tile.buildingId,
           constructionCompletesAt: tile.constructionCompletesAt,
           assignedWorkers: tile.assignedWorkers ?? 0,
-          defaultWorkerSeeded: tile.defaultWorkerSeeded ?? false
+          defaultWorkerSeeded: tile.defaultWorkerSeeded ?? false,
+          poiId: tile.poiId ?? null
         }))
       );
     }
@@ -275,7 +277,8 @@ export async function fetchWorld(
         buildingId: worldTiles.buildingId,
         constructionCompletesAt: worldTiles.constructionCompletesAt,
         assignedWorkers: worldTiles.assignedWorkers,
-        defaultWorkerSeeded: worldTiles.defaultWorkerSeeded
+        defaultWorkerSeeded: worldTiles.defaultWorkerSeeded,
+        poiId: worldTiles.poiId
       })
       .from(worldTiles)
       .where(eq(worldTiles.worldId, worldId)),
@@ -303,7 +306,8 @@ export async function fetchWorld(
       buildingId: (tile.buildingId as BuildingId | null) ?? null,
       constructionCompletesAt: tile.constructionCompletesAt ?? null,
       assignedWorkers: tile.assignedWorkers ?? 0,
-      defaultWorkerSeeded: tile.defaultWorkerSeeded ?? false
+      defaultWorkerSeeded: tile.defaultWorkerSeeded ?? false,
+      poiId: (tile.poiId as PoiId | null) ?? null
     })),
     regions: regions.map((region) => ({
       centerQ: region.centerQ,
@@ -427,6 +431,8 @@ export async function setTileBuilding(
     constructionCompletesAt: Date | null;
     assignedWorkers?: number;
     defaultWorkerSeeded?: boolean;
+    /** Si fourni, met à jour le POI (ex. ferme qui efface le troupeau). */
+    poiId?: PoiId | null;
   }
 ): Promise<void> {
   await db
@@ -435,7 +441,8 @@ export async function setTileBuilding(
       buildingId: tile.buildingId,
       constructionCompletesAt: tile.constructionCompletesAt,
       assignedWorkers: tile.assignedWorkers ?? 0,
-      defaultWorkerSeeded: tile.defaultWorkerSeeded ?? false
+      defaultWorkerSeeded: tile.defaultWorkerSeeded ?? false,
+      ...(tile.poiId !== undefined ? { poiId: tile.poiId } : {})
     })
     .where(
       and(
@@ -483,7 +490,7 @@ export async function clearTileBuilding(
 export async function setTileBiomeDev(
   db: WorldDb,
   worldId: string,
-  tile: { q: number; r: number; biome: BiomeId }
+  tile: { q: number; r: number; biome: BiomeId; poiId?: PoiId | null }
 ): Promise<void> {
   await db
     .update(worldTiles)
@@ -492,7 +499,8 @@ export async function setTileBiomeDev(
       buildingId: null,
       constructionCompletesAt: null,
       assignedWorkers: 0,
-      defaultWorkerSeeded: false
+      defaultWorkerSeeded: false,
+      poiId: tile.poiId ?? null
     })
     .where(
       and(
@@ -534,7 +542,8 @@ export async function appendRegion(
         buildingId: tile.buildingId,
         constructionCompletesAt: tile.constructionCompletesAt,
         assignedWorkers: tile.assignedWorkers ?? 0,
-        defaultWorkerSeeded: tile.defaultWorkerSeeded ?? false
+        defaultWorkerSeeded: tile.defaultWorkerSeeded ?? false,
+        poiId: tile.poiId ?? null
       }))
     );
   }

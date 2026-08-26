@@ -1,5 +1,16 @@
-export { biomes, primaryBiomes, type BiomeDefinition, type BiomeKind } from "./biomes.ts";
+export { biomes, primaryBiomes, getBiomeDefinition, type BiomeDefinition, type BiomeKind } from "./biomes.ts";
 export { resources, type ResourceDefinition } from "./resources.ts";
+export {
+  pois,
+  getPoiDefinition,
+  isPoiId,
+  poiAllowedOnBiome,
+  FISH_BANK_SPAWN_CHANCE,
+  COW_HERD_SPAWN_CHANCE,
+  IRON_DEPOSIT_SPAWN_CHANCE,
+  type PoiDefinition,
+  type PoiKind
+} from "./pois.ts";
 export {
   buildings,
   getBuildingDefinition,
@@ -46,9 +57,11 @@ export {
   LUMBER_CAMP_MAX_WORKERS,
   FARM_MAX_WORKERS,
   QUARRY_MAX_WORKERS,
+  FISHING_HUT_MAX_WORKERS,
   WOOD_RATE_PER_WORKER_PER_MINUTE,
   WHEAT_RATE_PER_WORKER_PER_MINUTE,
   STONE_RATE_PER_WORKER_PER_MINUTE,
+  FISHING_HUT_FOOD_RATE_PER_WORKER_PER_MINUTE,
   WOOD_STOCK_CAP,
   WHEAT_STOCK_CAP,
   STONE_STOCK_CAP,

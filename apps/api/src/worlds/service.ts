@@ -88,9 +88,11 @@ function buildingFlags(world: PersistedWorld, now = Date.now()) {
     lumberCampSites: countBuildingSites(world.tiles, "lumber_camp"),
     farmSites: countBuildingSites(world.tiles, "farm"),
     quarrySites: countBuildingSites(world.tiles, "quarry"),
+    fishingHutSites: countBuildingSites(world.tiles, "fishing_hut"),
     hasLumberCamp: hasCompletedBuilding(world.tiles, "lumber_camp", now),
     hasFarm: hasCompletedBuilding(world.tiles, "farm", now),
-    hasQuarry: hasCompletedBuilding(world.tiles, "quarry", now)
+    hasQuarry: hasCompletedBuilding(world.tiles, "quarry", now),
+    hasFishingHut: hasCompletedBuilding(world.tiles, "fishing_hut", now)
   };
 }
 
@@ -103,7 +105,8 @@ function tileSnapshot(tile: WorldTileRow) {
     constructionCompletesAt: tile.constructionCompletesAt
       ? tile.constructionCompletesAt.toISOString()
       : null,
-    assignedWorkers: tile.assignedWorkers ?? 0
+    assignedWorkers: tile.assignedWorkers ?? 0,
+    poiId: tile.poiId ?? null
   };
 }
 
@@ -153,6 +156,7 @@ function rowToEconomyState(
     woodcutters: totals.woodcutters,
     farmers: totals.farmers,
     quarriers: totals.quarriers,
+    fishers: totals.fishers,
     stocks,
     foodSurplusAccumulated: row.foodSurplusAccumulated ?? 0,
     extractorSites: extractorSitesFromTiles(tiles, now),
@@ -202,12 +206,15 @@ function toEconomySnapshot(state: EconomyState): WorldEconomySnapshot {
     woodcutters: state.woodcutters,
     farmers: state.farmers,
     quarriers: state.quarriers,
+    fishers: state.fishers,
     lumberCampMaxWorkers: maxAssignableWorkersForJob("woodcutter", state),
     farmMaxWorkers: maxAssignableWorkersForJob("farmer", state),
     quarryMaxWorkers: maxAssignableWorkersForJob("quarrier", state),
+    fishingHutMaxWorkers: maxAssignableWorkersForJob("fisher", state),
     hasLumberCamp: state.hasLumberCamp,
     hasFarm: state.hasFarm,
     hasQuarry: state.hasQuarry,
+    hasFishingHut: state.hasFishingHut,
     stocks: [
       wood,
       wheat,
@@ -351,7 +358,8 @@ export async function createWorldService(
       buildingId: null,
       constructionCompletesAt: null,
       assignedWorkers: 0,
-      defaultWorkerSeeded: false
+      defaultWorkerSeeded: false,
+      poiId: null
     });
   }
 
@@ -520,10 +528,20 @@ export async function setTileBiomeDevService(
       now
     );
 
+    const nextPoiId =
+      tile.poiId === "fish_bank" && input.biome !== "water"
+        ? null
+        : tile.poiId === "cow_herd" && input.biome !== "plains"
+          ? null
+          : tile.poiId === "iron_deposit" && input.biome !== "mountain"
+            ? null
+            : tile.poiId;
+
     await setTileBiomeDev(tx, worldId, {
       q: input.q,
       r: input.r,
-      biome: input.biome
+      biome: input.biome,
+      poiId: nextPoiId
     });
 
     const updatedTile: WorldTileRow = {
@@ -532,7 +550,8 @@ export async function setTileBiomeDevService(
       buildingId: null,
       constructionCompletesAt: null,
       assignedWorkers: 0,
-      defaultWorkerSeeded: false
+      defaultWorkerSeeded: false,
+      poiId: nextPoiId
     };
     const updatedTiles = world.tiles.map((entry) =>
       entry.q === tile.q && entry.r === tile.r ? updatedTile : entry
@@ -611,16 +630,16 @@ export async function expandRegionService(
       center: input.center,
       biome: input.biome,
       tiles: created.map((tile) => ({
-        ...tile,
+        q: tile.q,
+        r: tile.r,
+        biome: tile.biome,
         buildingId: null,
         constructionCompletesAt: null,
         assignedWorkers: 0,
-        defaultWorkerSeeded: false
+        defaultWorkerSeeded: false,
+        poiId: tile.poiId ?? null
       }))
     });
-
-    const economyRow = economyStateToRow(spent.state);
-    await updateWorldEconomy(tx, worldId, economyRow);
 
     const updatedTiles: WorldTileRow[] = [
       ...world.tiles,
@@ -631,9 +650,17 @@ export async function expandRegionService(
         buildingId: null,
         constructionCompletesAt: null,
         assignedWorkers: 0,
-        defaultWorkerSeeded: false
+        defaultWorkerSeeded: false,
+        poiId: tile.poiId ?? null
       }))
     ];
+    const afterExpand = {
+      ...spent.state,
+      extractorSites: extractorSitesFromTiles(updatedTiles, now)
+    };
+    const economyRow = economyStateToRow(afterExpand);
+    await updateWorldEconomy(tx, worldId, economyRow);
+
     const updatedWorld: PersistedWorld = {
       ...world,
       tiles: updatedTiles,
@@ -655,14 +682,16 @@ export async function expandRegionService(
         center: input.center,
         biome: input.biome,
         tiles: created.map((tile) => ({
-          ...tile,
+          q: tile.q,
+          r: tile.r,
+          biome: tile.biome,
           buildingId: null,
           constructionCompletesAt: null,
           assignedWorkers: 0,
-          defaultWorkerSeeded: false
+          poiId: tile.poiId ?? null
         })),
         cost,
-        world: toSnapshot(updatedWorld, spent.state)
+        world: toSnapshot(updatedWorld, afterExpand)
       }
     };
   });
@@ -752,6 +781,7 @@ export type BuildError =
   | "unknown_building"
   | "not_buildable"
   | "wrong_terrain"
+  | "missing_poi"
   | "tile_occupied"
   | "has_village"
   | "insufficient_resources"
@@ -776,7 +806,8 @@ export async function buildService(
       origin: input.origin,
       biome: tile.biome,
       hasVillage: isStartVillage(tile.q, tile.r),
-      existingBuildingId: tile.buildingId
+      existingBuildingId: tile.buildingId,
+      poiId: tile.poiId ?? null
     });
 
     if (!placement.ok) {
@@ -802,6 +833,10 @@ export async function buildService(
     });
     const completesAt = new Date(construction.constructionCompletesAt);
     const reserveWorker = 1;
+    // Troupeau / gisement : effacés par ferme / carrière (étable / mine plus tard).
+    const clearTransientPoi =
+      tile.poiId === "cow_herd" || tile.poiId === "iron_deposit";
+    const nextPoiId = clearTransientPoi ? null : (tile.poiId ?? null);
 
     await setTileBuilding(tx, worldId, {
       q: tile.q,
@@ -809,7 +844,8 @@ export async function buildService(
       buildingId: placement.buildingId,
       constructionCompletesAt: completesAt,
       assignedWorkers: reserveWorker,
-      defaultWorkerSeeded: reserveWorker > 0
+      defaultWorkerSeeded: reserveWorker > 0,
+      ...(clearTransientPoi ? { poiId: null } : {})
     });
 
     const economyRow = economyStateToRow(spent.state);
@@ -820,7 +856,8 @@ export async function buildService(
       buildingId: placement.buildingId,
       constructionCompletesAt: completesAt,
       assignedWorkers: reserveWorker,
-      defaultWorkerSeeded: reserveWorker > 0
+      defaultWorkerSeeded: reserveWorker > 0,
+      poiId: nextPoiId
     };
     const updatedTiles = world.tiles.map((entry) =>
       entry.q === tile.q && entry.r === tile.r ? updatedTile : entry
