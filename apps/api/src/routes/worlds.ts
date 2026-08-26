@@ -26,7 +26,12 @@ import { env } from "../env.ts";
 const uuidRe =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-const actionTypes = new Set(["build", "assign_workers", "generate_region"]);
+const actionTypes = new Set([
+  "build",
+  "assign_workers",
+  "generate_region",
+  "set_research_target"
+]);
 
 function isHexCoord(value: unknown): value is { q: number; r: number } {
   return (
@@ -59,6 +64,9 @@ function isGameAction(value: unknown): value is GameAction {
       isPrimaryBiome(body.biome as PrimaryBiomeId)
     );
   }
+  if (body.type === "set_research_target") {
+    return typeof body.techId === "string" && body.techId.length > 0;
+  }
   return false;
 }
 
@@ -71,10 +79,20 @@ function statusForActionError(error: string): number {
     error === "invalid_count" ||
     error === "invalid_biome" ||
     error === "unknown_building" ||
+    error === "unknown_tech" ||
+    error === "invalid_tech" ||
+    error === "not_researchable" ||
     error === "unknown_action" ||
     error === "under_construction"
   ) {
     return 400;
+  }
+  if (
+    error === "already_unlocked" ||
+    error === "prerequisites_not_met" ||
+    error === "tech_not_unlocked"
+  ) {
+    return 409;
   }
   return 409;
 }

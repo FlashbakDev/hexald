@@ -7,8 +7,7 @@ useHead({
   title: "Admin · Hexald"
 });
 
-/** Gate client simple (prompt). Override: NUXT_PUBLIC_ADMIN_CODE */
-const ADMIN_UNLOCK_KEY = "hexald-admin-ok";
+type AdminGate = "loading" | "login" | "forbidden" | "ready";
 
 type AdminOverview = {
   generatedAt: string;
@@ -60,11 +59,26 @@ type TestMailResult = {
 };
 
 const config = useRuntimeConfig();
-const expectedCode = String(config.public.adminCode ?? "nimda");
+const { kind, email, probeSession } = useSession();
+const {
+  configured: firebaseConfigured,
+  authBusy,
+  authError,
+  ensureHexaldSession,
+  signInWithGoogle,
+  signInWithEmail,
+  watchAuth
+} = useFirebaseAuth();
 
-const unlocked = ref(false);
+const gate = ref<AdminGate>("loading");
+const gateMessage = ref<string | null>(null);
 const testMailBusy = ref(false);
 const testMailStatus = ref<string | null>(null);
+
+const emailPanelOpen = ref(false);
+const emailMode = ref<"login" | "register">("login");
+const emailDraft = ref("");
+const passwordDraft = ref("");
 
 const {
   data,
@@ -75,7 +89,8 @@ const {
   "admin-overview",
   () =>
     $fetch<AdminOverview>("/v1/admin/overview", {
-      baseURL: config.public.apiBase
+      baseURL: config.public.apiBase,
+      credentials: "include"
     }),
   { server: false, immediate: false }
 );
@@ -89,30 +104,85 @@ function startPolling() {
   }, 10_000);
 }
 
-function unlockAdmin() {
-  unlocked.value = true;
-  sessionStorage.setItem(ADMIN_UNLOCK_KEY, "1");
+function stopPolling() {
+  if (timer) {
+    clearInterval(timer);
+    timer = null;
+  }
+}
+
+async function resolveGate() {
+  gateMessage.value = null;
+  gate.value = "loading";
+
+  if (!firebaseConfigured.value) {
+    gate.value = "forbidden";
+    gateMessage.value =
+      "Firebase n’est pas configuré côté client. Ajoute NUXT_PUBLIC_FIREBASE_* dans apps/web/.env.";
+    return;
+  }
+
+  watchAuth();
+  await ensureHexaldSession();
+
+  const session = await probeSession();
+  if (!session || session.kind !== "firebase") {
+    gate.value = "login";
+    return;
+  }
+
+  if (!session.isAdmin) {
+    gate.value = "forbidden";
+    gateMessage.value =
+      "Ce compte n’a pas accès admin. Demande l’ajout de ton email dans ADMIN_EMAILS (API).";
+    return;
+  }
+
+  gate.value = "ready";
   startPolling();
 }
 
+async function onGoogleLogin() {
+  const session = await signInWithGoogle();
+  if (session?.isAdmin) {
+    await resolveGate();
+  } else if (session && !session.isAdmin) {
+    gate.value = "forbidden";
+    gateMessage.value = "Compte connecté, mais pas autorisé admin.";
+  }
+}
+
+async function onEmailSubmit() {
+  const addr = emailDraft.value.trim();
+  const password = passwordDraft.value;
+  if (!addr || password.length < 6) return;
+  const session = await signInWithEmail(addr, password);
+  if (session?.isAdmin) {
+    await resolveGate();
+  } else if (session && !session.isAdmin) {
+    gate.value = "forbidden";
+    gateMessage.value = "Compte connecté, mais pas autorisé admin.";
+  }
+}
+
 onMounted(() => {
-  if (sessionStorage.getItem(ADMIN_UNLOCK_KEY) === "1") {
-    unlockAdmin();
-    return;
-  }
-
-  const entered = window.prompt("Code admin");
-  if (entered === expectedCode) {
-    unlockAdmin();
-    return;
-  }
-
-  window.alert("Accès refusé");
-  void navigateTo("/");
+  void resolveGate();
 });
 
 onBeforeUnmount(() => {
-  if (timer) clearInterval(timer);
+  stopPolling();
+});
+
+watch(error, (err) => {
+  if (!err || gate.value !== "ready") return;
+  const status =
+    err && typeof err === "object" && "statusCode" in err
+      ? Number((err as { statusCode?: number }).statusCode)
+      : 0;
+  if (status === 401 || status === 403) {
+    stopPolling();
+    void resolveGate();
+  }
 });
 
 function formatWhen(iso: string) {
@@ -140,7 +210,8 @@ async function sendTestMail() {
   try {
     const result = await $fetch<TestMailResult>("/v1/admin/test-mail", {
       baseURL: config.public.apiBase,
-      method: "POST"
+      method: "POST",
+      credentials: "include"
     });
     if (result.mode === "resend") {
       testMailStatus.value = `Envoyé via Resend → ${result.to}`;
@@ -152,8 +223,10 @@ async function sendTestMail() {
       err && typeof err === "object" && "statusCode" in err
         ? Number((err as { statusCode?: number }).statusCode)
         : 0;
-    if (status === 403) {
-      testMailStatus.value = "Réservé au mode development de l’API.";
+    if (status === 401 || status === 403) {
+      testMailStatus.value = "Session admin expirée ou refusée.";
+      stopPolling();
+      void resolveGate();
     } else if (status === 503) {
       testMailStatus.value = "RESEND_API_KEY manquante.";
     } else {
@@ -166,10 +239,121 @@ async function sendTestMail() {
 </script>
 
 <template>
-  <div v-if="unlocked" class="admin min-h-dvh bg-[#e8f0ec] text-[#1c2b28]">
+  <div class="admin min-h-dvh bg-[#e8f0ec] text-[#1c2b28]">
     <div class="admin-glow" aria-hidden="true" />
 
-    <div class="relative mx-auto max-w-6xl px-5 py-10 sm:px-8 sm:py-14">
+    <div
+      v-if="gate === 'loading'"
+      class="relative flex min-h-dvh items-center justify-center px-6 text-[#6b7c76]"
+    >
+      Chargement…
+    </div>
+
+    <div
+      v-else-if="gate === 'login'"
+      class="relative mx-auto flex min-h-dvh max-w-md flex-col justify-center px-6 py-12"
+    >
+      <p class="font-display text-sm tracking-[0.18em] text-[#4a7c6f] uppercase">
+        Hexald
+      </p>
+      <h1 class="font-display mt-2 text-3xl font-medium tracking-tight">
+        Connexion admin
+      </h1>
+      <p class="mt-3 text-sm text-[#6b7c76]">
+        Utilise le même compte Google ou email que pour le jeu. Seuls les emails
+        listés dans <code class="text-xs">ADMIN_EMAILS</code> côté API sont autorisés.
+      </p>
+
+      <p v-if="authError" class="mt-4 rounded-lg bg-red-100 px-4 py-3 text-sm text-red-900">
+        {{ authError }}
+      </p>
+
+      <div class="mt-6 flex flex-col gap-3">
+        <UButton
+          color="primary"
+          block
+          :loading="authBusy"
+          @click="onGoogleLogin"
+        >
+          Continuer avec Google
+        </UButton>
+
+        <UButton
+          color="neutral"
+          variant="soft"
+          block
+          :disabled="authBusy"
+          @click="emailPanelOpen = !emailPanelOpen"
+        >
+          Email et mot de passe
+        </UButton>
+
+        <form
+          v-if="emailPanelOpen"
+          class="mt-2 space-y-3 rounded-xl border border-[#1c2b28]/10 bg-white/60 p-4"
+          @submit.prevent="onEmailSubmit"
+        >
+          <div class="flex gap-2 text-sm">
+            <button
+              type="button"
+              class="rounded-md px-2 py-1"
+              :class="emailMode === 'login' ? 'bg-[#2d5248] text-white' : 'text-[#6b7c76]'"
+              @click="emailMode = 'login'"
+            >
+              Connexion
+            </button>
+            <button
+              type="button"
+              class="rounded-md px-2 py-1 text-[#6b7c76]"
+              disabled
+              title="Crée un compte joueur sur la landing, puis ajoute l’email dans ADMIN_EMAILS"
+            >
+              Inscription (via le jeu)
+            </button>
+          </div>
+          <UInput v-model="emailDraft" type="email" placeholder="Email" autocomplete="email" />
+          <UInput
+            v-model="passwordDraft"
+            type="password"
+            placeholder="Mot de passe"
+            autocomplete="current-password"
+          />
+          <UButton type="submit" color="primary" block :loading="authBusy">
+            Se connecter
+          </UButton>
+        </form>
+
+        <NuxtLink
+          to="/"
+          class="mt-4 text-center text-sm text-[#6b7c76] underline-offset-2 hover:underline"
+        >
+          Retour au jeu
+        </NuxtLink>
+      </div>
+    </div>
+
+    <div
+      v-else-if="gate === 'forbidden'"
+      class="relative mx-auto flex min-h-dvh max-w-md flex-col justify-center px-6 py-12"
+    >
+      <h1 class="font-display text-2xl font-medium">Accès refusé</h1>
+      <p class="mt-3 text-sm text-[#6b7c76]">
+        {{ gateMessage ?? "Tu n’as pas les droits admin." }}
+      </p>
+      <p v-if="email && kind === 'firebase'" class="mt-2 text-xs text-[#6b7c76]">
+        Connecté en tant que {{ email }}.
+      </p>
+      <div class="mt-6 flex flex-wrap gap-3">
+        <UButton color="neutral" variant="soft" @click="resolveGate()">
+          Réessayer
+        </UButton>
+        <UButton color="neutral" variant="ghost" to="/">
+          Retour
+        </UButton>
+      </div>
+    </div>
+
+    <div v-else class="relative mx-auto max-w-6xl px-5 py-10 sm:px-8 sm:py-14">
       <header class="mb-10 flex flex-wrap items-end justify-between gap-4">
         <div>
           <p class="font-display text-sm tracking-[0.18em] text-[#4a7c6f] uppercase">
@@ -180,6 +364,9 @@ async function sendTestMail() {
           </h1>
           <p class="mt-2 max-w-xl text-[#6b7c76]">
             Stats live, présence approximative ({{ ttlMinutes }}&nbsp;min).
+          </p>
+          <p v-if="email" class="mt-1 text-xs text-[#6b7c76]">
+            {{ email }}
           </p>
         </div>
 

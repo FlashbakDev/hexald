@@ -4,7 +4,9 @@ export {
   worlds,
   worldInventory,
   worldTiles,
-  worldRegions
+  worldRegions,
+  worldUnlockedTechs,
+  worldTechProgress
 } from "./schema/index.ts";
 export {
   insertAnonymousPlayer,
@@ -26,6 +28,7 @@ export {
   listWorldsByOwner,
   appendRegion,
   updateWorldEconomy,
+  updateWorldResearch,
   setTileBuilding,
   setTileBiomeDev,
   clearTileBuilding,
@@ -40,6 +43,8 @@ export {
   type WorldRegionRow,
   type WorldEconomyRow,
   type WorldInventoryRow,
+  type WorldResearchRow,
+  type WorldTechProgressRow,
   type WorldLockFailure,
   type WorldLockResult
 } from "./worlds.ts";

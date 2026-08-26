@@ -12,7 +12,9 @@ import type {
   InventoryStockSnapshot,
   PrimaryBiomeId,
   ResourceId,
+  TechId,
   WorldEconomySnapshot,
+  WorldResearchSnapshot,
   WorldSnapshot,
   WorldSummary
 } from "@hexald/shared";
@@ -23,6 +25,7 @@ import {
   createInitialEconomy,
   createStartingWorld,
   extractorSitesFromTiles,
+  countPastureTiles,
   foodConsumptionPerMinute,
   foodNetRatePerMinute,
   foodProductionPerMinute,
@@ -36,11 +39,16 @@ import {
   isBiomeId,
   maxAssignableWorkersForJob,
   POP_GROWTH_SURPLUS_FOOD_REQUIRED,
+  researchStateChanged,
+  scienceProductionPerMinute,
   settleEconomy,
+  settleResearch,
+  setResearchTarget,
   spendResource,
   spendWood,
   startConstruction,
   stockCapFor,
+  techProgressFor,
   validateAction,
   validateBuildPlacement,
   woodRefundOnDestroy,
@@ -51,14 +59,17 @@ import {
   computePopulationCap,
   computeRegionExpansionCost,
   type EconomyState,
+  type ResearchState,
   type StockEntry
 } from "@hexald/game-core";
+import { isResearchableTechId, isTechId, normalizeTechId, techScienceCost } from "@hexald/content";
 import type {
   Database,
   PersistedWorld,
   WorldDb,
   WorldEconomyRow,
   WorldInventoryRow,
+  WorldResearchRow,
   WorldTileRow
 } from "@hexald/db";
 import {
@@ -72,6 +83,7 @@ import {
   clearTileBuilding,
   setTileWorkerState,
   updateWorldEconomy,
+  updateWorldResearch,
   withWorldLock
 } from "@hexald/db";
 import { hexKey } from "@hexald/shared";
@@ -93,6 +105,74 @@ function buildingFlags(world: PersistedWorld, now = Date.now()) {
     hasFarm: hasCompletedBuilding(world.tiles, "farm", now),
     hasQuarry: hasCompletedBuilding(world.tiles, "quarry", now),
     hasFishingHut: hasCompletedBuilding(world.tiles, "fishing_hut", now)
+  };
+}
+
+function normalizeUnlockedTechIds(ids: readonly TechId[]): TechId[] {
+  const set = new Set<TechId>(["foundations"]);
+  for (const id of ids) {
+    const normalized = normalizeTechId(id) ?? (isTechId(id) ? id : null);
+    if (normalized) set.add(normalized);
+  }
+  return [...set];
+}
+
+function rowToResearchState(row: WorldResearchRow): ResearchState {
+  const progress: Partial<Record<TechId, number>> = {};
+  for (const entry of row.progress) {
+    const techId =
+      normalizeTechId(entry.techId) ??
+      (isTechId(entry.techId) ? entry.techId : null);
+    if (!techId) continue;
+    progress[techId] = Math.max(progress[techId] ?? 0, entry.progress);
+  }
+  const targetRaw = row.researchTargetTechId;
+  const researchTargetTechId = targetRaw
+    ? normalizeTechId(targetRaw) ?? (isTechId(targetRaw) ? targetRaw : null)
+    : null;
+  return {
+    researchTargetTechId,
+    unlockedTechIds: normalizeUnlockedTechIds(row.unlockedTechIds),
+    progress,
+    scienceLastSettledAt: row.scienceLastSettledAt.getTime()
+  };
+}
+
+function researchStateToRow(state: ResearchState): WorldResearchRow {
+  const progress = Object.entries(state.progress)
+    .map(([techId, value]) => ({
+      techId: techId as TechId,
+      progress: Math.max(0, Math.floor(value ?? 0))
+    }))
+    .filter((entry) => entry.progress > 0);
+
+  return {
+    researchTargetTechId: state.researchTargetTechId,
+    scienceLastSettledAt: new Date(state.scienceLastSettledAt),
+    unlockedTechIds: state.unlockedTechIds,
+    progress
+  };
+}
+
+function toResearchSnapshot(state: ResearchState): WorldResearchSnapshot {
+  const ids = new Set<TechId>();
+  for (const key of Object.keys(state.progress)) {
+    if (isTechId(key) && isResearchableTechId(key)) ids.add(key);
+  }
+  if (state.researchTargetTechId) {
+    ids.add(state.researchTargetTechId);
+  }
+
+  return {
+    researchTargetTechId: state.researchTargetTechId,
+    unlockedTechIds: state.unlockedTechIds,
+    techProgress: [...ids].map((techId) => ({
+      techId,
+      progress: techProgressFor(state, techId),
+      scienceCost: techScienceCost(techId)
+    })),
+    scienceProductionPerMinute: scienceProductionPerMinute(),
+    scienceLastSettledAt: new Date(state.scienceLastSettledAt).toISOString()
   };
 }
 
@@ -139,7 +219,8 @@ function rowToEconomyState(
   row: WorldEconomyRow,
   flags: ReturnType<typeof buildingFlags>,
   tiles: WorldTileRow[],
-  now: number
+  now: number,
+  unlockedTechIds: TechId[] = ["foundations"]
 ): EconomyState {
   const totals = workerTotalsFromTiles(tiles, now);
   const stocks = inventoryToStocks(row.inventory);
@@ -160,6 +241,8 @@ function rowToEconomyState(
     stocks,
     foodSurplusAccumulated: row.foodSurplusAccumulated ?? 0,
     extractorSites: extractorSitesFromTiles(tiles, now),
+    unlockedTechIds,
+    pastureTileCount: countPastureTiles(tiles),
     ...flags
   };
 }
@@ -243,7 +326,11 @@ function toEconomySnapshot(state: EconomyState): WorldEconomySnapshot {
   };
 }
 
-function toSnapshot(world: PersistedWorld, economy: EconomyState): WorldSnapshot {
+function toSnapshot(
+  world: PersistedWorld,
+  economy: EconomyState,
+  research: ResearchState
+): WorldSnapshot {
   return {
     id: world.id,
     ownerId: world.ownerId,
@@ -254,7 +341,8 @@ function toSnapshot(world: PersistedWorld, economy: EconomyState): WorldSnapshot
       center: { q: region.centerQ, r: region.centerR },
       biome: region.biome
     })),
-    economy: toEconomySnapshot(economy)
+    economy: toEconomySnapshot(economy),
+    research: toResearchSnapshot(research)
   };
 }
 
@@ -307,7 +395,7 @@ async function settleAndPersist(
   db: WorldDb,
   world: PersistedWorld,
   now = Date.now()
-): Promise<{ world: PersistedWorld; economy: EconomyState }> {
+): Promise<{ world: PersistedWorld; economy: EconomyState; research: ResearchState }> {
   const population = world.economy.populationTotal;
   const released = releaseHousingConstructionWorkers(world.tiles, now);
   let tiles = released.changed ? released.tiles : world.tiles;
@@ -322,24 +410,66 @@ async function settleAndPersist(
   }
 
   const flags = buildingFlags({ ...world, tiles }, now);
-  const before = rowToEconomyState(world.economy, flags, tiles, now);
+  const before = rowToEconomyState(
+    world.economy,
+    flags,
+    tiles,
+    now,
+    world.research.unlockedTechIds
+  );
   const settled = settleEconomy(before, now);
   const capChanged = world.economy.populationCap !== settled.populationCap;
 
-  if (
+  const researchBefore = rowToResearchState(world.research);
+  const researchAfter = settleResearch(researchBefore, now);
+
+  const economyChanged =
     stocksChanged(before, settled) ||
     released.changed ||
     seeded.changed ||
-    capChanged
-  ) {
-    const row = economyStateToRow(settled);
-    await updateWorldEconomy(db, world.id, row);
+    capChanged;
+  const researchChanged = researchStateChanged(researchBefore, researchAfter);
+
+  if (economyChanged || researchChanged) {
+    const row = economyChanged ? economyStateToRow(settled) : world.economy;
+    if (economyChanged) {
+      await updateWorldEconomy(db, world.id, row);
+    }
+    if (researchChanged) {
+      await updateWorldResearch(db, world.id, researchStateToRow(researchAfter));
+    }
     return {
-      world: { ...world, tiles, economy: row, updatedAt: new Date() },
-      economy: settled
+      world: {
+        ...world,
+        tiles,
+        economy: row,
+        research: researchStateToRow(researchAfter),
+        updatedAt: new Date()
+      },
+      economy: settled,
+      research: researchAfter
     };
   }
-  return { world, economy: settled };
+  return { world: { ...world, tiles }, economy: settled, research: researchAfter };
+}
+
+async function settleResearchAndPersist(
+  db: WorldDb,
+  worldId: string,
+  world: PersistedWorld,
+  now: number
+): Promise<{ world: PersistedWorld; research: ResearchState }> {
+  const before = rowToResearchState(world.research);
+  const after = settleResearch(before, now);
+  if (!researchStateChanged(before, after)) {
+    return { world, research: after };
+  }
+  const row = researchStateToRow(after);
+  await updateWorldResearch(db, worldId, row);
+  return {
+    world: { ...world, research: row, updatedAt: new Date() },
+    research: after
+  };
 }
 
 export async function createWorldService(
@@ -374,7 +504,8 @@ export async function createWorldService(
     economy: economyStateToRow(economy)
   });
 
-  return toSnapshot(persisted, economy);
+  const research = rowToResearchState(persisted.research);
+  return toSnapshot(persisted, economy, research);
 }
 
 export async function getWorldService(
@@ -383,8 +514,8 @@ export async function getWorldService(
   ownerId: string
 ): Promise<WorldSnapshot | null> {
   const locked = await withWorldLock(db, worldId, ownerId, async (tx, world) => {
-    const { world: settledWorld, economy } = await settleAndPersist(tx, world);
-    return toSnapshot(settledWorld, economy);
+    const { world: settledWorld, economy, research } = await settleAndPersist(tx, world);
+    return toSnapshot(settledWorld, economy, research);
   });
 
   if (locked.ok) return locked.value;
@@ -396,10 +527,17 @@ export async function getWorldService(
     const now = Date.now();
     const flags = buildingFlags(world, now);
     const economy = settleEconomy(
-      rowToEconomyState(world.economy, flags, world.tiles, now),
+      rowToEconomyState(
+        world.economy,
+        flags,
+        world.tiles,
+        now,
+        world.research.unlockedTechIds
+      ),
       now
     );
-    return toSnapshot(world, economy);
+    const research = settleResearch(rowToResearchState(world.research), now);
+    return toSnapshot(world, economy, research);
   }
 
   return null;
@@ -470,7 +608,13 @@ export async function grantDevResourcesService(
     const now = Date.now();
     const flags = buildingFlags(world, now);
     const settled = settleEconomy(
-      rowToEconomyState(world.economy, flags, world.tiles, now),
+      rowToEconomyState(
+        world.economy,
+        flags,
+        world.tiles,
+        now,
+        world.research.unlockedTechIds
+      ),
       now
     );
     let next = grantResource(settled, "wood", DEV_RESOURCE_GRANT, now, stockCapFor("wood"));
@@ -481,8 +625,14 @@ export async function grantDevResourcesService(
 
     const row = economyStateToRow(next);
     await updateWorldEconomy(tx, worldId, row);
+    const { world: withResearch, research } = await settleResearchAndPersist(
+      tx,
+      worldId,
+      { ...world, economy: row, updatedAt: new Date() },
+      now
+    );
 
-    return toSnapshot({ ...world, economy: row, updatedAt: new Date() }, next);
+    return toSnapshot(withResearch, next, research);
   });
 
   if (!locked.ok) return { ok: false, error: locked.error };
@@ -524,7 +674,13 @@ export async function setTileBiomeDevService(
     const now = Date.now();
     const flags = buildingFlags(world, now);
     const settled = settleEconomy(
-      rowToEconomyState(world.economy, flags, world.tiles, now),
+      rowToEconomyState(
+        world.economy,
+        flags,
+        world.tiles,
+        now,
+        world.research.unlockedTechIds
+      ),
       now
     );
 
@@ -560,17 +716,21 @@ export async function setTileBiomeDevService(
       economyStateToRow(settled),
       buildingFlags({ ...world, tiles: updatedTiles }, now),
       updatedTiles,
-      now
+      now,
+      world.research.unlockedTechIds
     );
     const row = economyStateToRow(after);
     await updateWorldEconomy(tx, worldId, row);
+    const { world: withResearch, research } = await settleResearchAndPersist(
+      tx,
+      worldId,
+      { ...world, tiles: updatedTiles, economy: row, updatedAt: new Date() },
+      now
+    );
 
     return {
       ok: true as const,
-      world: toSnapshot(
-        { ...world, tiles: updatedTiles, economy: row, updatedAt: new Date() },
-        after
-      )
+      world: toSnapshot(withResearch, after, research)
     };
   });
 
@@ -620,7 +780,13 @@ export async function expandRegionService(
     });
 
     const flags = buildingFlags(world, now);
-    const current = rowToEconomyState(world.economy, flags, world.tiles, now);
+    const current = rowToEconomyState(
+      world.economy,
+      flags,
+      world.tiles,
+      now,
+      world.research.unlockedTechIds
+    );
     const spent = spendResource(current, "worldshard", cost.worldshards, now);
     if (!spent.ok) {
       return { ok: false as const, error: "insufficient_resources" as const };
@@ -675,6 +841,12 @@ export async function expandRegionService(
       economy: economyRow,
       updatedAt: new Date()
     };
+    const { world: withResearch, research } = await settleResearchAndPersist(
+      tx,
+      worldId,
+      updatedWorld,
+      now
+    );
 
     return {
       ok: true as const,
@@ -691,7 +863,7 @@ export async function expandRegionService(
           poiId: tile.poiId ?? null
         })),
         cost,
-        world: toSnapshot(updatedWorld, afterExpand)
+        world: toSnapshot(withResearch, afterExpand, research)
       }
     };
   });
@@ -721,7 +893,13 @@ export async function assignWorkersService(
   const locked = await withWorldLock(db, worldId, ownerId, async (tx, world) => {
     const now = Date.now();
     const flags = buildingFlags(world, now);
-    const before = rowToEconomyState(world.economy, flags, world.tiles, now);
+    const before = rowToEconomyState(
+      world.economy,
+      flags,
+      world.tiles,
+      now,
+      world.research.unlockedTechIds
+    );
     const settled = settleEconomy(before, now);
 
     const result = assignWorkersAtTile(
@@ -759,14 +937,21 @@ export async function assignWorkersService(
       economyStateToRow(settled),
       buildingFlags(updatedWorld, now),
       updatedTiles,
-      now
+      now,
+      world.research.unlockedTechIds
     );
     const row = economyStateToRow(after);
     await updateWorldEconomy(tx, worldId, row);
+    const { world: withResearch, research } = await settleResearchAndPersist(
+      tx,
+      worldId,
+      { ...updatedWorld, economy: row },
+      now
+    );
 
     return {
       ok: true as const,
-      world: toSnapshot({ ...updatedWorld, economy: row }, after)
+      world: toSnapshot(withResearch, after, research)
     };
   });
 
@@ -785,7 +970,8 @@ export type BuildError =
   | "tile_occupied"
   | "has_village"
   | "insufficient_resources"
-  | "insufficient_population";
+  | "insufficient_population"
+  | "tech_not_unlocked";
 
 export async function buildService(
   db: Database["db"],
@@ -807,7 +993,8 @@ export async function buildService(
       biome: tile.biome,
       hasVillage: isStartVillage(tile.q, tile.r),
       existingBuildingId: tile.buildingId,
-      poiId: tile.poiId ?? null
+      poiId: tile.poiId ?? null,
+      unlockedTechIds: world.research.unlockedTechIds
     });
 
     if (!placement.ok) {
@@ -816,7 +1003,13 @@ export async function buildService(
 
     const now = Date.now();
     const flags = buildingFlags(world, now);
-    const current = rowToEconomyState(world.economy, flags, world.tiles, now);
+    const current = rowToEconomyState(
+      world.economy,
+      flags,
+      world.tiles,
+      now,
+      world.research.unlockedTechIds
+    );
     const committed = committedWorkersFromTiles(world.tiles);
     const idlePopulation = current.population - committed;
     if (idlePopulation < 1) {
@@ -873,6 +1066,13 @@ export async function buildService(
       economyRow,
       buildingFlags(updatedWorld, now),
       updatedTiles,
+      now,
+      world.research.unlockedTechIds
+    );
+    const { world: withResearch, research } = await settleResearchAndPersist(
+      tx,
+      worldId,
+      updatedWorld,
       now
     );
 
@@ -880,7 +1080,7 @@ export async function buildService(
       ok: true as const,
       result: {
         tile: tileSnapshot(updatedTile),
-        world: toSnapshot(updatedWorld, economy)
+        world: toSnapshot(withResearch, economy, research)
       }
     };
   });
@@ -921,7 +1121,13 @@ export async function destroyBuildingService(
     const now = Date.now();
     const flags = buildingFlags(world, now);
     const settled = settleEconomy(
-      rowToEconomyState(world.economy, flags, world.tiles, now),
+      rowToEconomyState(
+        world.economy,
+        flags,
+        world.tiles,
+        now,
+        world.research.unlockedTechIds
+      ),
       now
     );
 
@@ -957,7 +1163,8 @@ export async function destroyBuildingService(
       economyStateToRow(afterGrant),
       buildingFlags({ ...world, tiles: updatedTiles }, now),
       updatedTiles,
-      now
+      now,
+      world.research.unlockedTechIds
     );
     const row = economyStateToRow(after);
     await updateWorldEconomy(tx, worldId, row);
@@ -968,17 +1175,101 @@ export async function destroyBuildingService(
       economy: row,
       updatedAt: new Date()
     };
+    const { world: withResearch, research } = await settleResearchAndPersist(
+      tx,
+      worldId,
+      updatedWorld,
+      now
+    );
 
     return {
       ok: true as const,
       result: {
         tile: tileSnapshot(updatedTile),
-        world: toSnapshot(updatedWorld, after),
+        world: toSnapshot(withResearch, after, research),
         refunds: {
           wood: woodGranted,
           workers: freedWorkers
         }
       }
+    };
+  });
+
+  if (!locked.ok) return { ok: false, error: locked.error };
+  return locked.value;
+}
+
+export type SetResearchTargetError =
+  | "world_not_found"
+  | "world_busy"
+  | "unknown_tech"
+  | "not_researchable"
+  | "already_unlocked"
+  | "prerequisites_not_met";
+
+export async function setResearchTargetService(
+  db: Database["db"],
+  worldId: string,
+  ownerId: string,
+  techId: TechId
+): Promise<
+  { ok: true; world: WorldSnapshot } | { ok: false; error: SetResearchTargetError }
+> {
+  const locked = await withWorldLock(db, worldId, ownerId, async (tx, world) => {
+    const now = Date.now();
+    const flags = buildingFlags(world, now);
+    const economy = settleEconomy(
+      rowToEconomyState(
+        world.economy,
+        flags,
+        world.tiles,
+        now,
+        world.research.unlockedTechIds
+      ),
+      now
+    );
+    const researchBefore = rowToResearchState(world.research);
+    const settledResearch = settleResearch(researchBefore, now);
+    const outcome = setResearchTarget(settledResearch, techId, now);
+    if (!outcome.ok) {
+      if (researchStateChanged(researchBefore, settledResearch)) {
+        await updateWorldResearch(tx, worldId, researchStateToRow(settledResearch));
+      }
+      return { ok: false as const, error: outcome.reason };
+    }
+
+    if (researchStateChanged(researchBefore, outcome.state)) {
+      await updateWorldResearch(tx, worldId, researchStateToRow(outcome.state));
+    }
+
+    const economyRow = economyStateToRow(economy);
+    if (
+      stocksChanged(
+        rowToEconomyState(
+          world.economy,
+          flags,
+          world.tiles,
+          now,
+          world.research.unlockedTechIds
+        ),
+        economy
+      )
+    ) {
+      await updateWorldEconomy(tx, worldId, economyRow);
+    }
+
+    return {
+      ok: true as const,
+      world: toSnapshot(
+        {
+          ...world,
+          economy: economyRow,
+          research: researchStateToRow(outcome.state),
+          updatedAt: new Date()
+        },
+        economy,
+        outcome.state
+      )
     };
   });
 
@@ -1023,6 +1314,12 @@ export async function applyWorldAction(
     });
     if (!outcome.ok) return { ok: false, error: outcome.error };
     return { ok: true, type: "generate_region", result: outcome.result };
+  }
+
+  if (action.type === "set_research_target") {
+    const outcome = await setResearchTargetService(db, worldId, ownerId, action.techId);
+    if (!outcome.ok) return { ok: false, error: outcome.error };
+    return { ok: true, type: "set_research_target", world: outcome.world };
   }
 
   return { ok: false, error: "unknown_action" };

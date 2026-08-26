@@ -127,6 +127,20 @@
       "when": 1787750000000,
       "tag": "0017_players_firebase",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1787751000000,
+      "tag": "0018_world_research",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1787752000000,
+      "tag": "0019_tech_agriculture_branches",
+      "breakpoints": true
     }
   ]
 }

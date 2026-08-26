@@ -9,6 +9,7 @@ import type {
   GameAction,
   HexCoord,
   PrimaryBiomeId,
+  TechId,
   WorldSnapshot,
   WorldSummary
 } from "@hexald/shared";
@@ -36,6 +37,9 @@ function buildErrorMessage(err: unknown): string {
   }
   if (code === "insufficient_population") {
     return "Pas assez de pop libre pour construire (1 requis).";
+  }
+  if (code === "tech_not_unlocked") {
+    return "Tech requise non débloquée — ouvre l’arbre technologique.";
   }
   return err instanceof Error ? err.message : "build_failed";
 }
@@ -125,7 +129,7 @@ export function useWorld() {
         }
       );
       if (outcome.ok) {
-        if (outcome.type === "assign_workers") {
+        if (outcome.type === "assign_workers" || outcome.type === "set_research_target") {
           world.value = outcome.world;
         } else {
           world.value = outcome.result.world;
@@ -178,6 +182,18 @@ export function useWorld() {
     });
     if (!outcome?.ok || outcome.type !== "build") return null;
     return outcome.result;
+  }
+
+  async function setResearchTarget(
+    id: string,
+    techId: TechId
+  ): Promise<WorldSnapshot | null> {
+    const outcome = await applyAction(id, {
+      type: "set_research_target",
+      techId
+    });
+    if (!outcome?.ok || outcome.type !== "set_research_target") return null;
+    return outcome.world;
   }
 
   async function destroyBuilding(
@@ -274,6 +290,7 @@ export function useWorld() {
     ensureWorld,
     refreshWorld,
     applyAction,
+    setResearchTarget,
     expandRegion,
     assignWorkers,
     buildBuilding,

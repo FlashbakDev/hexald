@@ -128,5 +128,12 @@ export const env = {
   resendApiKey: process.env.RESEND_API_KEY?.trim() || undefined,
   supportTo: process.env.SUPPORT_TO?.trim() || "contact@hexald.com",
   supportFrom:
-    process.env.SUPPORT_FROM?.trim() || "Hexald <noreply@hexald.com>"
+    process.env.SUPPORT_FROM?.trim() || "Hexald <noreply@hexald.com>",
+  /** Emails autorisés pour /v1/admin/* (minuscules, séparés par des virgules). */
+  adminEmails: new Set(
+    (process.env.ADMIN_EMAILS ?? "")
+      .split(",")
+      .map((entry) => entry.trim().toLowerCase())
+      .filter(Boolean)
+  )
 };

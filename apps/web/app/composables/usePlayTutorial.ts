@@ -22,8 +22,8 @@ export type TutorialHole = {
 
 export type PlayTutorialStepId =
   | "intro"
-  | "select-forest"
   | "place-lumber"
+  | "select-forest"
   | "select-expand"
   | "place-plains"
   | "done";
@@ -56,18 +56,18 @@ export const PLAY_TUTORIAL_STEPS: PlayTutorialStep[] = [
     target: "header"
   },
   {
-    id: "select-forest",
-    title: "Première récolte",
-    body: "Clique une tuile de forêt pour y construire.",
-    mode: "action",
-    target: "map-forest"
-  },
-  {
     id: "place-lumber",
     title: "Camp de bûcherons",
-    body: "Choisis le camp pour produire du bois.",
+    body: "Ouvre le menu Construire en bas et choisis le camp de bûcherons.",
     mode: "action",
     target: "build-lumber"
+  },
+  {
+    id: "select-forest",
+    title: "Première récolte",
+    body: "Clique une case de forêt surlignée pour y placer le camp.",
+    mode: "action",
+    target: "map-forest"
   },
   {
     id: "select-expand",
@@ -159,23 +159,23 @@ export function usePlayTutorial() {
     stepIndex.value += 1;
   }
 
-  /** Sélection tuile forêt → étape camp. */
   function onTileSelected(input: {
     biome: string | null | undefined;
     canGenerate: boolean;
   }) {
     if (!active.value || !step.value) return;
-    if (step.value.id === "select-forest" && input.biome === "forest") {
-      goNext();
-      return;
-    }
     if (step.value.id === "select-expand" && input.canGenerate && !input.biome) {
       goNext();
     }
   }
 
-  function onBuildingPlaced(buildingId: string) {
+  function onConstructionSelected(buildingId: string) {
     if (!active.value || step.value?.id !== "place-lumber") return;
+    if (buildingId === "lumber_camp") goNext();
+  }
+
+  function onBuildingPlaced(buildingId: string) {
+    if (!active.value || step.value?.id !== "select-forest") return;
     if (buildingId === "lumber_camp") goNext();
   }
 
@@ -196,6 +196,7 @@ export function usePlayTutorial() {
     goNext,
     complete,
     onTileSelected,
+    onConstructionSelected,
     onBuildingPlaced,
     onRegionCreated
   };

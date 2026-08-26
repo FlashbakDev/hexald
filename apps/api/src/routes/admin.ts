@@ -10,13 +10,17 @@ import {
   isSupportMailConfigured,
   sendSupportMail
 } from "../support/mail.ts";
+import { requireAdmin } from "../admin/access.ts";
 
 function toIso(value: Date) {
   return value.toISOString();
 }
 
 export async function adminRoutes(app: FastifyInstance) {
-  app.get("/admin/overview", async () => {
+  app.get("/admin/overview", async (request, reply) => {
+    const admin = await requireAdmin(app, request, reply);
+    if (!admin) return;
+
     const stats = await fetchAdminDbStats(app.db);
     const online = listOnlinePresence();
     const onlinePlayers = await fetchPlayersByIds(
@@ -77,7 +81,10 @@ export async function adminRoutes(app: FastifyInstance) {
   });
 
   /** Dev only — envoie un mail de test via Resend (ou log si pas de clé). */
-  app.post("/admin/test-mail", async (_request, reply) => {
+  app.post("/admin/test-mail", async (request, reply) => {
+    const admin = await requireAdmin(app, request, reply);
+    if (!admin) return;
+
     if (!env.isDev) {
       return reply.code(403).send({ error: "dev_only" });
     }
@@ -88,10 +95,10 @@ export async function adminRoutes(app: FastifyInstance) {
       message:
         "Mail de test envoyé depuis /admin (environnement development).\nSi tu lis ceci, Resend fonctionne.",
       player: {
-        id: "00000000-0000-4000-8000-000000000000",
-        pseudo: "admin-test",
-        kind: "admin",
-        email: null,
+        id: admin.id,
+        pseudo: admin.pseudo,
+        kind: admin.kind,
+        email: admin.email,
         firebaseUid: null
       },
       meta: {

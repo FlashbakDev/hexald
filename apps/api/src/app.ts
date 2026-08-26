@@ -64,6 +64,17 @@ export async function buildApp() {
     );
   }
 
+  if (env.adminEmails.size === 0) {
+    app.log.warn(
+      "ADMIN_EMAILS empty — /v1/admin/* is unreachable until configured"
+    );
+  } else {
+    app.log.info(
+      { count: env.adminEmails.size },
+      "Admin access configured (Firebase + allowlist)"
+    );
+  }
+
   await app.register(healthRoutes);
   await app.register(sessionRoutes, { prefix: "/v1" });
   await app.register(contentRoutes, { prefix: "/v1" });

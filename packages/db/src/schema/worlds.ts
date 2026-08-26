@@ -25,7 +25,15 @@ export const worlds = pgTable("worlds", {
   /** Agrégats dénormalisés (vérité = world_tiles.assigned_workers). */
   woodcutters: integer("woodcutters").notNull().default(0),
   farmers: integer("farmers").notNull().default(0),
-  quarriers: integer("quarriers").notNull().default(0)
+  quarriers: integer("quarriers").notNull().default(0),
+  /** Tech cible active (DEC-022) ; null = pause. */
+  researchTargetTechId: text("research_target_tech_id"),
+  /** Horloge prod science HDV (ms epoch stocké en timestamptz). */
+  scienceLastSettledAt: timestamp("science_last_settled_at", {
+    withTimezone: true
+  })
+    .defaultNow()
+    .notNull()
 });
 
 /** Inventaire générique — une ligne par (monde, ressource). */
@@ -83,4 +91,27 @@ export const worldRegions = pgTable(
   (table) => [
     primaryKey({ columns: [table.worldId, table.centerQ, table.centerR] })
   ]
+);
+
+export const worldUnlockedTechs = pgTable(
+  "world_unlocked_techs",
+  {
+    worldId: uuid("world_id")
+      .notNull()
+      .references(() => worlds.id, { onDelete: "cascade" }),
+    techId: text("tech_id").notNull()
+  },
+  (table) => [primaryKey({ columns: [table.worldId, table.techId] })]
+);
+
+export const worldTechProgress = pgTable(
+  "world_tech_progress",
+  {
+    worldId: uuid("world_id")
+      .notNull()
+      .references(() => worlds.id, { onDelete: "cascade" }),
+    techId: text("tech_id").notNull(),
+    progress: integer("progress").notNull().default(0)
+  },
+  (table) => [primaryKey({ columns: [table.worldId, table.techId] })]
 );

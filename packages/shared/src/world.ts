@@ -1,4 +1,4 @@
-import type { BiomeId, BuildingId, PoiId, PrimaryBiomeId, ResourceId } from "./ids.ts";
+import type { BiomeId, BuildingId, PoiId, PrimaryBiomeId, ResourceId, TechId } from "./ids.ts";
 import type { HexCoord } from "./hex.ts";
 
 export type WorldTileSnapshot = {
@@ -82,6 +82,24 @@ export type WorldEconomySnapshot = {
   popGrowthSurplusRequired: number;
 };
 
+/** Progression d’une tech en cours (DEC-022). */
+export type TechProgressSnapshot = {
+  techId: TechId;
+  progress: number;
+  scienceCost: number;
+};
+
+/** État recherche monde-wide — pas de stock science. */
+export type WorldResearchSnapshot = {
+  researchTargetTechId: TechId | null;
+  unlockedTechIds: TechId[];
+  techProgress: TechProgressSnapshot[];
+  /** Prod HDV : +1 science / 10 min au MVP. */
+  scienceProductionPerMinute: number;
+  /** Horloge prod science (ISO) — projection client entre syncs. */
+  scienceLastSettledAt: string;
+};
+
 export type WorldSnapshot = {
   id: string;
   ownerId: string;
@@ -90,6 +108,7 @@ export type WorldSnapshot = {
   tiles: WorldTileSnapshot[];
   regions: WorldRegionSnapshot[];
   economy: WorldEconomySnapshot;
+  research: WorldResearchSnapshot;
 };
 
 export type WorldSummary = {

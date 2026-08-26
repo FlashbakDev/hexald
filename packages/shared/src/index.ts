@@ -5,7 +5,8 @@ export type {
   ResourceId,
   BuildingId,
   WorkerJob,
-  PoiId
+  PoiId,
+  TechId
 } from "./ids.ts";
 export {
   HEX_DIRECTIONS,
@@ -21,6 +22,7 @@ export type {
   BuildAction,
   AssignWorkersAction,
   GenerateRegionAction,
+  SetResearchTargetAction,
   ApplyActionSuccess,
   ApplyActionFailure,
   ApplyActionOutcome
@@ -31,6 +33,8 @@ export type {
   WorldTileSnapshot,
   WorldRegionSnapshot,
   WorldEconomySnapshot,
+  WorldResearchSnapshot,
+  TechProgressSnapshot,
   InventoryStockSnapshot,
   RegionExpansionCostSnapshot,
   ExpandRegionRequest,

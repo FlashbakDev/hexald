@@ -53,6 +53,7 @@
           <a href="#wiki-resources"><span class="nav-dot"></span>Ressources</a>
           <a href="#wiki-buildings"><span class="nav-dot"></span>Bâtiments</a>
           <a href="#wiki-chains"><span class="nav-dot"></span>Chaînes</a>
+          <a href="#wiki-tech"><span class="nav-dot"></span>Technologies</a>
           <a href="#wiki-world"><span class="nav-dot"></span>Monde</a>
           <a href="#wiki-pois"><span class="nav-dot"></span>POI</a>
         </div>
@@ -70,7 +71,7 @@
       </nav>
 
       <div class="sidebar-foot">
-        <div>Phase actuelle : <strong id="sidebar-phase">Economy POC · Food live</strong></div>
+        <div>Phase actuelle : <strong id="sidebar-phase">Phase 4 · Science live</strong></div>
         <div>Statut : <strong>Pre-production · Prod live</strong></div>
       </div>
     </aside>
@@ -79,7 +80,7 @@
       <header class="topbar">
         <button class="menu-toggle" type="button" data-open-nav aria-label="Ouvrir le menu">☰</button>
         <span class="badge badge-warning">Pre-production</span>
-        <span class="badge badge-accent">Phase 3 — Economy POC</span>
+        <span class="badge badge-accent">Phase 4 — Industry</span>
         <span class="badge badge-neutral">VPS · Docker</span>
         <button class="search-btn" type="button" data-open-search>
           <span>Rechercher une section</span>
@@ -105,12 +106,12 @@
             <article class="card stat-card">
               <div class="label">Phase</div>
               <div class="value">POC</div>
-              <div class="hint">Phase 3 — pêche · comptes · éclats</div>
+              <div class="hint">Phase 4 — mine · processors · adjacence</div>
             </article>
             <article class="card stat-card">
               <div class="label">Priority</div>
               <div class="value">Industry</div>
-              <div class="hint">Science · mine · adjacence</div>
+              <div class="hint">Mine · chaînes · adjacence Civ</div>
             </article>
             <article class="card stat-card">
               <div class="label">Status</div>
@@ -127,7 +128,7 @@
           <div class="grid grid-2" style="margin-top:14px">
             <article class="card">
               <h3>Stack en place</h3>
-              <p>Frontend Nuxt 4 / Vue / TypeScript / Three.js / Tailwind / Nuxt UI / PWA. Backend Fastify autoritaire. PostgreSQL + Drizzle (sessions, mondes, tuiles, inventaire, chantiers). Auth joueur : session cookie + <strong>Firebase</strong> (Google / email). Deploy Docker Compose + GitHub Actions SSH. Admin ops <code>/admin</code>. Contenu design dans <code>packages/content</code>.</p>
+              <p>Frontend Nuxt 4 / Vue / TypeScript / Three.js / Tailwind / Nuxt UI / PWA. Backend Fastify autoritaire. PostgreSQL + Drizzle (sessions, mondes, tuiles, inventaire, chantiers, recherche). Auth joueur : session cookie + <strong>Firebase</strong> (Google / email). Deploy Docker Compose + GitHub Actions SSH. Admin ops <code>/admin</code> (DEC-025). Contenu design dans <code>packages/content</code>.</p>
               <div class="chip-row">
                 <span class="badge badge-accent">Nuxt 4</span>
                 <span class="badge badge-accent">Three.js</span>
@@ -136,6 +137,7 @@
                 <span class="badge badge-accent">Firebase</span>
                 <span class="badge badge-accent">Docker</span>
                 <span class="badge badge-accent">PWA</span>
+                <span class="badge badge-accent">Science</span>
                 <span class="badge badge-neutral">ads.txt</span>
                 <span class="badge badge-neutral">Wiki contenu</span>
                 <span class="badge badge-neutral">UI nuages</span>
@@ -143,8 +145,8 @@
             </article>
             <article class="card">
               <h3>Dernière décision importante</h3>
-              <p><span class="badge badge-accent">DEC-024</span> Comptes Firebase : invité → lien Google / email, monde conservé.</p>
-              <p>Aussi : pêche (DEC-023), science (DEC-022), banc (DEC-021), éclats (DEC-020).</p>
+              <p><span class="badge badge-accent">DEC-022</span> Arbre technologique : prod HDV +1 / 10&nbsp;min, cible manuelle, frise <code>TechTimelinePanel</code>, gate build.</p>
+              <p>Aussi : <span class="badge badge-accent">DEC-025</span> Admin Firebase + <code>ADMIN_EMAILS</code>. Pop 4 · 1 worker / site (niv. 1).</p>
             </article>
           </div>
 
@@ -156,8 +158,11 @@
                 <li><span>02</span> Cabane de pêcheur + banc de poisson — fait</li>
                 <li><span>03</span> Comptes Firebase (lien invité) — fait</li>
                 <li><span>04</span> Tutoriel play + parallax gyro + pages légales — fait</li>
-                <li><span>05</span> Centre de recherche + science / techs (DEC-022)</li>
-                <li><span>06</span> Bonus d’adjacence Civ · Mine (fer) · sécuriser <code>/admin</code></li>
+                <li><span>05</span> Arbre technologique + prod science HDV (DEC-022) — fait</li>
+                <li><span>06</span> Sécuriser <code>/admin</code> (Firebase + <code>ADMIN_EMAILS</code>) — fait</li>
+                <li><span>07</span> Mine (fer) — extracteur runtime + mesh</li>
+                <li><span>08</span> Processors (scierie, moulin, fonderie, forge)</li>
+                <li><span>09</span> Bonus d’adjacence Civ (voisins → rate)</li>
               </ol>
             </article>
             <article class="card notes-card">
@@ -406,7 +411,7 @@
                   <li><strong>Cap de base = hôtel de ville</strong> (DEC-016) — ex. 80 par ressource ; les entrepôts / niveaux augmentent plus tard</li>
                   <li><strong>Cap hard actuel (placeholders)</strong> bois/blé 200, pierre 150 — à rattacher au stockage village</li>
                   <li><strong>Feedback UI</strong> <span class="status status-done">Live</span> — <code>stock/cap</code>, état near/full, rate <code>0/min</code> au cap, hint soft bois plein</li>
-                  <li><strong>Sinks réguliers</strong> — coûts d’expansion en <strong>éclats</strong> (DEC-020), construction bois, <strong>recherche science</strong> (DEC-022), upgrades, transformateurs, <strong>consommation food/pop</strong></li>
+                  <li><strong>Sinks réguliers</strong> — coûts d’expansion en <strong>éclats</strong> (DEC-020), construction bois, <strong>recherche tech</strong> (DEC-022 — prod science directe, pas de stock), upgrades, transformateurs, <strong>consommation food/pop</strong></li>
                 </ul>
               </div>
             </div>
@@ -493,29 +498,32 @@
 
           <article class="card" style="margin-top:14px">
             <h3>Science &amp; arbre technologique <span class="status status-planned">Planned</span> <span class="badge badge-neutral">DEC-022</span></h3>
-            <p>Progression Civ-light : la <strong>science</strong> est une ressource d’inventaire ; le <strong>Centre de recherche</strong> produit et sert de porte d’entrée à l’arbre. Séparé des éclats (expansion) et du bois (construction).</p>
+            <p>Progression Civ-light : la prod science de l’<strong>hôtel de ville</strong> alimente directement la tech <strong>cible</strong> choisie par le joueur. Pas de stock tampon — sans cible, la prod est perdue. Séparé des éclats (expansion) et du bois (construction).</p>
             <div class="grid grid-2" style="margin-top:12px">
               <div>
-                <h4 style="margin:0 0 8px">Accumulation</h4>
+                <h4 style="margin:0 0 8px">Production &amp; recherche</h4>
                 <ul class="tech-list">
-                  <li>HDV : filet passif <strong>+1 science / 10&nbsp;min</strong> (lazy)</li>
-                  <li>Centre de recherche : <strong>2 science / worker / min</strong>, max 1 worker niv. 1</li>
-                  <li>Cap stock <strong>60</strong> · départ <strong>0</strong></li>
-                  <li>Pas de yield Civ par tuile au MVP</li>
+                  <li>HDV : filet passif <strong>+1 science / 10&nbsp;min</strong> (lazy settle)</li>
+                  <li><strong>Pas de stock</strong> — prod → barre de la cible active, ou perdue si pause</li>
+                  <li>Cible obligatoire : tech <strong>available</strong> uniquement (pas de prérequis auto)</li>
+                  <li>Après unlock (online ou offline) : <strong>pause forcée</strong> — re-sélection manuelle</li>
+                  <li>Centre de recherche : <strong>hors MVP</strong> (phase ultérieure)</li>
                 </ul>
               </div>
               <div>
                 <h4 style="margin:0 0 8px">Arbre MVP (unlock bâtiments)</h4>
                 <ul class="tech-list">
+                  <li><code>foundations</code> — nœud « Acquis » (pédagogique, jamais recherchable)</li>
+                  <li><code>fishing</code> ~20 → cabane de pêcheur</li>
                   <li><code>woodworking</code> ~25 → scierie</li>
                   <li><code>agriculture</code> ~30 → moulin + boulangerie</li>
                   <li><code>mining</code> ~40 → mine</li>
                   <li><code>metallurgy</code> ~50 (req. mining) → fonderie + forge</li>
-                  <li>Camp / ferme / carrière / maison : <strong>jamais</strong> gated</li>
+                  <li>Hors gate : camp, ferme, carrière, maison, expansion</li>
                 </ul>
               </div>
             </div>
-            <p class="notes-hint" style="margin-top:12px">Plusieurs centres possibles. UI arbre ouverte depuis un centre achevé ; <strong>1 recherche active / centre</strong> (action <code>research</code> ciblée sur la tuile). Techs débloquées = monde entier.</p>
+            <p class="notes-hint" style="margin-top:12px">UI arbre toujours accessible (bouton play). Action <code>set_research_target</code> · progression partielle conservée au changement de cible · techs débloquées = monde entier.</p>
           </article>
 
           <article class="card" style="margin-top:14px">
@@ -765,7 +773,7 @@
             </article>
             <article class="card">
               <h3>Client jouable</h3>
-              <p>Landing <code>/</code> (pseudo + CTA + connexion Firebase). Carte Three.js dans <code>/play</code> : header / bottom sheet nuage, food + barre croissance, <strong>éclats</strong>, roue biomes, roue build (camp / ferme / carrière / maison / <strong>cabane de pêcheur</strong>), stocks, workers, badges +20&nbsp;% fusion, tutoriel coach, lien de compte, parallax gyro (mobile), réglages. Actualités <code>/news</code>, pages légales. Dev <code>/poc</code>. Admin <code>/admin</code>. PWA + blocker offline. <code>ads.txt</code> AdSense.</p>
+              <p>Landing <code>/</code> (pseudo + CTA + connexion Firebase). Carte Three.js dans <code>/play</code> : header / bottom sheet nuage, food + barre croissance, <strong>éclats</strong>, frise <strong>Technologies</strong>, roue biomes, roue build (extracteurs / maison / cabane gated), stocks, workers, badges carte (pop, workers, timer, +20&nbsp;% fusion, alerte orange si 0 worker), tutoriel coach, toasts in-app (tech, pop, stocks pleins, chantiers), lien de compte, parallax gyro (mobile), réglages notifs. Frein de pan : territoire constructible au centre de l’écran. Actualités <code>/news</code>, pages légales. Dev <code>/poc</code>. Admin <code>/admin</code> (Firebase). PWA + blocker offline. <code>ads.txt</code> AdSense.</p>
             </article>
           </div>
 
@@ -797,15 +805,15 @@
             <div class="tab-panels">
               <div class="panel-front card">
                 <h3>Nuxt 4 · Vue · TypeScript · Three.js · Firebase Auth</h3>
-                <p>Routes : <code>/</code> landing, <code>/play</code> jeu, <code>/news</code>, légales (<code>/privacy</code>…), <code>/admin</code>, <code>/poc</code>. Proxy <code>/backend</code> → API (+ proxy Firebase Auth Domain si configuré). Client Firebase (popup desktop / redirect mobile). Three.js uniquement pour la carte (<code>app/renderer</code>). PWA + <code>OfflineBlocker</code>.</p>
+                <p>Routes : <code>/</code> landing, <code>/play</code> jeu, <code>/news</code>, légales (<code>/privacy</code>…), <code>/admin</code>, <code>/poc</code>. Proxy <code>/backend</code> → API (+ proxy Firebase Auth Domain si configuré). Client Firebase (popup desktop / redirect mobile). Three.js uniquement pour la carte (<code>app/renderer</code>). PWA + <code>OfflineBlocker</code>. Frise tech <code>TechTimelinePanel</code> + dock science. Toasts jeu via <code>useGameNotifications</code>.</p>
               </div>
               <div class="panel-back card">
                 <h3>Node.js · TypeScript · Fastify · Firebase Admin</h3>
-                <p>Session cookie <code>tw_sid</code> (anonyme ou liée). <code>POST /v1/session/firebase</code> vérifie l’idToken et lie / crée le joueur. Mondes, régions, bâtiments (chantiers), workers/tuile, settle lazy (extracteurs dont pêche + food/croissance + <strong>éclats</strong>), content, admin, support Resend. Présence en mémoire (TTL 5&nbsp;min).</p>
+                <p>Session cookie <code>tw_sid</code> (anonyme ou liée). <code>POST /v1/session/firebase</code> vérifie l’idToken et lie / crée le joueur. Mondes, régions, bâtiments (chantiers), workers/tuile, settle lazy (extracteurs dont pêche + food/croissance + <strong>éclats</strong> + <strong>recherche</strong>), actions unifiées (<code>build</code>, <code>assign_workers</code>, <code>generate_region</code>, <code>set_research_target</code>), content, admin (<code>ADMIN_EMAILS</code>), support Resend. Présence en mémoire (TTL 5&nbsp;min).</p>
               </div>
               <div class="panel-data card">
                 <h3>PostgreSQL · Drizzle ORM</h3>
-                <p>Schéma : <code>players</code> (<code>kind</code>, <code>firebase_uid</code>, email), <code>worlds</code> (pop + surplus food), <code>world_inventory</code>, tuiles (<code>building_id</code>, <code>poi_id</code>, chantiers, workers) / régions. Contenu design dans <code>packages/content</code>.</p>
+                <p>Schéma : <code>players</code> (<code>kind</code>, <code>firebase_uid</code>, email), <code>worlds</code> (pop, surplus food, <code>research_target_tech_id</code>, <code>world_unlocked_techs</code>, <code>world_tech_progress</code>), <code>world_inventory</code>, tuiles (<code>building_id</code>, <code>poi_id</code>, chantiers, workers) / régions. Contenu design dans <code>packages/content</code> (<code>technologies.ts</code>, <code>cityImprovements.ts</code>).</p>
               </div>
               <div class="panel-arch">
                 <pre class="mono"><span class="tree-key">hexald/</span>
@@ -1056,9 +1064,9 @@
               <h3>Admin ops léger ; contenu design en fichiers</h3>
               <dl>
                 <dt>Contexte</dt><dd>Besoin de voir joueurs, mondes, présence et compteurs pendant le développement, sans bâtir un CMS de game design.</dd>
-                <dt>Décision</dt><dd>Page Nuxt <code>/admin</code> + <code>GET /v1/admin/overview</code> (sans auth pour l’instant). Présence en mémoire (activité API, TTL 5&nbsp;min). Biomes / bâtiments / recettes restent dans <code>packages/content</code>.</dd>
+                <dt>Décision</dt><dd>Page Nuxt <code>/admin</code> + <code>GET /v1/admin/overview</code>. Présence en mémoire (activité API, TTL 5&nbsp;min). Biomes / bâtiments / recettes restent dans <code>packages/content</code>. <strong>Mise à jour 2026-08-26</strong> : auth via session Firebase + liste serveur <code>ADMIN_EMAILS</code> (DEC-025).</dd>
                 <dt>Raison</dt><dd>L’admin sert à observer et opérer le live. Éditer le contenu via UI trop tôt coûte cher (validation, versions, hot-edit) alors que les fichiers typés + Git restent le meilleur fit en pre-prod.</dd>
-                <dt>Conséquences</dt><dd>Ne pas exposer <code>/admin</code> en prod sans auth. Hot-edit du catalogue = décision future (contenu versionné), pas un CRUD libre. Repo GitHub : <code>FlashbakDev/hexald</code>.</dd>
+                <dt>Conséquences</dt><dd>Configurer <code>ADMIN_EMAILS</code> sur l’API avant d’utiliser l’admin en prod. Hot-edit du catalogue = décision future (contenu versionné), pas un CRUD libre. Repo GitHub : <code>FlashbakDev/hexald</code>.</dd>
               </dl>
             </article>
 
@@ -1071,7 +1079,7 @@
               <h3>Population v0 — pop fixe + camp bois implicite</h3>
               <dl>
                 <dt>Contexte</dt><dd>Phase 3 doit valider assignation → production hors ligne sans poser encore tout le système de bâtiments.</dd>
-                <dt>Décision</dt><dd>Pop fixe <strong>4</strong> (cap 12 affiché). Extracteurs niveau 1 : <strong>1 worker max</strong> chacun. Rate 12 bois/worker/h, cap stock 200, départ 30. Assignation via <code>POST /v1/worlds/:id/actions</code> (<code>assign_workers</code>). Settle lazy au load / assign (DEC-006).</dd>
+                <dt>Décision</dt><dd>Pop de départ <strong>4</strong> (cap HDV = 4 au départ ; +1 / maison). Extracteurs niveau 1 : <strong>1 worker max</strong> chacun. Rate <strong>5 / worker / min</strong> (catalogue bâtiments). Cap stock de base HDV <strong>80</strong> / ressource. Assignation via <code>POST /v1/worlds/:id/actions</code> (<code>assign_workers</code>). Settle lazy au load / assign (DEC-006).</dd>
                 <dt>Raison</dt><dd>Prouve la boucle navigateur (Travian-like + idle) avec un scope minimal. Pas de croissance / food / pathfinding au v0.</dd>
                 <dt>Conséquences</dt><dd>Colonnes économie sur <code>worlds</code> (legacy). Stocks génériques dans <code>world_inventory</code> (migration 0011). UI <code>/play</code> : panneau workers ± et stocks. Remplacé en partie par DEC-014 (camp posé sur carte).</dd>
               </dl>
@@ -1265,32 +1273,51 @@
             <article class="decision">
               <header>
                 <span class="id">DEC-022</span>
-                <span class="status status-accepted">Accepted</span>
+                <span class="status status-done">Accepted</span>
                 <span class="badge badge-neutral">2026-08-26</span>
+                <span class="badge badge-neutral">révisé 2026-08-26</span>
               </header>
-              <h3>Arbre technologique Civ-light — science + Centre de recherche</h3>
+              <h3>Arbre technologique Civ-light — science HDV, cible manuelle</h3>
               <dl>
-                <dt>Contexte</dt><dd>Les chaînes Phase 4 (scierie, mine, forge…) doivent se débloquer progressivement sans casser le MVP extracteurs. Le backlog « Âges technologiques » et l’idée Civ demandent une progression lisible, idle-friendly, alignée inventaire générique (DEC-013+) — pas un yield Civ par tuile.</dd>
+                <dt>Contexte</dt><dd>Les chaînes Phase 4 (scierie, mine, forge…) doivent se débloquer progressivement sans casser le MVP extracteurs terrestres. Le backlog « Âges technologiques » et l’idée Civ demandent une progression lisible, idle-friendly — pas un yield Civ par tuile. La première rédaction (stock science + centre de recherche multi-slots) a été simplifiée après revue UX : cible obligatoire, pas de stock, HDV seul au MVP.</dd>
                 <dt>Décision</dt><dd>
                   <ul style="margin:0;padding-left:1.1em">
-                    <li><strong>Ressource <code>science</code></strong> (« Science ») dans l’inventaire monde — settle lazy, caps entiers, sink = recherche. Distinct de <code>worldshard</code> (expansion) et <code>wood</code> (construction).</li>
-                    <li><strong>Prod</strong> : hôtel de ville <strong>+1 / 10&nbsp;min</strong> (filet) ; bâtiment <code>research_center</code> (« Centre de recherche ») <strong>2 / worker / min</strong>, max <strong>1</strong> worker niveau 1, terrain <code>any</code>, rôle <code>special</code>. Cap stock science <strong>60</strong>, départ <strong>0</strong>. Prod totale = somme des centres (workers assignés).</li>
-                    <li><strong>Centre de recherche</strong> : <strong>pas de limite</strong> de nombre par monde ; posable (coût bois + chantier, même pattern DEC-018) <strong>sans</strong> prérequis tech. Chaque centre achevé : (1) <strong>accès UI</strong> à l’arbre (sélection tuile / sheet), (2) <strong>1 slot de recherche</strong> — une tech en cours à la fois <em>par centre</em>. Plusieurs centres = recherches parallèles. Techs débloquées restent <strong>monde-wide</strong>. Pas de menu global tech sans au moins un centre (le filet HDV peut remplir le stock, mais pas ouvrir l’UI).</li>
-                    <li><strong>Techs</strong> : catalogue data-driven (<code>packages/content</code>) — id, coût science, prérequis tech[], unlocks (bâtiments / chaînes). Action unifiée <code>research</code> sur <code>POST /v1/worlds/:id/actions</code> (lock monde), payload avec tuile / id du centre. Le slot du centre doit être libre ; débit science (stock monde) jusqu’à complétion — pas d’instant unlock au MVP si un slot est ouvert (barre « en cours » sur le centre).</li>
-                    <li><strong>Arbre MVP</strong> (coûts tunables) :
+                    <li><strong>Pas de stock science</strong> — la production n’est pas une ressource d’inventaire. Elle alimente directement la barre de progression de la tech <strong>cible</strong> ; sans cible (pause), la prod est <strong>perdue</strong>. Distinct de <code>worldshard</code> (expansion) et <code>wood</code> (construction).</li>
+                    <li><strong>Prod MVP</strong> : hôtel de ville <strong>+1 science / 10&nbsp;min</strong> (settle lazy). Bâtiment <code>research_center</code> (« Centre de recherche ») : <strong>hors MVP</strong> — prévu plus tard pour accélérer la prod (2 / worker / min).</li>
+                    <li><strong>Recherche monde-wide</strong> : le joueur choisit une tech <strong>available</strong> (prérequis OK, pas encore unlocked) via l’UI ou l’action <code>set_research_target</code> sur <code>POST /v1/worlds/:id/actions</code> (lock monde). Impossible de cibler une tech locked (prérequis manquants) — pas de chemin auto vers une cible lointaine ; une tech à la fois, sélection manuelle à chaque étape.</li>
+                    <li><strong>Pause obligatoire</strong> : après chaque unlock (online ou offline), <code>research_target</code> repasse à <code>null</code> — le joueur doit re-sélectionner. Offline : la prod rattrapée peut terminer la tech en cours, puis stop ; le surplus éventuel est perdu.</li>
+                    <li><strong>Progression partielle</strong> : conservée par tech (<code>world_tech_progress</code>) ; changer de cible ne réinitialise pas les autres branches.</li>
+                    <li><strong>UI</strong> : bouton « Technologies » toujours visible (play) ; frise <code>TechTimelinePanel</code> ; barre <code>progress / scienceCost</code> sur la cible ; affichage prod (+X / min), pas de compteur de stock.</li>
+                    <li><strong>Catalogue</strong> data-driven (<code>packages/content/src/technologies.ts</code>) — 16 techs, 3 âges (Origines → Artisanat → Métallurgie), branches Agriculture (élevage, poterie, maçonnerie…). Frise horizontale branchée sur le snapshot monde.</li>
+                    <li><strong>Arbre implémenté</strong> (coûts tunables, extrait) :
                       <ul style="margin:0.35em 0 0;padding-left:1.1em">
-                        <li><code>woodworking</code> (~25) → unlock <code>sawmill</code></li>
-                        <li><code>agriculture</code> (~30) → unlock <code>mill</code> + <code>bakery</code></li>
-                        <li><code>mining</code> (~40) → unlock <code>mine</code></li>
-                        <li><code>metallurgy</code> (~50, req. <code>mining</code>) → unlock <code>smelter</code> + <code>forge</code></li>
+                        <li><code>foundations</code> (0) — nœud « <strong>Acquis</strong> » ; extracteurs terrestres de base</li>
+                        <li><code>sailing</code> → <code>fishing_hut</code> · <code>agriculture</code> → branches élevage / poterie / irrigation…</li>
+                        <li><code>mining</code> → <code>mine</code> · <code>metallurgy</code> → <code>smelter</code> + <code>forge</code></li>
                       </ul>
                     </li>
-                    <li><strong>Hors gate</strong> : <code>lumber_camp</code>, <code>farm</code>, <code>quarry</code>, <code>fishing_hut</code>, <code>house</code>, expansion, centre de recherche. Pas de bonus rate magique via tech au MVP (unlock only).</li>
+                    <li><strong>Gate build</strong> — hors gate au départ : <code>lumber_camp</code>, <code>farm</code>, <code>quarry</code>, <code>house</code>, expansion. Derrière tech : <code>fishing_hut</code> (<code>sailing</code>), processors, mine, fonderie, forge. Pas de bonus rate via tech au MVP (unlock + bonus passifs ciblés). <code>requiredTechId</code> sur les bâtiments du catalogue.</li>
+                    <li><strong>Mondes existants</strong> : bâtiments déjà construits conservés (grandfather) ; gate appliqué aux <strong>nouvelles</strong> poses seulement.</li>
                     <li>Pas d’âges nommés (Antiquité…) tant que &lt; ~8 techs — graphe court + label « Technologies ».</li>
                   </ul>
                 </dt>
-                <dt>Raison</dt><dd>Même modèle ressource que le reste de l’éco (lisible, settle lazy). Le bâtiment ancre fantasy Civ (campus) et force un choix pop (worker recherche vs prod). Plusieurs centres = scaling science + recherches parallèles, sans plafond artificiel. Unlock des chaînes déjà catalogue sans payer la puissance. Sépare clairement expansion / build / research.</dd>
-                <dt>Conséquences</dt><dd>Shared : <code>science</code> ResourceId, <code>research_center</code> BuildingId, <code>TechId</code> + état débloqué monde + tech en cours <em>par tuile centre</em>. Content : techs + placeable centre (multi). game-core : settle science (tous centres), spend progressif + complete tech. API : action <code>research</code> (cible tuile), gate <code>build</code> sur unlocks. UI : stock science, mesh centres, panneau arbre + barre slot depuis le bâtiment cliqué.</dd>
+                <dt>Raison</dt><dd>Forcer un retour joueur à chaque unlock (pause post-tech) plutôt qu’un enchaînement idle invisible. Pas de stock = tension sur le timing (prod perdue si oubli de cibler). HDV seul au MVP limite la surface d’implémentation ; le centre de recherche viendra accélérer sans changer le modèle cible + barre. Sépare clairement expansion / build / research.</dd>
+                <dt>Conséquences</dt><dd>Shared : <code>TechId</code> (+ <code>fishing</code>), action <code>set_research_target</code>. DB : <code>worlds.research_target_tech_id</code>, <code>world_unlocked_techs</code>, <code>world_tech_progress</code> — pas de <code>science</code> dans <code>world_inventory</code>. Content : techs + <code>requiredTechId</code> sur bâtiments gated. game-core : settle prod HDV → progress cible, complete + pause. API : gate <code>build</code> sur unlocks. UI : frise branchée sur snapshot monde. <code>research_center</code> reste catalogue « planned », non implémenté au MVP.</dd>
+              </dl>
+            </article>
+
+            <article class="decision">
+              <header>
+                <span class="id">DEC-025</span>
+                <span class="status status-done">Accepted</span>
+                <span class="badge badge-neutral">2026-08-26</span>
+              </header>
+              <h3>Admin protégé — Firebase + ADMIN_EMAILS</h3>
+              <dl>
+                <dt>Contexte</dt><dd><code>/admin</code> et <code>/v1/admin/*</code> étaient ouverts (DEC-012). Avant exposition publique, il faut restreindre l’accès sans construire un RBAC complet.</dd>
+                <dt>Décision</dt><dd>Session joueur Firebase obligatoire. L’email normalisé du joueur doit figurer dans <code>ADMIN_EMAILS</code> (liste serveur, virgules). UI <code>/admin</code> : gate login Google / email, puis appels API avec cookie session. <code>POST /v1/admin/test-mail</code> (dev only) pour tester Resend.</dd>
+                <dt>Raison</dt><dd>Réutilise l’auth déjà en place (DEC-024). Pas de secret partagé côté client. Liste d’emails = contrôle ops simple pour une petite équipe.</dd>
+                <dt>Conséquences</dt><dd>Env API : <code>ADMIN_EMAILS=you@example.com,…</code>. Erreurs <code>admin_firebase_required</code> / <code>admin_forbidden</code>. Les invités anonymes ne voient pas l’overview.</dd>
               </dl>
             </article>
 
@@ -1356,6 +1383,10 @@
             <a class="card wiki-nav-card" href="#wiki-chains">
               <h3>Chaînes</h3>
               <p>Fer, bois, nourriture, pierre, éclats de monde — étapes de production.</p>
+            </a>
+            <a class="card wiki-nav-card" href="#wiki-tech">
+              <h3>Technologies</h3>
+              <p>Arbre MVP DEC-022 : coûts, prérequis, unlocks bâtiments.</p>
             </a>
             <a class="card wiki-nav-card" href="#wiki-world">
               <h3>Monde</h3>
@@ -1620,7 +1651,6 @@
                 <tr><td><code>iron_ingot</code></td><td>Lingot de fer</td><td>Fonderie</td></tr>
                 <tr><td><code>tools</code></td><td>Outils</td><td>Forge — bout de chaîne fer</td></tr>
                 <tr><td><code>worldshard</code></td><td>Éclat de monde</td><td>Ancrage / révélation de région (DEC-020) ; prod HDV 1/15&nbsp;min, cap 5</td></tr>
-                <tr><td><code>science</code></td><td>Science</td><td>Recherche (DEC-022) ; HDV 1/10&nbsp;min + Centre de recherche ; sink techs ; cap 60</td></tr>
               </tbody>
             </table>
           </div>
@@ -1688,7 +1718,7 @@
                 </tr>
                 <tr data-wiki-kind="mvp">
                   <td>Cabane de pêcheur</td><td><code>fishing_hut</code></td><td>water + fish_bank</td><td>workers</td><td>food</td><td>1</td>
-                  <td><span class="status status-done">Live</span> <span class="badge badge-neutral">DEC-023</span></td>
+                  <td><span class="status status-done">Live</span> <span class="badge badge-neutral">DEC-023</span> · gate <code>fishing</code> (DEC-022)</td>
                 </tr>
                 <tr data-wiki-kind="mvp">
                   <td>Fonderie</td><td><code>smelter</code></td><td>any</td><td>iron_ore</td><td>iron_ingot</td><td>multi</td>
@@ -1698,9 +1728,9 @@
                   <td>Forge</td><td><code>forge</code></td><td>any</td><td>iron_ingot</td><td>tools</td><td>1</td>
                   <td><span class="status status-mvp">MVP</span></td>
                 </tr>
-                <tr data-wiki-kind="planned">
-                  <td>Centre de recherche</td><td><code>research_center</code></td><td>any</td><td>workers</td><td>science (+ accès arbre)</td><td>1</td>
-                  <td><span class="status status-planned">Planned</span> <span class="badge badge-neutral">DEC-022</span></td>
+                <tr data-wiki-kind="later">
+                  <td>Centre de recherche</td><td><code>research_center</code></td><td>any</td><td>workers</td><td>science (accélération prod.)</td><td>1</td>
+                  <td><span class="status status-planned">Later</span> <span class="badge badge-neutral">post DEC-022</span></td>
                 </tr>
                 <tr data-wiki-kind="later">
                   <td>Monument</td><td><code>monument</code></td><td>any</td><td>—</td><td>prestige</td><td>multi</td>
@@ -1756,13 +1786,14 @@
               <p class="wiki-meta">DEC-020 · Cap 5 · Départ 1 · Futurs bâtiments prod. dédiés</p>
             </article>
             <article class="card wiki-entry">
-              <h3>Science <code class="wiki-id">science</code></h3>
+              <h3>Science (recherche) <span class="badge badge-neutral">DEC-022</span></h3>
               <div class="wiki-chain">
-                <span>Hôtel de ville → <code>science</code> (1 / 10&nbsp;min)</span>
-                <span>Centre de recherche → <code>science</code> (2 / worker / min)</span>
-                <span>Dépenser → tech (<code>research</code>) → unlock bâtiments</span>
+                <span>Hôtel de ville → prod science (1 / 10&nbsp;min)</span>
+                <span>Si cible active → barre <code>progress / scienceCost</code></span>
+                <span>Sinon → prod perdue</span>
+                <span>Unlock → pause · re-sélection manuelle</span>
               </div>
-              <p class="wiki-meta">DEC-022 · Cap 60 · Départ 0 · Multi-centres · 1 slot recherche / centre · techs monde-wide</p>
+              <p class="wiki-meta">Pas de stock · Pas de ressource inventaire · HDV seul au MVP · Centre de recherche plus tard</p>
             </article>
             <article class="card wiki-entry">
               <h3>Pierre <code class="wiki-id">stone</code></h3>
@@ -1772,6 +1803,79 @@
               <p class="wiki-meta">Chaîne courte MVP ; blocs (<code>stone_blocks</code>) plus tard.</p>
             </article>
           </div>
+        </section>
+
+        <section id="wiki-tech">
+          <p class="section-kicker">Wiki · Technologies</p>
+          <h2>Arbre technologique</h2>
+          <p>Catalogue <code>packages/content/src/technologies.ts</code> — <strong>16 techs</strong>, 3 âges (Origines → Artisanat → Métallurgie). Règles runtime : <span class="badge badge-neutral">DEC-022</span> — prod HDV +1 / 10&nbsp;min vers cible, pause post-unlock, pas de stock science. Frise <code>TechTimelinePanel</code> live.</p>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Tech</th>
+                  <th>Id</th>
+                  <th>Coût</th>
+                  <th>Prérequis</th>
+                  <th>Unlocks</th>
+                  <th>Statut nœud</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Fondations</td>
+                  <td><code>foundations</code></td>
+                  <td>—</td>
+                  <td>—</td>
+                  <td>Extracteurs terrestres (implicite)</td>
+                  <td><span class="status status-done">Acquis</span> pédagogique</td>
+                </tr>
+                <tr>
+                  <td>Navigation à voile</td>
+                  <td><code>sailing</code></td>
+                  <td>25</td>
+                  <td><code>agriculture</code></td>
+                  <td><code>fishing_hut</code></td>
+                  <td><span class="status status-mvp">Live</span></td>
+                </tr>
+                <tr>
+                  <td>Agriculture</td>
+                  <td><code>agriculture</code></td>
+                  <td>20</td>
+                  <td><code>foundations</code></td>
+                  <td>Branches élevage, poterie, irrigation…</td>
+                  <td><span class="status status-mvp">Live</span></td>
+                </tr>
+                <tr>
+                  <td>Mine souterraine</td>
+                  <td><code>mining</code></td>
+                  <td>40</td>
+                  <td><code>pottery</code></td>
+                  <td><code>mine</code> (catalogue ; runtime extracteur à brancher)</td>
+                  <td><span class="status status-mvp">Live</span></td>
+                </tr>
+                <tr>
+                  <td>Métallurgie</td>
+                  <td><code>metallurgy</code></td>
+                  <td>50</td>
+                  <td><code>mining</code></td>
+                  <td><code>smelter</code>, <code>forge</code></td>
+                  <td><span class="status status-mvp">Live</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="notes-hint">Tableau résumé — voir le fichier source pour l’arbre complet (élevage, maçonnerie, monnaie, etc.).</p>
+
+          <article class="card" style="margin-top:14px">
+            <h3>Gate build (DEC-022)</h3>
+            <ul class="tech-list">
+              <li><strong>Hors gate</strong> : <code>lumber_camp</code>, <code>farm</code>, <code>quarry</code>, <code>house</code>, expansion région</li>
+              <li><strong>Gated</strong> : <code>fishing_hut</code> (<code>sailing</code>), processors (<code>sawmill</code>, <code>mill</code>, <code>bakery</code>), <code>mine</code>, <code>smelter</code>, <code>forge</code></li>
+              <li>Mondes existants : bâtiments déjà posés conservés ; gate sur nouvelles poses seulement</li>
+            </ul>
+          </article>
         </section>
 
         <section id="wiki-world">
@@ -2069,14 +2173,14 @@
                 <li>Client branché sur la persistance (charger / sauver) — fait</li>
               </ul>
             </article>
-            <article class="roadmap-item is-current">
-              <div class="roadmap-head"><h3>Phase 3 — Economy POC</h3><span class="status status-progress">In progress</span></div>
+            <article class="roadmap-item is-done">
+              <div class="roadmap-head"><h3>Phase 3 — Economy POC</h3><span class="status status-done">Done</span></div>
               <ul>
                 <li>Landing + session + claim pseudo — fait</li>
                 <li>Admin ops (<code>/admin</code>, overview API) — fait</li>
                 <li>Pop + workers + bois lazy — fait</li>
                 <li>Pose extracteurs <code>lumber_camp</code> / <code>farm</code> / <code>quarry</code> / <code>fishing_hut</code> + chantiers — fait</li>
-                <li>Workers par tuile (1 max / site) — fait</li>
+                <li>Workers par tuile (1 max / site niv. 1) — fait</li>
                 <li>Coût d’expansion — éclats de monde (hop) — fait</li>
                 <li>UI play : header / bottom sheet nuage — fait</li>
                 <li><code>ads.txt</code> AdSense — fait</li>
@@ -2089,19 +2193,22 @@
                 <li>Comptes Firebase / lien invité (DEC-024) — fait</li>
                 <li>Tutoriel play + parallax gyro + pages légales / news — fait</li>
                 <li>Décors fusion / eau / pêche (meshes &amp; silhouettes) — fait</li>
-                <li>Bonus d’adjacence Civ (voisins → rate)</li>
-                <li>Bâtiments producteurs d’éclats (post-MVP)</li>
-                <li>Mine (fer) — même pattern extracteur</li>
-                <li>Sécuriser <code>/admin</code></li>
+                <li>Arbre technologique + prod science HDV (DEC-022) — fait</li>
+                <li>Sécuriser <code>/admin</code> (DEC-025) — fait</li>
+                <li>UX carte : badges alerte 0 worker, frein pan centre écran — fait</li>
               </ul>
             </article>
-            <article class="roadmap-item">
-              <div class="roadmap-head"><h3>Phase 4 — Industry</h3><span class="status status-planned">Planned</span></div>
+            <article class="roadmap-item is-current">
+              <div class="roadmap-head"><h3>Phase 4 — Industry</h3><span class="status status-progress">In progress</span></div>
               <ul>
-                <li>Centre de recherche + ressource science (DEC-022) — multi-centres, 1 recherche / centre</li>
-                <li>Arbre MVP : woodworking → agriculture → mining → metallurgy</li>
-                <li>Mine, fonderie, forge, outils (gated techs)</li>
-                <li>Chaînes de production (scierie, moulin / boulangerie)</li>
+                <li>Arbre technologique + prod science HDV (DEC-022) — fait</li>
+                <li>Frise <code>TechTimelinePanel</code> + action <code>set_research_target</code> — fait</li>
+                <li>Gate build processors / pêche / mine via techs — fait (catalogue)</li>
+                <li>Bonus d’adjacence Civ (voisins → rate)</li>
+                <li>Mine (fer) — extracteur runtime + mesh + workers</li>
+                <li>Chaînes de production (scierie, moulin / boulangerie, fonderie, forge)</li>
+                <li>Centre de recherche <code>research_center</code> (accélération prod science) — planned</li>
+                <li>Bâtiments producteurs d’éclats (post-MVP)</li>
               </ul>
             </article>
             <article class="roadmap-item">
@@ -2167,16 +2274,18 @@
                 <li>Éclats de monde (prod HDV) — validé</li>
                 <li>Pêche (banc + cabane) — validé</li>
                 <li>Comptes Firebase (lien invité) — validé</li>
+                <li>Arbre technologique + science HDV (DEC-022) — validé</li>
+                <li>Admin protégé (DEC-025) — validé</li>
               </ul>
             </article>
             <article class="card priority-col">
               <h3><span class="priority priority-p1">P1</span> Important</h3>
               <ul>
-                <li>Centre de recherche + science (DEC-022)</li>
                 <li>Mine (fer) + chaînes industrielles</li>
                 <li>Bonus d’adjacence (Civ-like)</li>
+                <li>Processors posables (scierie, moulin, fonderie, forge)</li>
+                <li>Centre de recherche (accélération science)</li>
                 <li>Bâtiments prod. d’éclats</li>
-                <li>Sécuriser /admin</li>
                 <li>Routes</li>
                 <li>Villages additionnels</li>
               </ul>
@@ -2212,9 +2321,9 @@
           <div class="kanban" id="kanban">
             <div class="kanban-col" data-column="ideas">
               <h3>Ideas</h3>
-              <article class="task" draggable="true" data-id="task-ages">
-                <strong>Science + Centre de recherche</strong>
-                <p>DEC-022 — science, multi-centres (1 recherche / centre), arbre MVP unlock chaînes.</p>
+              <article class="task" draggable="true" data-id="task-research-center">
+                <strong>Centre de recherche</strong>
+                <p>Bâtiment <code>research_center</code> — accélère la prod science (2 / worker / min). DEC-022 post-MVP.</p>
               </article>
               <article class="task" draggable="true" data-id="task-adjacency-bonus">
                 <strong>Bonus d’adjacence Civ</strong>
@@ -2245,15 +2354,15 @@
               <h3>Todo</h3>
               <article class="task" draggable="true" data-id="task-economy-resources">
                 <strong>Mine (fer)</strong>
-                <p>Même pattern extracteur + workers ; ouvre la chaîne forge (Phase 4).</p>
+                <p>Même pattern extracteur + workers ; catalogue + gate tech OK, runtime à brancher.</p>
+              </article>
+              <article class="task" draggable="true" data-id="task-processors">
+                <strong>Processors posables</strong>
+                <p>Scierie, moulin, boulangerie, fonderie, forge — craft runtime + meshes.</p>
               </article>
               <article class="task" draggable="true" data-id="task-adjacency-after-extractors">
                 <strong>Adjacence après extracteurs</strong>
                 <p>Bonus voisins → rate une fois camp/ferme/carrière en place.</p>
-              </article>
-              <article class="task" draggable="true" data-id="task-admin-auth">
-                <strong>Sécuriser /admin</strong>
-                <p>Auth / secret avant expo prod. Aujourd’hui ouvert volontairement.</p>
               </article>
             </div>
             <div class="kanban-col" data-column="doing">
@@ -2264,6 +2373,22 @@
               <article class="task" draggable="true" data-id="task-firebase-accounts">
                 <strong>Comptes Firebase</strong>
                 <p>Invité → lien Google / email, <code>POST /v1/session/firebase</code>, DEC-024.</p>
+              </article>
+              <article class="task" draggable="true" data-id="task-ages">
+                <strong>Arbre technologique (DEC-022)</strong>
+                <p>Prod HDV +1 / 10&nbsp;min · cible manuelle · frise · gate build · <code>set_research_target</code>.</p>
+              </article>
+              <article class="task" draggable="true" data-id="task-admin-auth">
+                <strong>Sécuriser /admin</strong>
+                <p>Firebase + <code>ADMIN_EMAILS</code> · gate UI login · DEC-025.</p>
+              </article>
+              <article class="task" draggable="true" data-id="task-play-ux-map">
+                <strong>UX carte play</strong>
+                <p>Badge alerte 0 worker (orange + !) · frein pan centre écran · badges remontés.</p>
+              </article>
+              <article class="task" draggable="true" data-id="task-game-notifications">
+                <strong>Toasts in-app</strong>
+                <p>Tech débloquée, pop, stocks pleins, chantier fini · prefs réglages.</p>
               </article>
               <article class="task" draggable="true" data-id="task-fishing-hut">
                 <strong>Cabane de pêcheur</strong>
@@ -2319,7 +2444,7 @@
               </article>
               <article class="task" draggable="true" data-id="task-admin-ops">
                 <strong>Admin ops</strong>
-                <p><code>/admin</code> + <code>/v1/admin/overview</code> : stats, présence, joueurs / mondes récents.</p>
+                <p><code>/admin</code> + <code>/v1/admin/overview</code> : stats, présence, test-mail dev (DEC-025).</p>
               </article>
               <article class="task" draggable="true" data-id="task-landing-session">
                 <strong>Landing + session + pseudo</strong>
@@ -2457,7 +2582,7 @@
             <article class="card idea" data-status="confirmed">
               <span class="status status-confirmed">Confirmed</span>
               <h3>Arbre technologique (science)</h3>
-              <p>Validé DEC-022 : Centre de recherche + ressource science ; âges nommés / extensions hors MVP.</p>
+              <p>Validé DEC-022 (révisé) : prod HDV directe vers cible, pause obligatoire, tech <code>fishing</code> ; centre de recherche et âges nommés hors MVP.</p>
             </article>
             <article class="card idea" data-status="confirmed">
               <span class="status status-confirmed">Confirmed</span>
@@ -2599,8 +2724,8 @@
               <p>Risque d’ajouter PvP, PvM, social ou commerce trop tôt. Mitigation : hors scope MVP explicite, P3 jusqu’à la boucle fun ; PvM avant PvP.</p>
             </article>
             <article class="risk-card">
-              <h3>Admin ouvert <span class="badge badge-warning">Medium</span></h3>
-              <p><code>/admin</code> et <code>/v1/admin/overview</code> sans auth (DEC-012). Mitigation : ne pas exposer en prod, ou protéger avant deploy public ; tâche backlog « Sécuriser /admin ».</p>
+              <h3>Admin <span class="badge badge-neutral">Mitigated</span></h3>
+              <p><code>/admin</code> et <code>/v1/admin/*</code> protégés par session Firebase + <code>ADMIN_EMAILS</code> (DEC-025). Mitigation restante : tenir la liste d’emails à jour ; pas de RBAC granulaire.</p>
             </article>
           </div>
         </section>
@@ -2625,6 +2750,7 @@
             <div class="check-item is-done"><span class="check-box"></span>Éclats de monde (expansion)</div>
             <div class="check-item is-done"><span class="check-box"></span>Bonus fusion +20&nbsp;% extracteurs</div>
             <div class="check-item is-done"><span class="check-box"></span>Comptes Firebase (lien invité)</div>
+            <div class="check-item is-done"><span class="check-box"></span>Arbre technologique + prod science HDV (DEC-022)</div>
             <div class="check-item"><span class="check-box"></span>Mine + minerai</div>
             <div class="check-item"><span class="check-box"></span>Fonderie + lingot</div>
             <div class="check-item"><span class="check-box"></span>Forge + outils</div>
@@ -2651,7 +2777,7 @@
         </section>
 
         <footer class="page-foot">
-          Hexald — Project Hub. Site statique de documentation, pas le jeu. Ouvrir <code>docs/index.html</code> dans le navigateur. Dernière mise à jour du contenu : 26 août 2026 (score / leaderboard · DEC-024 Firebase · pêche · biomes planifiés · Phase 3–6).
+          Hexald — Project Hub. Site statique de documentation, pas le jeu. Ouvrir <code>docs/index.html</code> dans le navigateur. Dernière mise à jour du contenu : 26 août 2026 (DEC-022 science · DEC-025 admin · pop 4 / 1 worker · UX carte · Phase 4 Industry).
         </footer>
       </div>
     </div>

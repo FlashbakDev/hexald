@@ -45,6 +45,7 @@ export {
   foodNetRatePerMinute,
   popGrowthProgress,
   tileProductionMultiplier,
+  countPastureTiles,
   extractorSitesFromTiles,
   LUMBER_CAMP_MAX_WORKERS,
   FARM_MAX_WORKERS,
@@ -81,6 +82,7 @@ export {
   listBuildOptionsForTile,
   terrainAllowsBuilding,
   validateBuildPlacement,
+  isBuildingUnlocked,
   type BuildPlacementInput,
   type BuildPlacementResult
 } from "./build.ts";
@@ -132,3 +134,15 @@ export {
   type DevelopmentSite,
   type RegionExpansionCost
 } from "./regionCost.ts";
+export {
+  createInitialResearchState,
+  isTechAvailable,
+  projectResearchSnapshot,
+  researchStateChanged,
+  scienceProductionPerMinute,
+  setResearchTarget,
+  settleResearch,
+  techProgressFor,
+  type ResearchState,
+  type SetResearchTargetResult
+} from "./research.ts";

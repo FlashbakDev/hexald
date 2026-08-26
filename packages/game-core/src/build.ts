@@ -6,11 +6,12 @@ import {
   isPlaceableBuildingId,
   isPlaceableExtractorId,
   listPlaceableBuildings,
+  buildingRequiredTech,
   type BuildingDefinition,
   type PlaceableBuildingId,
   type PlaceableExtractorId
 } from "@hexald/content";
-import type { BiomeId, BuildingId, HexCoord, PoiId, PrimaryBiomeId } from "@hexald/shared";
+import type { BiomeId, BuildingId, HexCoord, PoiId, PrimaryBiomeId, TechId } from "@hexald/shared";
 import { biomeInfluences, isBuildableBiome, isWaterBiome } from "./world.ts";
 
 export type BuildPlacementInput = {
@@ -20,6 +21,8 @@ export type BuildPlacementInput = {
   hasVillage: boolean;
   existingBuildingId: BuildingId | null;
   poiId?: PoiId | null;
+  /** Techs débloquées monde-wide (DEC-022). */
+  unlockedTechIds?: readonly TechId[];
 };
 
 export type BuildPlacementResult =
@@ -32,7 +35,8 @@ export type BuildPlacementResult =
         | "wrong_terrain"
         | "missing_poi"
         | "tile_occupied"
-        | "has_village";
+        | "has_village"
+        | "tech_not_unlocked";
     };
 
 export { getBuildingDefinition };
@@ -86,18 +90,30 @@ function poiAllowsBuilding(
   return poiId === definition.requiredPoiId;
 }
 
-/** Bâtiments posables sur ce biome (+ POI) — bois / pop libre : UI + spend côté API. */
+export function isBuildingUnlocked(
+  buildingId: BuildingId,
+  unlockedTechIds: readonly TechId[]
+): boolean {
+  const required = buildingRequiredTech(buildingId);
+  if (!required) return true;
+  return unlockedTechIds.includes(required);
+}
+
+/** Bâtiments posables sur ce biome (+ POI + tech) — bois / pop libre : UI + spend côté API. */
 export function listBuildOptionsForTile(input: {
   biome: BiomeId;
   hasVillage: boolean;
   existingBuildingId: BuildingId | null;
   poiId?: PoiId | null;
+  unlockedTechIds?: readonly TechId[];
 }): PlaceableBuildingId[] {
+  const unlockedTechIds = input.unlockedTechIds ?? [];
   if (input.hasVillage || input.existingBuildingId) return [];
 
   return listPlaceableBuildings()
     .filter((definition) => {
       if (!isPlaceableBuildingId(definition.id)) return false;
+      if (!isBuildingUnlocked(definition.id, unlockedTechIds)) return false;
       if (!terrainAllowsBuilding(definition.terrain, input.biome)) return false;
       if (!poiAllowsBuilding(definition, input.poiId)) return false;
       // Les bâtiments « terre » restent exclus de l’eau pure.
@@ -133,6 +149,10 @@ export function validateBuildPlacement(
 
   if (!poiAllowsBuilding(definition, input.poiId)) {
     return { ok: false, reason: "missing_poi" };
+  }
+
+  if (!isBuildingUnlocked(input.buildingId, input.unlockedTechIds ?? [])) {
+    return { ok: false, reason: "tech_not_unlocked" };
   }
 
   // Eau : uniquement bâtiments terrain water (cabane de pêcheur).

@@ -206,7 +206,7 @@ export function useFirebaseAuth() {
     const user = auth.currentUser;
     if (!user) return { session: null, bridged: false };
 
-    const { probeSession, hasAccount, kind, playerId, pseudo, email } =
+    const { probeSession, hasAccount, kind, playerId, pseudo, email, isAdmin } =
       useSession();
 
     let existing: SessionSnapshot | null = null;
@@ -215,7 +215,8 @@ export function useFirebaseAuth() {
         playerId: playerId.value,
         pseudo: pseudo.value,
         kind: kind.value,
-        email: email.value
+        email: email.value,
+        isAdmin: isAdmin.value
       };
     } else {
       existing = await probeSession();

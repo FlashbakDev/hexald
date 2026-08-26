@@ -25,12 +25,16 @@ import {
   WOOD_STOCK_CAP,
   WORLDSHARD_STOCK_CAP,
   buildingRateFromCatalog,
+  lumberCampTechBonusPerMinute as lumberCampTechBonusFromUnlocks,
+  quarryMasonryBonusPerMinute as quarryMasonryBonusFromUnlocks,
+  pastureFoodBonusPerMinute,
+  plantationFoodBonusPerMinute,
   getBuildingDefinition,
   resourceOutputForBuilding,
   stockCapFor,
   type PlaceableExtractorId
 } from "@hexald/content";
-import type { BiomeId, BuildingId, ExtractorJob, ResourceId } from "@hexald/shared";
+import type { BiomeId, BuildingId, ExtractorJob, ResourceId, TechId } from "@hexald/shared";
 import { applyOfflineProduction } from "./production.ts";
 import { isBuildingComplete } from "./construction.ts";
 import { isPlaceableExtractor } from "./build.ts";
@@ -58,6 +62,9 @@ export type EconomyState = {
   fishers: number;
   /** Inventaire générique (resource_id → stock). */
   stocks: Partial<Record<ResourceId, StockEntry>>;
+  unlockedTechIds: readonly TechId[];
+  /** Tuiles pâturage (POI troupeau, sans ferme). */
+  pastureTileCount: number;
   /** Sites posés (y compris en chantier). */
   lumberCampSites: number;
   farmSites: number;
@@ -76,6 +83,18 @@ export type EconomyState = {
 
 export function tileProductionMultiplier(biome: BiomeId): number {
   return isFusionBiome(biome) ? 1 + FUSION_TILE_PRODUCTION_BONUS : 1;
+}
+
+/** Tuiles pâturage : troupeau présent, ferme non construite. */
+export function countPastureTiles(
+  tiles: readonly {
+    poiId?: string | null;
+    buildingId?: string | null;
+  }[]
+): number {
+  return tiles.filter(
+    (tile) => tile.poiId === "cow_herd" && tile.buildingId !== "farm"
+  ).length;
 }
 
 export function extractorSitesFromTiles(
@@ -102,6 +121,34 @@ export function extractorSitesFromTiles(
   return sites;
 }
 
+function completedSiteCount(
+  state: EconomyState,
+  buildingId: PlaceableExtractorId
+): number {
+  const sites = state.extractorSites.filter(
+    (site) => site.buildingId === buildingId && site.complete
+  );
+  if (sites.length > 0) return sites.length;
+  if (buildingId === "lumber_camp") return state.hasLumberCamp ? 1 : 0;
+  if (buildingId === "farm") return state.hasFarm ? 1 : 0;
+  if (buildingId === "fishing_hut") return state.hasFishingHut ? 1 : 0;
+  return state.hasQuarry ? 1 : 0;
+}
+
+function lumberCampTechBonusForState(state: EconomyState): number {
+  return lumberCampTechBonusFromUnlocks(
+    state.unlockedTechIds,
+    completedSiteCount(state, "lumber_camp")
+  );
+}
+
+function quarryMasonryBonusForState(state: EconomyState): number {
+  return quarryMasonryBonusFromUnlocks(
+    state.unlockedTechIds,
+    completedSiteCount(state, "quarry")
+  );
+}
+
 function rateFromSites(
   state: EconomyState,
   buildingId: PlaceableExtractorId
@@ -114,12 +161,17 @@ function rateFromSites(
   if (sites.length === 0) {
     const { workers, active } = workersAndActiveForBuilding(buildingId, state);
     if (!active) return 0;
-    return Math.max(0, workers) * base;
+    let rate = Math.max(0, workers) * base;
+    if (buildingId === "lumber_camp") rate += lumberCampTechBonusForState(state);
+    if (buildingId === "quarry") rate += quarryMasonryBonusForState(state);
+    return rate;
   }
   let total = 0;
   for (const site of sites) {
     total += site.workers * base * tileProductionMultiplier(site.biome);
   }
+  if (buildingId === "lumber_camp") total += lumberCampTechBonusForState(state);
+  if (buildingId === "quarry") total += quarryMasonryBonusForState(state);
   return total;
 }
 
@@ -241,7 +293,9 @@ export function createInitialEconomy(now = Date.now()): EconomyState {
     hasQuarry: false,
     hasFishingHut: false,
     foodSurplusAccumulated: 0,
-    extractorSites: []
+    extractorSites: [],
+    unlockedTechIds: ["foundations"],
+    pastureTileCount: 0
   };
 }
 
@@ -292,11 +346,22 @@ export function wheatFoodEquivalentPerMinute(state: EconomyState): number {
   return Math.floor(wheatRate / WHEAT_TO_FOOD_EMERGENCY_RATIO);
 }
 
-/** Prod food : hôtel de ville + cabane de pêcheur + équivalent blé brut (ferme). */
+function techFoodBonusPerMinute(state: EconomyState): number {
+  return (
+    pastureFoodBonusPerMinute(state.unlockedTechIds, state.pastureTileCount) +
+    plantationFoodBonusPerMinute(
+      state.unlockedTechIds,
+      completedSiteCount(state, "farm")
+    )
+  );
+}
+
+/** Prod food : HDV + cabanes + bonus tech pâturage / plantation + équivalent blé. */
 export function foodProductionPerMinute(state: EconomyState): number {
   return (
     TOWN_HALL_FOOD_PRODUCTION_PER_MINUTE +
     fishingFoodRateFromState(state) +
+    techFoodBonusPerMinute(state) +
     wheatFoodEquivalentPerMinute(state)
   );
 }
@@ -439,11 +504,13 @@ function settleFoodAndGrowth(state: EconomyState, now: number): EconomyState {
 
   // Stock food : HDV + cabane de pêcheur (le blé reste du blé jusqu’à conversion).
   const fishingRate = fishingFoodRateFromState(next);
+  const techFoodRate = techFoodBonusPerMinute(next);
   const foodNet =
     TOWN_HALL_FOOD_PRODUCTION_PER_MINUTE +
-    fishingRate -
+    fishingRate +
+    techFoodRate -
     population * FOOD_CONSUMPTION_PER_POP_PER_MINUTE;
-  const wheatRate = wheatProductionRatePerMinute(next.farmers, next.hasFarm);
+  const wheatRate = wheatRateFromState(next);
   const wheatFoodRate = wheatFoodEquivalentPerMinute(next);
 
   if (foodNet >= 0) {
@@ -504,17 +571,20 @@ function settleFoodAndGrowth(state: EconomyState, now: number): EconomyState {
     }
 
     surplus += growthFood;
-    while (
-      surplus >= POP_GROWTH_SURPLUS_FOOD_REQUIRED &&
-      population < state.populationCap
-    ) {
-      surplus -= POP_GROWTH_SURPLUS_FOOD_REQUIRED;
-      population += 1;
-    }
-    // Au plafond logements : on garde la barre remplie, sans stocker l’infini.
-    if (population >= state.populationCap) {
-      surplus = Math.min(surplus, POP_GROWTH_SURPLUS_FOOD_REQUIRED);
-    }
+  }
+
+  // Convertit le surplus déjà accumulé (ex. barre pleine au cap logements)
+  // dès qu’une place se libère — sans attendre elapsedMinutes > 0.
+  while (
+    surplus >= POP_GROWTH_SURPLUS_FOOD_REQUIRED &&
+    population < state.populationCap
+  ) {
+    surplus -= POP_GROWTH_SURPLUS_FOOD_REQUIRED;
+    population += 1;
+  }
+  // Au plafond logements : on garde la barre remplie, sans stocker l’infini.
+  if (population >= state.populationCap) {
+    surplus = Math.min(surplus, POP_GROWTH_SURPLUS_FOOD_REQUIRED);
   }
 
   return {

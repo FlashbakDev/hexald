@@ -50,5 +50,12 @@ export function validateAction(action: GameAction): ActionResult {
     return { ok: true };
   }
 
+  if (action.type === "set_research_target") {
+    if (typeof action.techId !== "string" || action.techId.length === 0) {
+      return { ok: false, reason: "invalid_tech" };
+    }
+    return { ok: true };
+  }
+
   return { ok: false, reason: "unknown_action" };
 }

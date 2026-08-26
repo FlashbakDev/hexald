@@ -132,6 +132,8 @@ defineExpose({
   projectTile: (q: number, r: number) => api?.projectTile(q, r) ?? null,
   setTutorialHighlights: (coords: readonly HexCoord[]) =>
     api?.setTutorialHighlights(coords),
+  setBuildHighlights: (valid: readonly HexCoord[], invalid?: readonly HexCoord[]) =>
+    api?.setBuildHighlights(valid, invalid),
   setDeviceTiltEnabled: (next: boolean) => tilt.setEnabled(next),
   deviceTilt: tilt
 });

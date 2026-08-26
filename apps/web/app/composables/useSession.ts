@@ -6,6 +6,7 @@ export function useSession() {
   const pseudo = useState<string | null>("session-pseudo", () => null);
   const kind = useState<string>("session-kind", () => "anonymous");
   const email = useState<string | null>("session-email", () => null);
+  const isAdmin = useState("session-is-admin", () => false);
   /** Cookie / compte déjà présent (GET), sans en créer un. */
   const hasAccount = useState("session-has-account", () => false);
   const ready = useState("session-ready", () => false);
@@ -16,6 +17,7 @@ export function useSession() {
     pseudo.value = session.pseudo;
     kind.value = session.kind ?? "anonymous";
     email.value = session.email ?? null;
+    isAdmin.value = session.isAdmin ?? false;
     hasAccount.value = true;
     error.value = null;
     ready.value = true;
@@ -26,6 +28,7 @@ export function useSession() {
     pseudo.value = null;
     kind.value = "anonymous";
     email.value = null;
+    isAdmin.value = false;
     hasAccount.value = false;
   }
 
@@ -109,6 +112,7 @@ export function useSession() {
     pseudo,
     kind,
     email,
+    isAdmin,
     hasAccount,
     ready,
     error,

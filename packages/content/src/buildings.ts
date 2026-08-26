@@ -1,4 +1,4 @@
-import type { BiomeId, BuildingId, PoiId, ResourceId, WorkerJob } from "@hexald/shared";
+import type { BiomeId, BuildingId, PoiId, ResourceId, TechId, WorkerJob } from "@hexald/shared";
 
 export type BuildingStatus = "mvp" | "planned" | "later";
 
@@ -33,6 +33,8 @@ export type BuildingDefinition = {
   populationCapBonus?: number;
   /** POI requis sur la tuile (ex. banc de poisson). */
   requiredPoiId?: PoiId;
+  /** Tech requise pour poser le bâtiment (DEC-022). Absent = hors gate. */
+  requiredTechId?: TechId;
 };
 export const buildings: BuildingDefinition[] = [
   {
@@ -71,7 +73,8 @@ export const buildings: BuildingDefinition[] = [
     hexSize: 1,
     status: "mvp",
     role: "processor",
-    placeable: false
+    placeable: false,
+    requiredTechId: "animal_husbandry"
   },
   {
     id: "mine",
@@ -89,7 +92,8 @@ export const buildings: BuildingDefinition[] = [
     maxWorkers: 1,
     ratePerWorkerPerMinute: 5,
     workerJob: "miner",
-    requiredPoiId: "iron_deposit"
+    requiredPoiId: "iron_deposit",
+    requiredTechId: "mining"
   },
   {
     id: "farm",
@@ -116,7 +120,8 @@ export const buildings: BuildingDefinition[] = [
     hexSize: 1,
     status: "planned",
     role: "processor",
-    placeable: false
+    placeable: false,
+    requiredTechId: "pottery"
   },
   {
     id: "bakery",
@@ -127,7 +132,8 @@ export const buildings: BuildingDefinition[] = [
     hexSize: 1,
     status: "planned",
     role: "processor",
-    placeable: false
+    placeable: false,
+    requiredTechId: "pottery"
   },
   {
     id: "quarry",
@@ -147,7 +153,7 @@ export const buildings: BuildingDefinition[] = [
   },
   {
     id: "fishing_hut",
-    label: "Cabane de pêcheur",
+    label: "Quai de pêche",
     terrain: "water",
     input: "workers",
     output: "food",
@@ -160,7 +166,20 @@ export const buildings: BuildingDefinition[] = [
     maxWorkers: 1,
     ratePerWorkerPerMinute: 2,
     workerJob: "fisher",
-    requiredPoiId: "fish_bank"
+    requiredPoiId: "fish_bank",
+    requiredTechId: "sailing"
+  },
+  {
+    id: "brickworks",
+    label: "Briqueterie",
+    terrain: "any",
+    input: null,
+    output: "stone_blocks",
+    hexSize: 1,
+    status: "planned",
+    role: "processor",
+    placeable: false,
+    requiredTechId: "pottery"
   },
   {
     id: "house",
@@ -185,7 +204,8 @@ export const buildings: BuildingDefinition[] = [
     hexSize: "multi",
     status: "mvp",
     role: "processor",
-    placeable: false
+    placeable: false,
+    requiredTechId: "metallurgy"
   },
   {
     id: "forge",
@@ -196,7 +216,73 @@ export const buildings: BuildingDefinition[] = [
     hexSize: 1,
     status: "mvp",
     role: "processor",
-    placeable: false
+    placeable: false,
+    requiredTechId: "metallurgy"
+  },
+  {
+    id: "library",
+    label: "Bibliothèque",
+    terrain: "any",
+    input: null,
+    output: "prestige",
+    hexSize: 1,
+    status: "planned",
+    role: "special",
+    placeable: false,
+    requiredTechId: "writing"
+  },
+  {
+    id: "garden",
+    label: "Jardin",
+    terrain: "plains",
+    input: "workers",
+    output: "food",
+    hexSize: 1,
+    status: "planned",
+    role: "extractor",
+    placeable: false,
+    woodCost: 25,
+    buildDurationMs: 60_000,
+    maxWorkers: 1,
+    ratePerWorkerPerMinute: 3,
+    workerJob: "farmer",
+    requiredTechId: "irrigation"
+  },
+  {
+    id: "barracks",
+    label: "Caserne",
+    terrain: "any",
+    input: null,
+    output: null,
+    hexSize: 1,
+    status: "planned",
+    role: "special",
+    placeable: false,
+    requiredTechId: "bronze_working"
+  },
+  {
+    id: "market",
+    label: "Marché",
+    terrain: "any",
+    input: null,
+    output: null,
+    hexSize: 1,
+    status: "planned",
+    role: "special",
+    placeable: false,
+    requiredTechId: "currency"
+  },
+  {
+    id: "baths",
+    label: "Bains",
+    terrain: "any",
+    input: null,
+    output: "prestige",
+    hexSize: 1,
+    status: "planned",
+    role: "special",
+    placeable: false,
+    requiredTechId: "currency"
   },
   {
     id: "monument",
@@ -301,6 +387,10 @@ export function buildingRateFromCatalog(id: BuildingId): number {
 
 export function buildingPopulationCapBonus(id: BuildingId): number {
   return getBuildingDefinition(id)?.populationCapBonus ?? 0;
+}
+
+export function buildingRequiredTech(id: BuildingId): TechId | null {
+  return getBuildingDefinition(id)?.requiredTechId ?? null;
 }
 
 /** Maps dérivés — compat API historique. */

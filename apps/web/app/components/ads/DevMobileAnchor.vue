@@ -47,7 +47,7 @@ onBeforeUnmount(() => {
   left: 0;
   right: 0;
   bottom: 0;
-  z-index: 5;
+  z-index: 50;
   box-sizing: border-box;
   height: var(--play-ad-bottom-inset, 3.25rem);
   padding-bottom: env(safe-area-inset-bottom, 0px);

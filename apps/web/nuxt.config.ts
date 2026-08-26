@@ -51,8 +51,6 @@ export default defineNuxtConfig({
   runtimeConfig: {
     public: {
       apiBase: "/backend",
-      /** Override with NUXT_PUBLIC_ADMIN_CODE */
-      adminCode: "nimda",
       /** AdSense publisher client — NUXT_PUBLIC_ADSENSE_CLIENT_ID (never load via head; plugin gates it) */
       adsenseClientId: "",
       /** Firebase web config — NUXT_PUBLIC_FIREBASE_* (explicit pour mobile / LAN) */

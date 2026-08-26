@@ -74,6 +74,9 @@ export const WHEAT_STOCK_CAP = 200;
 export const STONE_STOCK_CAP = 150;
 export const FOOD_STOCK_CAP = TOWN_HALL_BASE_STORAGE;
 
+/** Intervalle de prod science HDV (10 min) — DEC-022. */
+export const TOWN_HALL_SCIENCE_INTERVAL_MS = 10 * 60_000;
+
 /**
  * Éclats de monde — révélation de région.
  * Coût = hop (1 pour voisin du départ, 2 au rang suivant, …).

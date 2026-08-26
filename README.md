@@ -68,7 +68,7 @@ Variables utiles dans `.env` :
 | `FIREBASE_PRIVATE_KEY` | Clé privée service account (`\n` pour les retours ligne) |
 | `RESEND_API_KEY` | Clé [Resend](https://resend.com) pour les reports (Aide & contact) |
 | `SUPPORT_TO` | Destinataire (défaut `contact@hexald.com`) |
-| `SUPPORT_FROM` | Expéditeur vérifié chez Resend (ex. `Hexald <noreply@hexald.com>`) |
+| `ADMIN_EMAILS` | Emails Firebase autorisés pour `/v1/admin/*` (virgules) |
 
 | Script | Rôle |
 | --- | --- |
@@ -108,7 +108,7 @@ Pour rester en localhost uniquement : `pnpm --filter @hexald/api dev -- --host 1
 | `GET` | `/v1/worlds/:id` | Charge un monde (owner uniquement) |
 | `POST` | `/v1/worlds/:id/actions` | Action unifiée (`build` / `assign_workers` / `generate_region`) |
 | `POST` | `/v1/worlds/:id/buildings/destroy` | Démolit un bâtiment (hors village) |
-| `GET` | `/v1/admin/overview` | Stats admin (sans auth pour l’instant) |
+| `GET` | `/v1/admin/overview` | Stats admin (Firebase + `ADMIN_EMAILS`) |
 
 La session est un cookie httpOnly signé. Départ en **invité** ; optionnel : lien Google / email (Firebase) qui conserve le même `playerId` / monde. Les mondes appartiennent au `playerId` de la session.
 
@@ -118,7 +118,7 @@ Build / extracteurs : catalogue `packages/content` (`buildings.placeable`, coût
 
 Renderer : streaming GPU des tuiles biome (`syncBiomeTiles`) — état logique complet en mémoire, meshes chargés/déchargés selon le viewport (hystérésis). Les tuiles vides streamaient déjà.
 
-UI admin (dev) : [`/admin`](http://127.0.0.1:9089/admin).
+Admin : [`/admin`](http://127.0.0.1:9089/admin) — connexion Google / email (même auth que le jeu), email dans `ADMIN_EMAILS`.
 
 Économie live : pop + food/croissance (DEC-016–017), extracteurs posés (bois / blé / pierre / **pêche**), inventaire générique, bonus fusion +20&nbsp;% (DEC-019). Banc de poisson (`fish_bank`) + cabane de pêcheur (DEC-021 / 023).
 
@@ -169,7 +169,7 @@ pnpm dev:web
 | `/play` | Écran de jeu (session + pseudo requis) |
 | `/news` | Actualités / patch notes joueurs |
 | `/privacy`, `/terms`, `/cookies`, `/legals` | Pages légales |
-| `/admin` | Stats joueurs / mondes / présence (sans auth) |
+| `/admin` | Stats joueurs / mondes / présence (Firebase + allowlist) |
 | `/poc` | Grille hexagonale plein écran (dev) |
 | `/backend/**` | Proxy vers l’API Fastify `:9088` |
 

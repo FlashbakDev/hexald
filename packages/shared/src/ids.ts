@@ -8,6 +8,24 @@ export type FusionBiomeId =
 
 export type BiomeId = PrimaryBiomeId | FusionBiomeId;
 
+export type TechId =
+  | "foundations"
+  | "agriculture"
+  | "sailing"
+  | "animal_husbandry"
+  | "pottery"
+  | "writing"
+  | "masonry"
+  | "irrigation"
+  | "wheel"
+  | "currency"
+  | "bronze_working"
+  | "military_training"
+  | "advanced_navigation"
+  | "engineering"
+  | "mining"
+  | "metallurgy";
+
 export type ResourceId =
   | "wood"
   | "planks"
@@ -35,10 +53,16 @@ export type BuildingId =
   | "bakery"
   | "quarry"
   | "fishing_hut"
+  | "brickworks"
   | "smelter"
   | "forge"
   | "monument"
-  | "house";
+  | "house"
+  | "library"
+  | "garden"
+  | "barracks"
+  | "market"
+  | "baths";
 
 export type WorkerJob =
   | "idle"

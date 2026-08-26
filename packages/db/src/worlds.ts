@@ -1,10 +1,12 @@
 import { and, desc, eq, sql } from "drizzle-orm";
-import type { BiomeId, BuildingId, PoiId, ResourceId } from "@hexald/shared";
+import type { BiomeId, BuildingId, PoiId, ResourceId, TechId } from "@hexald/shared";
 import type { Database, WorldDb } from "./client.ts";
 import {
   worldInventory,
   worldRegions,
+  worldTechProgress,
   worldTiles,
+  worldUnlockedTechs,
   worlds
 } from "./schema/index.ts";
 
@@ -31,6 +33,18 @@ export type WorldInventoryRow = {
   lastCalculatedAt: Date;
 };
 
+export type WorldTechProgressRow = {
+  techId: TechId;
+  progress: number;
+};
+
+export type WorldResearchRow = {
+  researchTargetTechId: TechId | null;
+  scienceLastSettledAt: Date;
+  unlockedTechIds: TechId[];
+  progress: WorldTechProgressRow[];
+};
+
 export type WorldEconomyRow = {
   populationTotal: number;
   populationCap: number;
@@ -47,6 +61,7 @@ export type PersistedWorld = {
   createdAt: Date;
   updatedAt: Date;
   economy: WorldEconomyRow;
+  research: WorldResearchRow;
   tiles: WorldTileRow[];
   regions: WorldRegionRow[];
 };
@@ -94,6 +109,90 @@ function isLockTimeoutError(err: unknown): boolean {
   const code = (err as { code?: string }).code;
   // 55P03 = lock_not_available ; 57014 = query_canceled (statement/lock timeout)
   return code === "55P03" || code === "57014";
+}
+
+async function loadResearch(db: WorldDb, worldId: string): Promise<WorldResearchRow> {
+  const [world] = await db
+    .select({
+      researchTargetTechId: worlds.researchTargetTechId,
+      scienceLastSettledAt: worlds.scienceLastSettledAt
+    })
+    .from(worlds)
+    .where(eq(worlds.id, worldId))
+    .limit(1);
+
+  const [unlockedRows, progressRows] = await Promise.all([
+    db
+      .select({ techId: worldUnlockedTechs.techId })
+      .from(worldUnlockedTechs)
+      .where(eq(worldUnlockedTechs.worldId, worldId)),
+    db
+      .select({
+        techId: worldTechProgress.techId,
+        progress: worldTechProgress.progress
+      })
+      .from(worldTechProgress)
+      .where(eq(worldTechProgress.worldId, worldId))
+  ]);
+
+  const unlockedTechIds = unlockedRows.map((row) => row.techId as TechId);
+  if (!unlockedTechIds.includes("foundations")) {
+    unlockedTechIds.push("foundations");
+  }
+
+  return {
+    researchTargetTechId: (world?.researchTargetTechId as TechId | null) ?? null,
+    scienceLastSettledAt: world?.scienceLastSettledAt ?? new Date(),
+    unlockedTechIds,
+    progress: progressRows.map((row) => ({
+      techId: row.techId as TechId,
+      progress: row.progress
+    }))
+  };
+}
+
+async function seedInitialResearch(tx: WorldDb, worldId: string): Promise<void> {
+  await tx
+    .insert(worldUnlockedTechs)
+    .values({ worldId, techId: "foundations" })
+    .onConflictDoNothing();
+}
+
+async function upsertResearch(
+  tx: WorldDb,
+  worldId: string,
+  research: WorldResearchRow
+): Promise<void> {
+  await tx
+    .update(worlds)
+    .set({
+      researchTargetTechId: research.researchTargetTechId,
+      scienceLastSettledAt: research.scienceLastSettledAt,
+      updatedAt: new Date()
+    })
+    .where(eq(worlds.id, worldId));
+
+  await tx.delete(worldUnlockedTechs).where(eq(worldUnlockedTechs.worldId, worldId));
+  if (research.unlockedTechIds.length > 0) {
+    await tx.insert(worldUnlockedTechs).values(
+      research.unlockedTechIds.map((techId) => ({
+        worldId,
+        techId
+      }))
+    );
+  }
+
+  await tx.delete(worldTechProgress).where(eq(worldTechProgress.worldId, worldId));
+  const progressRows = research.progress.filter((row) => row.progress > 0);
+  if (progressRows.length > 0) {
+    await tx.insert(worldTechProgress).values(
+      progressRows.map((row) => ({
+        worldId,
+        techId: row.techId,
+        progress: row.progress
+      }))
+    );
+  }
 }
 
 async function loadInventory(
@@ -248,6 +347,9 @@ export async function insertWorldWithTerrain(
 
     const inventory = input.economy?.inventory ?? [];
     await upsertInventory(tx, world.id, inventory);
+    await seedInitialResearch(tx, world.id);
+
+    const research = await loadResearch(tx, world.id);
 
     return {
       id: world.id,
@@ -255,6 +357,7 @@ export async function insertWorldWithTerrain(
       createdAt: world.createdAt,
       updatedAt: world.updatedAt,
       economy: economyFromWorld(world, inventory),
+      research,
       tiles: input.tiles,
       regions: input.regions
     };
@@ -268,7 +371,7 @@ export async function fetchWorld(
   const [world] = await db.select().from(worlds).where(eq(worlds.id, worldId)).limit(1);
   if (!world) return null;
 
-  const [tiles, regions, inventory] = await Promise.all([
+  const [tiles, regions, inventory, research] = await Promise.all([
     db
       .select({
         q: worldTiles.q,
@@ -290,7 +393,8 @@ export async function fetchWorld(
       })
       .from(worldRegions)
       .where(eq(worldRegions.worldId, worldId)),
-    loadInventory(db, worldId)
+    loadInventory(db, worldId),
+    loadResearch(db, worldId)
   ]);
 
   return {
@@ -299,6 +403,7 @@ export async function fetchWorld(
     createdAt: world.createdAt,
     updatedAt: world.updatedAt,
     economy: economyFromWorld(world, inventory),
+    research,
     tiles: tiles.map((tile) => ({
       q: tile.q,
       r: tile.r,
@@ -380,6 +485,14 @@ export async function updateWorldEconomy(
     .where(eq(worlds.id, worldId));
 
   await upsertInventory(db, worldId, economy.inventory);
+}
+
+export async function updateWorldResearch(
+  db: WorldDb,
+  worldId: string,
+  research: WorldResearchRow
+): Promise<void> {
+  await upsertResearch(db, worldId, research);
 }
 
 export async function setTileWorkerState(

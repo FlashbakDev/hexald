@@ -16,6 +16,9 @@ import {
   getBiomeDefinition,
   getBuildingDefinition,
   getPoiDefinition,
+  getTechNode,
+  buildingRequiredTech,
+  listPlaceableBuildings,
   primaryBiomes,
   STONE_RATE_PER_WORKER_PER_MINUTE,
   WHEAT_RATE_PER_WORKER_PER_MINUTE,
@@ -23,11 +26,16 @@ import {
   FISHING_HUT_FOOD_RATE_PER_WORKER_PER_MINUTE,
   TOWN_HALL_WORLDSHARD_INTERVAL_MS,
   type PlaceableBuildingId,
-  type PlaceableExtractorId
+  type PlaceableExtractorId,
+  type TechId,
+  lumberCampTechBonusPerMinute,
+  quarryMasonryBonusPerMinute
 } from "@hexald/content";
 import {
+  computePopulationCap,
   computeRegionExpansionCost,
   listBuildOptionsForTile,
+  isBuildingUnlocked,
   isBuildingUnderConstruction,
   isFusionBiome,
   committedWorkersFromTiles,
@@ -60,6 +68,7 @@ const {
   grantDevResources,
   setTileBiomeDev,
   refreshWorld,
+  setResearchTarget,
   world,
   error: worldError
 } = useWorld();
@@ -72,11 +81,67 @@ const {
   dismiss: dismissLinkAccount
 } = useLinkAccountPrompt();
 
+useGameNotifications(world);
+
+const { enabledCount: notificationEnabledCount, totalCount: notificationTotalCount } =
+  useNotificationPreferences();
+
 const settingsOpen = ref(false);
 const settingsRoot = ref<HTMLElement | null>(null);
 const disconnecting = ref(false);
 const disconnectConfirmOpen = ref(false);
 const supportOpen = ref(false);
+const notificationSettingsOpen = ref(false);
+const techTimelineOpen = ref(false);
+const constructionMenuOpen = ref(false);
+const selectingResearch = ref(false);
+const researchUnlockNotice = ref<string | null>(null);
+const unlockedTechKey = ref("");
+
+watch(
+  () => world.value?.research,
+  (research) => {
+    if (!research) return;
+    const key = [...research.unlockedTechIds].sort().join(",");
+    if (unlockedTechKey.value && key !== unlockedTechKey.value) {
+      const prev = new Set(unlockedTechKey.value.split(",").filter(Boolean));
+      const newly = research.unlockedTechIds.filter(
+        (id) => !prev.has(id) && id !== "foundations"
+      );
+      if (newly.length > 0) {
+        const label = getTechNode(newly[0]).label;
+        researchUnlockNotice.value = `${label} débloquée — choisis la prochaine recherche.`;
+        techTimelineOpen.value = true;
+      }
+    }
+    unlockedTechKey.value = key;
+  },
+  { deep: true }
+);
+
+watch(techTimelineOpen, (open) => {
+  if (!open) researchUnlockNotice.value = null;
+  if (open) constructionMenuOpen.value = false;
+});
+
+watch(constructionMenuOpen, (open) => {
+  if (open) techTimelineOpen.value = false;
+});
+
+async function onSelectResearchTarget(techId: TechId) {
+  const id = world.value?.id;
+  if (!id || selectingResearch.value) return;
+  selectingResearch.value = true;
+  expandError.value = null;
+  try {
+    const snapshot = await setResearchTarget(id, techId);
+    if (!snapshot) {
+      expandError.value = worldError.value ?? "Impossible de lancer la recherche.";
+    }
+  } finally {
+    selectingResearch.value = false;
+  }
+}
 
 function toggleSettings() {
   settingsOpen.value = !settingsOpen.value;
@@ -94,6 +159,11 @@ function openLinkAccountFromSettings() {
 function openSupportFromSettings() {
   closeSettings();
   supportOpen.value = true;
+}
+
+function openNotificationSettingsFromSettings() {
+  closeSettings();
+  notificationSettingsOpen.value = true;
 }
 
 function askDisconnect() {
@@ -159,7 +229,6 @@ useHead({
 });
 
 const preview = useTemplateRef<{
-  recenter: () => void;
   clearSelection: () => void;
   applyRegion: (
     center: HexCoord,
@@ -171,6 +240,10 @@ const preview = useTemplateRef<{
   applyTileBiome: (q: number, r: number, biome: BiomeId) => boolean;
   projectTile: (q: number, r: number) => HexScreenPoint | null;
   setTutorialHighlights: (coords: readonly HexCoord[]) => void;
+  setBuildHighlights: (
+    valid: readonly HexCoord[],
+    invalid?: readonly HexCoord[]
+  ) => void;
 }>("preview");
 
 const stage = useTemplateRef<HTMLElement>("stage");
@@ -182,11 +255,39 @@ const assigning = ref(false);
 const resetting = ref(false);
 const granting = ref(false);
 const debugBiomeOpen = ref(false);
+const debugChromeVisible = ref(true);
 const settingBiome = ref(false);
 const destroyConfirm = ref(false);
 const destroying = ref(false);
 const nowTick = ref(Date.now());
+const projectedResearch = useProjectedResearch(
+  computed(() => world.value?.research),
+  nowTick
+);
 const isDevClient = import.meta.dev;
+const DEBUG_CHROME_STORAGE_KEY = "hexald-debug-chrome-visible";
+
+function toggleDebugChrome() {
+  debugChromeVisible.value = !debugChromeVisible.value;
+}
+
+if (import.meta.client && import.meta.dev) {
+  onMounted(() => {
+    try {
+      const saved = localStorage.getItem(DEBUG_CHROME_STORAGE_KEY);
+      if (saved === "0") debugChromeVisible.value = false;
+    } catch {
+      /* ignore */
+    }
+  });
+  watch(debugChromeVisible, (visible) => {
+    try {
+      localStorage.setItem(DEBUG_CHROME_STORAGE_KEY, visible ? "1" : "0");
+    } catch {
+      /* ignore */
+    }
+  });
+}
 const { hasNoAds, setDevNoAds } = useAds();
 const {
   enabled: tiltEnabled,
@@ -214,8 +315,11 @@ const {
   complete: completeTutorial,
   onTileSelected: tutorialOnTileSelected,
   onBuildingPlaced: tutorialOnBuildingPlaced,
-  onRegionCreated: tutorialOnRegionCreated
+  onRegionCreated: tutorialOnRegionCreated,
+  onConstructionSelected: tutorialOnConstructionSelected
 } = usePlayTutorial();
+
+const constructionMode = ref<PlaceableBuildingId | null>(null);
 
 const tutorialHoleTick = ref(0);
 let tutorialHoleRaf: number | null = null;
@@ -228,13 +332,19 @@ let tickTimer: ReturnType<typeof setInterval> | null = null;
 let refreshTimer: ReturnType<typeof setInterval> | null = null;
 let overlayRaf: number | null = null;
 
+function scheduleWorldRefresh() {
+  if (refreshTimer) clearInterval(refreshTimer);
+  const ms = world.value?.research.researchTargetTechId ? 15_000 : 30_000;
+  refreshTimer = setInterval(() => {
+    void refreshWorld();
+  }, ms);
+}
+
 onMounted(() => {
   tickTimer = setInterval(() => {
     nowTick.value = Date.now();
   }, 1000);
-  refreshTimer = setInterval(() => {
-    void refreshWorld();
-  }, 30_000);
+  scheduleWorldRefresh();
   startOverlayLoop();
   if (world.value) {
     window.setTimeout(() => startTutorial(), 700);
@@ -244,6 +354,11 @@ onMounted(() => {
     if (!tutorialActive.value) maybeShowLinkAccount(0);
   }, 2800);
 });
+
+watch(
+  () => world.value?.research.researchTargetTechId,
+  () => scheduleWorldRefresh()
+);
 
 watch(tutorialActive, (on, wasOn) => {
   if (wasOn && !on) maybeShowLinkAccount(900);
@@ -280,7 +395,12 @@ onBeforeUnmount(() => {
 
 const economy = computed(() => world.value?.economy ?? null);
 const population = computed(() => economy.value?.population ?? 0);
-const populationCap = computed(() => economy.value?.populationCap ?? 0);
+/** Cap recalculé côté client dès qu’un logement achève son chantier. */
+const populationCap = computed(() => {
+  const tiles = world.value?.tiles;
+  if (!tiles?.length) return economy.value?.populationCap ?? 0;
+  return computePopulationCap(tiles, nowTick.value);
+});
 const worldName = computed(() => "No Name");
 
 /** Icônes UI — labels / coûts viennent du catalogue `buildings`. */
@@ -331,15 +451,37 @@ function extractorRatePerMinute(
   return total;
 }
 
-const liveWoodRate = computed(() =>
-  extractorRatePerMinute("lumber_camp", WOOD_RATE_PER_WORKER_PER_MINUTE)
-);
+const liveWoodRate = computed(() => {
+  const base = extractorRatePerMinute("lumber_camp", WOOD_RATE_PER_WORKER_PER_MINUTE);
+  const unlocked = world.value?.research.unlockedTechIds ?? ["foundations"];
+  const tiles = world.value?.tiles;
+  if (!tiles?.length) return base;
+  const now = nowTick.value;
+  let campCount = 0;
+  for (const tile of tiles) {
+    if (tile.buildingId !== "lumber_camp") continue;
+    if (isBuildingUnderConstruction(tile.constructionCompletesAt, now)) continue;
+    campCount++;
+  }
+  return base + lumberCampTechBonusPerMinute(unlocked, campCount);
+});
 const liveWheatRate = computed(() =>
   extractorRatePerMinute("farm", WHEAT_RATE_PER_WORKER_PER_MINUTE)
 );
-const liveStoneRate = computed(() =>
-  extractorRatePerMinute("quarry", STONE_RATE_PER_WORKER_PER_MINUTE)
-);
+const liveStoneRate = computed(() => {
+  const base = extractorRatePerMinute("quarry", STONE_RATE_PER_WORKER_PER_MINUTE);
+  const unlocked = world.value?.research.unlockedTechIds ?? ["foundations"];
+  const tiles = world.value?.tiles;
+  if (!tiles?.length) return base;
+  const now = nowTick.value;
+  let quarryCount = 0;
+  for (const tile of tiles) {
+    if (tile.buildingId !== "quarry") continue;
+    if (isBuildingUnderConstruction(tile.constructionCompletesAt, now)) continue;
+    quarryCount++;
+  }
+  return base + quarryMasonryBonusPerMinute(unlocked, quarryCount);
+});
 
 const displayedWood = computed(() => {
   const eco = economy.value;
@@ -520,7 +662,7 @@ const popGrowthLabel = computed(() => {
   const base = eco.foodSurplusAccumulated ?? 0;
   const net = eco.foodNetPerMinute ?? 0;
   const last = eco.foodLastCalculatedAt;
-  const atCap = eco.population >= eco.populationCap;
+  const atCap = eco.population >= populationCap.value;
   let projected = base;
   // Même au cap logements, on projette le remplissage (blé / surplus food).
   if (net > 0 && last) {
@@ -556,7 +698,7 @@ type PopGrowthTone = "idle" | "growing" | "housing";
 const popGrowthTone = computed((): PopGrowthTone => {
   const eco = economy.value;
   if (!eco) return "idle";
-  if (eco.population >= eco.populationCap) return "housing";
+  if (eco.population >= populationCap.value) return "housing";
   const net = eco.foodNetPerMinute ?? 0;
   if (net > 0 || popGrowthPercent.value > 0) return "growing";
   return "idle";
@@ -849,60 +991,87 @@ function startOverlayLoop() {
   overlayRaf = requestAnimationFrame(loop);
 }
 
-const hasActiveConstruction = computed(
+const activeConstructionCount = computed(
   () =>
-    world.value?.tiles.some((tile) => {
+    world.value?.tiles.filter((tile) => {
       const at = tile.constructionCompletesAt;
       if (!at) return false;
       const ends = Date.parse(at);
       return !Number.isNaN(ends) && ends > nowTick.value;
-    }) ?? false
+    }).length ?? 0
 );
 
-/** Un seul refresh quand le dernier chantier passe de « en cours » à « terminé ». */
-watch(hasActiveConstruction, (active, wasActive) => {
-  if (wasActive && !active) void refreshWorld();
+/** Refresh serveur à chaque chantier terminé (cap logements, +1 pop, libération ouvrier). */
+watch(activeConstructionCount, (count, prev) => {
+  if (prev !== undefined && count < prev) void refreshWorld();
 });
 
-const buildOptions = computed(() => {
-  const tile = selected.value;
-  const tiles = world.value?.tiles;
-  if (!tile?.biome || !tiles) return [] as PlaceableBuildingId[];
-  const snap = tiles.find((entry) => entry.q === tile.q && entry.r === tile.r);
-  return listBuildOptionsForTile({
+const buildOptionsForWorldTile = (tile: WorldTileSnapshot) =>
+  listBuildOptionsForTile({
     biome: tile.biome,
-    hasVillage: tile.hasVillage,
+    hasVillage: tile.q === 0 && tile.r === 0,
     existingBuildingId: tile.buildingId ?? null,
-    poiId: snap?.poiId ?? null
+    poiId: tile.poiId ?? null,
+    unlockedTechIds: world.value?.research.unlockedTechIds ?? ["foundations"]
   });
-});
 
-const buildWheelSlots = computed(() => {
-  const options = buildOptions.value;
-  const n = options.length;
+const constructionCatalog = computed(() => {
+  const unlockedTechIds = world.value?.research.unlockedTechIds ?? ["foundations"];
   const hasWood = (cost: number) => displayedWood.value + 1e-9 >= cost;
   const hasIdlePop = idlePop.value + 1e-9 >= BUILD_IDLE_POP_REQUIREMENT;
-  // Arc supérieur (gauche → haut → droite) pour laisser le bas au debug.
-  const arcSpan = Math.PI * 0.85;
-  const arcStart = -Math.PI / 2 - arcSpan / 2;
-  return options.map((id, index) => {
-    const angle =
-      n <= 1 ? -Math.PI / 2 : arcStart + (index * arcSpan) / (n - 1);
-    const radius = 56;
-    const def = buildingUi(id);
-    const woodCost = BUILD_COST_WOOD[id] ?? getBuildingDefinition(id)?.woodCost ?? 0;    const canAffordWood = hasWood(woodCost);
+  return listPlaceableBuildings().map((def) => {
+    const id = def.id as PlaceableBuildingId;
+    const woodCost = BUILD_COST_WOOD[id] ?? def.woodCost ?? 0;
+    const ui = buildingUi(id);
+    const isUnlocked = isBuildingUnlocked(id, unlockedTechIds);
+    const requiredTechId = buildingRequiredTech(id);
+    const requiredTechLabel = requiredTechId
+      ? getTechNode(requiredTechId).label
+      : null;
+    const canAffordWood = hasWood(woodCost);
+    const canAfford = isUnlocked && canAffordWood && hasIdlePop;
     return {
       id,
+      ...ui,
       woodCost,
+      isUnlocked,
+      requiredTechLabel,
       canAffordWood,
       hasIdlePop,
-      canAfford: canAffordWood && hasIdlePop,
-      ...def,
-      style: {
-        transform: `translate(-50%, -50%) translate(${Math.cos(angle) * radius}px, ${Math.sin(angle) * radius}px)`
-      }
+      canAfford,
+      active: constructionMode.value === id
     };
   });
+});
+
+const validConstructionTiles = computed(() => {
+  const buildingId = constructionMode.value;
+  const tiles = world.value?.tiles;
+  if (!buildingId || !tiles) return [] as HexCoord[];
+  const out: HexCoord[] = [];
+  for (const tile of tiles) {
+    if (buildOptionsForWorldTile(tile).includes(buildingId)) {
+      out.push({ q: tile.q, r: tile.r });
+    }
+  }
+  return out;
+});
+
+const invalidConstructionTiles = computed(() => {
+  const buildingId = constructionMode.value;
+  const tiles = world.value?.tiles;
+  if (!buildingId || !tiles) return [] as HexCoord[];
+  const validKeys = new Set(
+    validConstructionTiles.value.map((cell) => `${cell.q},${cell.r}`)
+  );
+  const out: HexCoord[] = [];
+  for (const tile of tiles) {
+    const key = `${tile.q},${tile.r}`;
+    if (!validKeys.has(key)) {
+      out.push({ q: tile.q, r: tile.r });
+    }
+  }
+  return out;
 });
 
 type WorkerPanel = {
@@ -1057,15 +1226,6 @@ const regionCostLabel = computed(() => {
   return n === 1 ? "1 éclat" : `${n} éclats`;
 });
 
-const showBuildWheel = computed(
-  () =>
-    selected.value != null &&
-    buildOptions.value.length > 0 &&
-    !expanding.value &&
-    !building.value &&
-    !debugBiomeOpen.value
-);
-
 /** Bottom sheet : bâtiment, village, ou tuile biome (sans bâtiment). */
 const showBuildingSheet = computed(() => {
   const tile = selected.value;
@@ -1073,6 +1233,11 @@ const showBuildingSheet = computed(() => {
   if (tile.hasVillage || tile.buildingId != null) return true;
   return tile.biome != null;
 });
+
+/** Construction ouverte en même temps qu’une fiche bas — empiler au-dessus. */
+const constructionSheetRaised = computed(
+  () => constructionMenuOpen.value && showBuildingSheet.value
+);
 
 /** Tuile biome libre (pas de bâtiment / village) — panneau d’info. */
 const showTileInfoSheet = computed(() => {
@@ -1098,12 +1263,11 @@ const selectedTilePoiInfo = computed(() => {
   return getPoiDefinition(poiId) ?? null;
 });
 
-/** Hub debug (bug) quand la tuile a un biome mais pas de roue build / sheet. */
+/** Hub debug (bug) quand la tuile a un biome mais pas de sheet / roue biome. */
 const showDebugHub = computed(
   () =>
     isDevClient &&
     selected.value?.biome != null &&
-    !showBuildWheel.value &&
     !showBuildingSheet.value &&
     !showBiomeWheel.value &&
     !debugBiomeOpen.value &&
@@ -1119,10 +1283,6 @@ const showDebugBiomeWheel = computed(
     selected.value?.biome != null &&
     !expanding.value &&
     !building.value
-);
-
-const showDebugBugOnBuildWheel = computed(
-  () => isDevClient && showBuildWheel.value
 );
 
 const showDebugBugOnSheet = computed(
@@ -1215,7 +1375,6 @@ function spawnDestroyFloats(
 const anyWheelOpen = computed(
   () =>
     showBiomeWheel.value ||
-    showBuildWheel.value ||
     showDebugHub.value ||
     showDebugBiomeWheel.value
 );
@@ -1284,8 +1443,6 @@ const debugBugButtonStyle = {
   transform: `translate(-50%, -50%) translate(0px, ${BIOME_WHEEL_RADIUS}px)`
 };
 
-const debugBugOnBuildStyle = debugBugButtonStyle;
-
 const debugBugOnBiomeStyle = {
   transform: `translate(-50%, -50%) translate(0px, ${DEBUG_BIOME_WHEEL_RADIUS}px)`
 };
@@ -1299,7 +1456,61 @@ const cancelButtonStyle = {
 };
 
 const buildingSheet = useTemplateRef<HTMLElement>("buildingSheet");
+const constructionBarRef = useTemplateRef<HTMLElement>("constructionBar");
 const wheelRoot = useTemplateRef<HTMLElement>("wheelRoot");
+
+function cancelConstructionMode() {
+  constructionMode.value = null;
+  preview.value?.setBuildHighlights([], []);
+}
+
+function closeConstructionMenu() {
+  constructionMenuOpen.value = false;
+  cancelConstructionMode();
+}
+
+function openConstructionMenu() {
+  clearSelection();
+  constructionMenuOpen.value = true;
+}
+
+function toggleConstructionMenu() {
+  if (constructionMenuOpen.value) {
+    closeConstructionMenu();
+  } else {
+    openConstructionMenu();
+  }
+}
+
+async function toggleDeviceTiltFromSettings() {
+  await toggleDeviceTilt();
+}
+
+function selectConstruction(id: PlaceableBuildingId) {
+  const entry = constructionCatalog.value.find((item) => item.id === id);
+  if (!entry?.isUnlocked) {
+    expandError.value = entry?.requiredTechLabel
+      ? `Débloque la tech « ${entry.requiredTechLabel} » pour construire.`
+      : "Bâtiment verrouillé par la recherche.";
+    return;
+  }
+  if (!entry?.canAfford) {
+    if (!entry.canAffordWood) {
+      expandError.value = `Pas assez de bois (${entry.woodCost} requis).`;
+    } else {
+      expandError.value = "Pas assez de pop libre (1 requis).";
+    }
+    return;
+  }
+  if (constructionMode.value === id) {
+    cancelConstructionMode();
+    return;
+  }
+  constructionMode.value = id;
+  expandError.value = null;
+  clearSelection();
+  tutorialOnConstructionSelected(id);
+}
 
 function onStagePointerDown(event: PointerEvent) {
   if (event.pointerType !== "touch" || !anyWheelOpen.value) return;
@@ -1307,6 +1518,7 @@ function onStagePointerDown(event: PointerEvent) {
   if (!(target instanceof Node)) return;
   if (wheelRoot.value?.contains(target)) return;
   if (buildingSheet.value?.contains(target)) return;
+  if (constructionBarRef.value?.contains(target)) return;
   if (target instanceof HTMLCanvasElement) return;
   clearSelection();
 }
@@ -1318,8 +1530,24 @@ function onSelect(tile: SelectedTile | null) {
   ) {
     return;
   }
+
+  if (constructionMode.value && tile?.biome) {
+    const valid = validConstructionTiles.value.some(
+      (entry) => entry.q === tile.q && entry.r === tile.r
+    );
+    if (valid) {
+      void placeBuildingAt(constructionMode.value, tile);
+      return;
+    }
+    expandError.value = "Impossible de construire ici.";
+    return;
+  }
+
   debugBiomeOpen.value = false;
   destroyConfirm.value = false;
+  if (tile != null) {
+    closeConstructionMenu();
+  }
   selected.value = tile;
   expandError.value = null;
   if (tile) {
@@ -1398,11 +1626,17 @@ async function generate(biome: PrimaryBiomeId) {
   }
 }
 
-async function placeBuilding(buildingId: PlaceableBuildingId) {
-  const tile = selected.value;
+async function placeBuildingAt(buildingId: PlaceableBuildingId, tile: SelectedTile) {
   const id = world.value?.id;
   if (!tile?.biome || !id || building.value) return;
-  if (!buildOptions.value.includes(buildingId)) return;
+  const unlockedTechIds = world.value?.research.unlockedTechIds ?? ["foundations"];
+  if (!isBuildingUnlocked(buildingId, unlockedTechIds)) {
+    const requiredTechId = buildingRequiredTech(buildingId);
+    expandError.value = requiredTechId
+      ? `Débloque la tech « ${getTechNode(requiredTechId).label} » pour construire.`
+      : "Bâtiment verrouillé par la recherche.";
+    return;
+  }
   const cost = BUILD_COST_WOOD[buildingId];
   if (displayedWood.value + 1e-9 < cost) {
     expandError.value = `Pas assez de bois (${cost} requis).`;
@@ -1425,6 +1659,7 @@ async function placeBuilding(buildingId: PlaceableBuildingId) {
     }
     preview.value?.applyBuilding(result.tile.q, result.tile.r, buildingId);
     tutorialOnBuildingPlaced(buildingId);
+    cancelConstructionMode();
     selected.value = {
       ...tile,
       buildingId,
@@ -1565,16 +1800,6 @@ function holeFromElement(
   };
 }
 
-const tutorialForestTargets = computed(() => {
-  const tiles = world.value?.tiles;
-  if (!tiles) return [] as { q: number; r: number }[];
-  const free = tiles.filter((t) => t.biome === "forest" && !t.buildingId);
-  if (free.length) return free.map((t) => ({ q: t.q, r: t.r }));
-  return tiles
-    .filter((t) => t.biome === "forest")
-    .map((t) => ({ q: t.q, r: t.r }));
-});
-
 const tutorialExpandTargets = computed(() => {
   const snap = world.value;
   if (!snap) return [] as { q: number; r: number }[];
@@ -1638,13 +1863,11 @@ const tutorialHole = computed((): TutorialHole | null => {
 
 /** Coords tuiles à surligner dans la scène 3D (pas de cercle DOM). */
 const tutorialHighlightCoords = computed(() => {
-  if (!tutorialActive.value || !tutorialStep.value) return [] as HexCoord[];
+  if (!tutorialActive.value || !tutorialStep.value || constructionMode.value) {
+    return [] as HexCoord[];
+  }
   const target = tutorialStep.value.target;
 
-  if (target === "map-forest") return tutorialForestTargets.value;
-  if (target === "build-lumber" && !tutorialHole.value) {
-    return tutorialForestTargets.value;
-  }
   if (target === "map-expand") return tutorialExpandTargets.value;
   if (target === "biome-plains" && !tutorialHole.value) {
     return tutorialExpandTargets.value;
@@ -1656,16 +1879,48 @@ const tutorialHighlightCoords = computed(() => {
 const tutorialLockMap = computed(() => Boolean(tutorialHole.value));
 
 watch(
+  [validConstructionTiles, invalidConstructionTiles, constructionMode],
+  ([valid, invalid, mode]) => {
+    if (mode) {
+      preview.value?.setBuildHighlights(valid, invalid);
+      preview.value?.setTutorialHighlights([]);
+      return;
+    }
+    preview.value?.setBuildHighlights([], []);
+  },
+  { flush: "post" }
+);
+
+watch(
   tutorialHighlightCoords,
   (coords) => {
+    if (constructionMode.value) return;
     preview.value?.setTutorialHighlights(coords);
   },
   { flush: "post" }
 );
 
 watch(tutorialActive, (on) => {
-  if (!on) preview.value?.setTutorialHighlights([]);
+  if (!on) {
+    preview.value?.setTutorialHighlights([]);
+    preview.value?.setBuildHighlights([], []);
+  }
 });
+
+watch(constructionMode, (mode) => {
+  if (!mode) return;
+  preview.value?.setTutorialHighlights([]);
+});
+
+watch(
+  () => tutorialStep.value?.id,
+  (stepId) => {
+    if (stepId === "place-lumber") {
+      clearSelection();
+      constructionMenuOpen.value = true;
+    }
+  }
+);
 
 watch(
   () => world.value?.id,
@@ -1681,7 +1936,14 @@ watch(
   <div
     ref="stage"
     class="game-shell relative h-dvh overflow-hidden bg-[#dfe8e4]"
-    :class="{ 'game-shell--full': hasNoAds }"
+    :class="{
+      'game-shell--full': hasNoAds,
+      'game-shell--construction-bar': world,
+      'game-shell--construction-bar-collapsed': world && !constructionMenuOpen,
+      'game-shell--tech-bar': world,
+      'game-shell--tech-bar-collapsed': world && !techTimelineOpen,
+      'game-shell--building-sheet': showBuildingSheet
+    }"
     @pointerdown.capture="onStagePointerDown"
   >
     <div
@@ -1889,6 +2151,31 @@ watch(
                 <button
                   type="button"
                   class="play-settings__item"
+                  role="menuitemcheckbox"
+                  :aria-checked="tiltEnabled"
+                  @click="toggleDeviceTiltFromSettings"
+                >
+                  <UIcon name="i-lucide-smartphone" class="play-settings__item-icon" aria-hidden="true" />
+                  <span>Parallax (gyro)</span>
+                  <span class="play-settings__item-meta">
+                    {{ tiltEnabled ? "Activé" : "Désactivé" }}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  class="play-settings__item"
+                  role="menuitem"
+                  @click="openNotificationSettingsFromSettings"
+                >
+                  <UIcon name="i-lucide-bell" class="play-settings__item-icon" aria-hidden="true" />
+                  <span>Notifications</span>
+                  <span class="play-settings__item-meta">
+                    {{ notificationEnabledCount }}/{{ notificationTotalCount }}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  class="play-settings__item"
                   role="menuitem"
                   @click="openSupportFromSettings"
                 >
@@ -2014,10 +2301,30 @@ watch(
       </p>
     </div>
 
-    <div
-      v-if="world && isDevClient"
-      class="play-bottom-chrome pointer-events-auto absolute left-3 z-30 flex max-w-[calc(100%-5.5rem)] flex-wrap items-center gap-2"
+    <button
+      v-if="world && isDevClient && !debugChromeVisible"
+      type="button"
+      class="play-dev-chrome play-dev-chrome--toggle pointer-events-auto absolute left-3 z-30 flex size-11 items-center justify-center rounded-full border border-[#1c2b28]/12 bg-white/80 text-[#2d5248] shadow-[0_8px_24px_rgb(28_43_40_/_0.1)] backdrop-blur-md transition hover:border-[#4a7c6f]/45 hover:text-[#1c2b28] active:scale-95"
+      title="Afficher l’interface debug"
+      aria-label="Afficher l’interface debug"
+      @click="toggleDebugChrome"
     >
+      <UIcon name="i-lucide-bug" class="size-5" />
+    </button>
+
+    <div
+      v-if="world && isDevClient && debugChromeVisible"
+      class="play-dev-chrome play-dev-chrome--panel pointer-events-auto absolute left-3 z-30 flex max-w-[calc(100%-5.5rem)] flex-wrap items-center gap-2"
+    >
+      <button
+        type="button"
+        class="flex h-11 items-center justify-center gap-1.5 rounded-full border border-[#1c2b28]/12 bg-white/75 px-3 text-xs font-semibold tracking-wide text-[#3d524c] shadow-[0_8px_24px_rgb(28_43_40_/_0.08)] backdrop-blur-md transition hover:border-[#4a7c6f]/45 hover:text-[#1c2b28] active:scale-95"
+        title="Masquer l’interface debug"
+        aria-label="Masquer l’interface debug"
+        @click="toggleDebugChrome"
+      >
+        <UIcon name="i-lucide-eye-off" class="size-4" />
+      </button>
       <button
         type="button"
         class="flex h-11 items-center gap-1.5 rounded-full border border-[#1c2b28]/12 bg-white/75 px-3 text-xs font-semibold tracking-wide text-[#3d524c] shadow-[0_8px_24px_rgb(28_43_40_/_0.08)] backdrop-blur-md transition hover:border-[#4a7c6f]/45 hover:text-[#1c2b28] active:scale-95 disabled:opacity-50"
@@ -2078,32 +2385,25 @@ watch(
       </div>
     </div>
 
-    <div
-      v-if="world"
-      class="play-bottom-chrome pointer-events-none absolute right-3 z-30 flex flex-col items-end gap-2"
-    >
-      <button
-        type="button"
-        class="pointer-events-auto flex size-11 items-center justify-center rounded-full border border-[#1c2b28]/12 bg-white/80 text-[#2d5248] shadow-[0_8px_24px_rgb(28_43_40_/_0.1)] backdrop-blur-md transition hover:border-[#4a7c6f]/45 hover:text-[#1c2b28] active:scale-95"
-        :class="tiltEnabled ? 'border-[#4a7c6f]/40 text-[#2d5248]' : 'opacity-70'"
-        :aria-label="
-          tiltEnabled
-            ? 'Désactiver le parallax (gyro)'
-            : 'Activer le parallax (gyro)'
-        "
-        :aria-pressed="tiltEnabled"
-        @click="toggleDeviceTilt"
-      >
-        <UIcon name="i-lucide-smartphone" class="size-5" />
-      </button>
-      <button
-        type="button"
-        class="pointer-events-auto flex size-11 items-center justify-center rounded-full border border-[#1c2b28]/12 bg-white/80 text-[#2d5248] shadow-[0_8px_24px_rgb(28_43_40_/_0.1)] backdrop-blur-md transition hover:border-[#4a7c6f]/45 hover:text-[#1c2b28] active:scale-95"
-        aria-label="Recentrer la caméra"
-        @click="preview?.recenter()"
-      >
-        <UIcon name="i-lucide-locate-fixed" class="size-5" />
-      </button>
+    <div v-if="world" class="play-right-chrome">
+      <div class="play-right-chrome__stack">
+        <ScienceDock
+          :active="techTimelineOpen"
+          :research="projectedResearch"
+          @click="techTimelineOpen = !techTimelineOpen"
+        />
+        <button
+          v-if="!constructionMenuOpen"
+          type="button"
+          class="play-construction-fab pointer-events-auto"
+          data-tutorial="build-menu-toggle"
+          aria-label="Afficher le menu construction"
+          :aria-expanded="false"
+          @click="toggleConstructionMenu"
+        >
+          <UIcon name="i-lucide-hammer" class="size-5" />
+        </button>
+      </div>
     </div>
 
     <Transition name="biome-wheel">
@@ -2169,82 +2469,132 @@ watch(
       </div>
     </Transition>
 
-    <Transition name="biome-wheel">
-      <div
-        v-if="showBuildWheel"
-        class="pointer-events-none absolute inset-0 z-40"
+    <Transition name="building-sheet">
+      <aside
+        v-if="world && constructionMenuOpen"
+        ref="constructionBar"
+        class="building-sheet construction-sheet pointer-events-none absolute inset-x-0 z-40"
+        :class="{ 'construction-sheet--raised': constructionSheetRaised }"
       >
-        <div
-          ref="wheelRoot"
-          class="biome-wheel__ring absolute"
-          :class="wheelInteractive ? 'pointer-events-auto' : 'pointer-events-none'"
-          :style="wheelStyle"
-        >
-          <button
-            type="button"
-            class="absolute left-0 top-0 flex size-9 items-center justify-center rounded-full border border-[#1c2b28]/12 bg-white/85 text-[#3d524c] shadow-md backdrop-blur-sm"
-            :style="cancelButtonStyle"
-            aria-label="Annuler"
-            @click="clearSelection"
+        <div class="building-sheet__sky" aria-hidden="true">
+          <svg
+            class="building-sheet__svg"
+            viewBox="0 0 1200 180"
+            preserveAspectRatio="none"
+            xmlns="http://www.w3.org/2000/svg"
           >
-            <UIcon name="i-lucide-x" class="size-3.5" />
-          </button>
-          <button
-            v-if="showDebugBugOnBuildWheel"
-            type="button"
-            class="absolute left-0 top-0 flex size-9 items-center justify-center rounded-full border border-[#9b4a4a]/35 bg-[#fff5f3] text-[#9b4a4a] shadow-md backdrop-blur-sm transition hover:scale-110"
-            :style="debugBugOnBuildStyle"
-            title="Debug biome"
-            aria-label="Debug biome"
-            @click="openDebugBiomeWheel"
-          >
-            <UIcon name="i-lucide-bug" class="size-3.5" />
-          </button>
-          <button
-            v-for="slot in buildWheelSlots"
-            :key="slot.id"
-            type="button"
-            :data-tutorial="slot.id === 'lumber_camp' ? 'build-lumber_camp' : undefined"
-            class="absolute left-0 top-0 flex size-12 flex-col items-center justify-center rounded-full border-2 bg-[#2d5248] text-[#f2f7f4] shadow-md transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4a7c6f]"
-            :class="
-              slot.canAfford
-                ? 'border-[#4a7c6f]/80 hover:scale-110'
-                : 'border-white/40 opacity-45'
-            "
-            :style="slot.style"
-            :title="
-              !slot.canAfford
-                ? !slot.canAffordWood && !slot.hasIdlePop
-                  ? `${slot.label} · pas assez de bois ni de pop libre`
-                  : !slot.canAffordWood
-                    ? `${slot.label} · pas assez de bois`
-                    : `${slot.label} · pas assez de pop libre`
-                : `${slot.label} · ${slot.woodCost} bois · ${BUILD_IDLE_POP_REQUIREMENT} pop`
-            "
-            :aria-label="slot.label"
-            :disabled="!slot.canAfford"
-            @click="placeBuilding(slot.id)"
-          >
-            <UIcon :name="slot.icon" class="size-4" />
-            <span class="mt-0.5 text-[9px] font-semibold uppercase tracking-wide">
-              {{ slot.short }}
-            </span>
-            <span
-              class="text-[8px] font-medium"
-              :class="slot.canAffordWood ? 'opacity-80' : 'text-[#f5b4b4]'"
-            >
-              {{ slot.woodCost }} bois
-            </span>
-            <span
-              class="text-[8px] font-medium"
-              :class="slot.hasIdlePop ? 'text-[#a8e0c0]' : 'text-[#f5b4b4]'"
-            >
-              {{ BUILD_IDLE_POP_REQUIREMENT }} pop
-            </span>
-          </button>
+            <defs>
+              <linearGradient id="play-cloud-construction-fill" x1="50%" y1="100%" x2="50%" y2="0%">
+                <stop offset="0%" stop-color="#ffffff" stop-opacity="0.97" />
+                <stop offset="55%" stop-color="#f4f8f5" stop-opacity="0.94" />
+                <stop offset="100%" stop-color="#e4eee8" stop-opacity="0.78" />
+              </linearGradient>
+              <filter id="play-cloud-construction-soft" x="-4%" y="-35%" width="108%" height="180%">
+                <feGaussianBlur in="SourceGraphic" stdDeviation="7" />
+              </filter>
+            </defs>
+            <path
+              fill="url(#play-cloud-construction-fill)"
+              filter="url(#play-cloud-construction-soft)"
+              d="M0 180H1200V48
+                C1080 48 1000 28 880 34
+                C740 42 660 22 520 30
+                C380 38 300 20 180 32
+                C90 40 40 44 0 48
+                Z"
+            />
+          </svg>
+          <div class="building-sheet__puff building-sheet__puff--1" />
+          <div class="building-sheet__puff building-sheet__puff--2" />
+          <div class="building-sheet__puff building-sheet__puff--3" />
+          <div class="building-sheet__puff building-sheet__puff--4" />
         </div>
-      </div>
+
+        <div class="building-sheet__content pointer-events-auto">
+          <div class="flex items-start justify-between gap-3">
+            <div class="min-w-0">
+              <p class="building-sheet__title">Construire</p>
+              <p v-if="constructionMode" class="building-sheet__hint">
+                Vert = possible · Rouge = impossible — clique une case verte
+              </p>
+            </div>
+            <div class="flex shrink-0 items-center gap-1.5">
+              <button
+                v-if="constructionMode"
+                type="button"
+                class="construction-sheet__cancel"
+                aria-label="Annuler le mode construction"
+                @click="cancelConstructionMode"
+              >
+                Annuler
+              </button>
+              <button
+                type="button"
+                class="building-sheet__close"
+                aria-label="Fermer le menu construction"
+                @click="closeConstructionMenu"
+              >
+                <UIcon name="i-lucide-x" class="size-4" />
+              </button>
+            </div>
+          </div>
+
+          <div class="construction-sheet__scroll">
+            <button
+              v-for="entry in constructionCatalog"
+              :key="entry.id"
+              type="button"
+              :data-tutorial="entry.id === 'lumber_camp' ? 'build-lumber_camp' : undefined"
+              class="construction-sheet__item"
+              :class="{
+                'construction-sheet__item--active': entry.active,
+                'construction-sheet__item--disabled': !entry.canAfford && !entry.active,
+                'construction-sheet__item--locked': !entry.isUnlocked
+              }"
+              :title="
+                !entry.isUnlocked
+                  ? `${entry.label} · tech ${entry.requiredTechLabel ?? 'requise'}`
+                  : !entry.canAfford
+                    ? !entry.canAffordWood && !entry.hasIdlePop
+                      ? `${entry.label} · pas assez de bois ni de pop libre`
+                      : !entry.canAffordWood
+                        ? `${entry.label} · pas assez de bois`
+                        : `${entry.label} · pas assez de pop libre`
+                    : `${entry.label} · ${entry.woodCost} bois · ${BUILD_IDLE_POP_REQUIREMENT} pop`
+              "
+              :aria-label="entry.label"
+              :aria-pressed="entry.active"
+              @click="selectConstruction(entry.id)"
+            >
+              <UIcon :name="entry.icon" class="construction-sheet__item-icon" />
+              <span class="construction-sheet__item-name">{{ entry.short }}</span>
+              <span
+                v-if="!entry.isUnlocked"
+                class="construction-sheet__item-lock"
+              >
+                <UIcon name="i-lucide-lock" class="size-3" aria-hidden="true" />
+                {{ entry.requiredTechLabel }}
+              </span>
+              <span
+                v-else
+                class="construction-sheet__item-cost"
+                :class="{ 'construction-sheet__item-cost--warn': !entry.canAffordWood }"
+              >
+                {{ entry.woodCost }} bois
+              </span>
+            </button>
+          </div>
+        </div>
+      </aside>
     </Transition>
+
+    <TechTimelinePanel
+      v-model:open="techTimelineOpen"
+      :research="projectedResearch"
+      :selecting="selectingResearch"
+      :unlock-notice="researchUnlockNotice"
+      @select-tech="onSelectResearchTarget"
+    />
 
     <Transition name="biome-wheel">
       <div
@@ -2573,6 +2923,8 @@ watch(
       v-model:open="supportOpen"
       :world-id="world?.id ?? null"
     />
+
+    <NotificationSettingsPanel v-model:open="notificationSettingsOpen" />
 
     <Teleport to="body">
       <Transition name="play-disconnect-sheet">

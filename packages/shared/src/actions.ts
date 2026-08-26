@@ -1,4 +1,4 @@
-import type { PrimaryBiomeId, WorkerJob } from "./ids.ts";
+import type { PrimaryBiomeId, TechId, WorkerJob } from "./ids.ts";
 import type { HexCoord } from "./hex.ts";
 import type {
   BuildResult,
@@ -26,12 +26,22 @@ export type GenerateRegionAction = {
   center: HexCoord;
 };
 
-export type GameAction = BuildAction | AssignWorkersAction | GenerateRegionAction;
+export type SetResearchTargetAction = {
+  type: "set_research_target";
+  techId: TechId;
+};
+
+export type GameAction =
+  | BuildAction
+  | AssignWorkersAction
+  | GenerateRegionAction
+  | SetResearchTargetAction;
 
 export type ApplyActionSuccess =
   | { ok: true; type: "build"; result: BuildResult }
   | { ok: true; type: "assign_workers"; world: WorldSnapshot }
-  | { ok: true; type: "generate_region"; result: ExpandRegionResult };
+  | { ok: true; type: "generate_region"; result: ExpandRegionResult }
+  | { ok: true; type: "set_research_target"; world: WorldSnapshot };
 
 export type ApplyActionFailure = { ok: false; error: string };
 

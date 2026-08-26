@@ -15,6 +15,7 @@ import {
   isFirebaseAdminReady,
   verifyFirebaseIdToken
 } from "../firebase.ts";
+import { isAdminPlayer } from "../admin/access.ts";
 import {
   clearSessionCookie,
   ensureAnonymousPlayer,
@@ -39,7 +40,8 @@ function toSession(player: {
     playerId: player.id,
     pseudo: player.pseudo,
     kind: player.kind,
-    email: player.email
+    email: player.email,
+    isAdmin: isAdminPlayer(player)
   };
 }
 

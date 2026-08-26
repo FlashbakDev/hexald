@@ -282,6 +282,11 @@ export type HexSceneApi = {
   projectTile: (q: number, r: number) => HexScreenPoint | null;
   /** Surbrillance tutoriel (tuiles cliquables) — emissive pulsante. */
   setTutorialHighlights: (coords: readonly HexCoord[]) => void;
+  /** Mode construction — halo vert (valides) / rouge (invalides). */
+  setBuildHighlights: (
+    valid: readonly HexCoord[],
+    invalid?: readonly HexCoord[]
+  ) => void;
 };
 
 export type HexSceneFraming = {
@@ -1211,6 +1216,8 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
   let hoveredMesh: Mesh | null = null;
   let selectedMesh: Mesh | null = null;
   let tutorialHighlightKeys = new Set<string>();
+  let buildValidHighlightKeys = new Set<string>();
+  let buildInvalidHighlightKeys = new Set<string>();
   let previewCenter: HexCoord | null = null;
   let hoverPreviewCenter: HexCoord | null = null;
   let frame = 0;
@@ -2081,6 +2088,8 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
       const hoveredHere = tile.mesh === hoveredMesh;
       const selectedHere = tile.mesh === selectedMesh;
       const tutorialHere = tutorialHighlightKeys.has(hexKey(tile.q, tile.r));
+      const buildValidHere = buildValidHighlightKeys.has(hexKey(tile.q, tile.r));
+      const buildInvalidHere = buildInvalidHighlightKeys.has(hexKey(tile.q, tile.r));
       const inPreview = previewKeys.has(hexKey(tile.q, tile.r));
 
       if (tile.spawn) {
@@ -2102,9 +2111,13 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
             ? HOVER_LIFT
             : selectedHere
               ? SELECT_LIFT
-              : tutorialHere
-                ? SELECT_LIFT * 0.55
-                : 0);
+              : buildValidHere
+                ? SELECT_LIFT * 0.45
+                : buildInvalidHere
+                  ? SELECT_LIFT * 0.3
+                  : tutorialHere
+                    ? SELECT_LIFT * 0.55
+                    : 0);
         tile.mesh.position.y += (targetY - tile.mesh.position.y) * 0.18;
       }
 
@@ -2112,6 +2125,12 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
         setEmissive(tile.materials, 0.14, 0.115, 0.056);
       } else if (selectedHere) {
         setEmissive(tile.materials, 0.22, 0.16, 0.04);
+      } else if (buildValidHere) {
+        const e = 0.16 + tutorialPulse * 0.28;
+        setEmissive(tile.materials, e * 0.12, e * 0.92, e * 0.22);
+      } else if (buildInvalidHere) {
+        const e = 0.14 + tutorialPulse * 0.26;
+        setEmissive(tile.materials, e * 0.95, e * 0.1, e * 0.08);
       } else if (tutorialHere) {
         const e = 0.14 + tutorialPulse * 0.2;
         setEmissive(tile.materials, e * 0.95, e, e * 0.82);
@@ -2259,6 +2278,14 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
     tutorialHighlightKeys = new Set(coords.map((cell) => hexKey(cell.q, cell.r)));
   };
 
+  const setBuildHighlights = (
+    valid: readonly HexCoord[],
+    invalid: readonly HexCoord[] = []
+  ) => {
+    buildValidHighlightKeys = new Set(valid.map((cell) => hexKey(cell.q, cell.r)));
+    buildInvalidHighlightKeys = new Set(invalid.map((cell) => hexKey(cell.q, cell.r)));
+  };
+
   const api = {
     recenter,
     clearSelection,
@@ -2270,6 +2297,7 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
     applyTileBiome,
     projectTile,
     setTutorialHighlights,
+    setBuildHighlights,
     dispose: () => {
       cancelAnimationFrame(frame);
       window.removeEventListener("resize", resize);
