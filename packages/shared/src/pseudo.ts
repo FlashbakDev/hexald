@@ -1,3 +1,8 @@
+import {
+  PROFILE_AVATAR_IDS,
+  type ProfileAvatarId
+} from "./profileAvatars.ts";
+
 export const PSEUDO_MIN_LENGTH = 3;
 export const PSEUDO_MAX_LENGTH = 20;
 export const PSEUDO_PATTERN = /^[a-zA-Z0-9_]+$/;
@@ -6,108 +11,10 @@ export type PseudoValidation =
   | { ok: true; pseudo: string }
   | { ok: false; reason: "empty" | "too_short" | "too_long" | "invalid_chars" };
 
-/** Prénoms / noms historiques (ASCII) pour les pseudos invités. */
-export const GUEST_HISTORICAL_NAMES = [
-  "Napoleon",
-  "Cleopatra",
-  "Caesar",
-  "Augustus",
-  "Hannibal",
-  "Socrates",
-  "Plato",
-  "Aristotle",
-  "Alexander",
-  "Pericles",
-  "Leonardo",
-  "Galileo",
-  "Copernicus",
-  "Newton",
-  "Darwin",
-  "Einstein",
-  "Curie",
-  "Pasteur",
-  "Voltaire",
-  "Rousseau",
-  "Moliere",
-  "Hugo",
-  "Dumas",
-  "Charlemagne",
-  "Richelieu",
-  "Colbert",
-  "Lafayette",
-  "Bonaparte",
-  "Churchill",
-  "Lincoln",
-  "Franklin",
-  "Washington",
-  "Genghis",
-  "Saladin",
-  "Ramses",
-  "Nefertiti",
-  "Confucius",
-  "Ashoka",
-  "Suleiman",
-  "Magellan",
-  "Columbus",
-  "Beethoven",
-  "Mozart",
-  "Bach",
-  "Chopin",
-  "Rembrandt",
-  "VanGogh",
-  "Monet",
-  "Picasso",
-  "Dali",
-  "Cleisthenes",
-  "Hypatia",
-  "Sappho",
-  "JoanOfArc",
-  "Boudica",
-  "Leonidas",
-  "Spartacus",
-  "Cicero",
-  "Seneca",
-  "Marcus",
-  "Trajan",
-  "Hadrian",
-  "Justinian",
-  "Theodora",
-  "Bayard",
-  "Turenne",
-  "Vauban",
-  "Descartes",
-  "Pascal",
-  "Lavoisier",
-  "Ampere",
-  "Fourier",
-  "Laplace",
-  "Fermat",
-  "Euclid",
-  "Archimedes",
-  "Ptolemy",
-  "Herodotus",
-  "Thucydides",
-  "Homer",
-  "Virgil",
-  "Dante",
-  "Petrarch",
-  "Erasmus",
-  "Luther",
-  "Calvin",
-  "Hobbes",
-  "Locke",
-  "Kant",
-  "Hegel",
-  "Marx",
-  "Freud",
-  "Jung",
-  "Tesla",
-  "Edison",
-  "Faraday",
-  "Maxwell",
-  "Kepler",
-  "Brahe"
-] as const;
+/** Pseudos guests = personnages qui ont un portrait généré. */
+export const GUEST_HISTORICAL_NAMES = PROFILE_AVATAR_IDS;
+
+export type { ProfileAvatarId };
 
 export function normalizePseudo(raw: string): string {
   return raw.trim();
@@ -165,7 +72,7 @@ export function suggestRandomGuestPseudo(
   const name =
     GUEST_HISTORICAL_NAMES[
       Math.floor(random() * GUEST_HISTORICAL_NAMES.length)
-    ] ?? "Traveler";
+    ] ?? "Cleopatra";
   const room = PSEUDO_MAX_LENGTH - name.length;
   if (room <= 0) return name.slice(0, PSEUDO_MAX_LENGTH);
 

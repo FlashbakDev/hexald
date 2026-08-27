@@ -36,3 +36,16 @@ export function hexNeighbors(cell: HexCoord): HexCoord[] {
 export function regionCells(center: HexCoord): HexCoord[] {
   return [center, ...hexNeighbors(center)];
 }
+
+/** Toutes les cellules à distance cube ≤ radius (inclut le centre). */
+export function hexDisk(center: HexCoord, radius: number): HexCoord[] {
+  const r = Math.max(0, Math.floor(radius));
+  if (r === 0) return [{ q: center.q, r: center.r }];
+  const cells: HexCoord[] = [];
+  for (let dq = -r; dq <= r; dq++) {
+    for (let dr = Math.max(-r, -dq - r); dr <= Math.min(r, -dq + r); dr++) {
+      cells.push({ q: center.q + dq, r: center.r + dr });
+    }
+  }
+  return cells;
+}

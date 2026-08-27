@@ -6,6 +6,7 @@ export function useSession() {
   const pseudo = useState<string | null>("session-pseudo", () => null);
   const kind = useState<string>("session-kind", () => "anonymous");
   const email = useState<string | null>("session-email", () => null);
+  const avatarId = useState<string | null>("session-avatar-id", () => null);
   const isAdmin = useState("session-is-admin", () => false);
   /** Cookie / compte déjà présent (GET), sans en créer un. */
   const hasAccount = useState("session-has-account", () => false);
@@ -17,6 +18,7 @@ export function useSession() {
     pseudo.value = session.pseudo;
     kind.value = session.kind ?? "anonymous";
     email.value = session.email ?? null;
+    avatarId.value = session.avatarId ?? null;
     isAdmin.value = session.isAdmin ?? false;
     hasAccount.value = true;
     error.value = null;
@@ -28,6 +30,7 @@ export function useSession() {
     pseudo.value = null;
     kind.value = "anonymous";
     email.value = null;
+    avatarId.value = null;
     isAdmin.value = false;
     hasAccount.value = false;
   }
@@ -79,6 +82,17 @@ export function useSession() {
     return session;
   }
 
+  async function setAvatar(nextAvatarId: string): Promise<SessionSnapshot> {
+    const session = await $fetch<SessionSnapshot>("/v1/session/avatar", {
+      baseURL: config.public.apiBase,
+      method: "POST",
+      credentials: "include",
+      body: { avatarId: nextAvatarId }
+    });
+    applySession(session);
+    return session;
+  }
+
   async function checkPseudoAvailable(nextPseudo: string): Promise<{
     available: boolean;
     reason?: string;
@@ -112,6 +126,7 @@ export function useSession() {
     pseudo,
     kind,
     email,
+    avatarId,
     isAdmin,
     hasAccount,
     ready,
@@ -120,6 +135,7 @@ export function useSession() {
     probeSession,
     ensureSession,
     claimPseudo,
+    setAvatar,
     checkPseudoAvailable,
     clearSessionCookie
   };

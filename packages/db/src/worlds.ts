@@ -1,7 +1,9 @@
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, isNotNull, sql } from "drizzle-orm";
 import type { BiomeId, BuildingId, PoiId, ResourceId, TechId } from "@hexald/shared";
+import type { RiverTip } from "@hexald/shared";
 import type { Database, WorldDb } from "./client.ts";
 import {
+  players,
   worldInventory,
   worldRegions,
   worldTechProgress,
@@ -19,6 +21,11 @@ export type WorldTileRow = {
   assignedWorkers: number;
   defaultWorkerSeeded: boolean;
   poiId: PoiId | null;
+  riverMask: number;
+  processorInputRate: number;
+  processorInputBuffer: number;
+  processorInputSettledAt: Date | null;
+  craftCompletesAt: Date | null;
 };
 
 export type WorldRegionRow = {
@@ -64,6 +71,7 @@ export type PersistedWorld = {
   research: WorldResearchRow;
   tiles: WorldTileRow[];
   regions: WorldRegionRow[];
+  riverTips: RiverTip[];
 };
 
 export type PersistedWorldSummary = {
@@ -329,7 +337,12 @@ export async function insertWorldWithTerrain(
           constructionCompletesAt: tile.constructionCompletesAt,
           assignedWorkers: tile.assignedWorkers ?? 0,
           defaultWorkerSeeded: tile.defaultWorkerSeeded ?? false,
-          poiId: tile.poiId ?? null
+          poiId: tile.poiId ?? null,
+          riverMask: tile.riverMask ?? 0,
+          processorInputRate: tile.processorInputRate ?? 0,
+          processorInputBuffer: tile.processorInputBuffer ?? 0,
+          processorInputSettledAt: tile.processorInputSettledAt ?? null,
+          craftCompletesAt: tile.craftCompletesAt ?? null
         }))
       );
     }
@@ -358,8 +371,16 @@ export async function insertWorldWithTerrain(
       updatedAt: world.updatedAt,
       economy: economyFromWorld(world, inventory),
       research,
-      tiles: input.tiles,
-      regions: input.regions
+      tiles: input.tiles.map((tile) => ({
+        ...tile,
+        riverMask: tile.riverMask ?? 0,
+        processorInputRate: tile.processorInputRate ?? 0,
+        processorInputBuffer: tile.processorInputBuffer ?? 0,
+        processorInputSettledAt: tile.processorInputSettledAt ?? null,
+        craftCompletesAt: tile.craftCompletesAt ?? null
+      })),
+      regions: input.regions,
+      riverTips: []
     };
   });
 }
@@ -381,7 +402,12 @@ export async function fetchWorld(
         constructionCompletesAt: worldTiles.constructionCompletesAt,
         assignedWorkers: worldTiles.assignedWorkers,
         defaultWorkerSeeded: worldTiles.defaultWorkerSeeded,
-        poiId: worldTiles.poiId
+        poiId: worldTiles.poiId,
+        riverMask: worldTiles.riverMask,
+        processorInputRate: worldTiles.processorInputRate,
+        processorInputBuffer: worldTiles.processorInputBuffer,
+        processorInputSettledAt: worldTiles.processorInputSettledAt,
+        craftCompletesAt: worldTiles.craftCompletesAt
       })
       .from(worldTiles)
       .where(eq(worldTiles.worldId, worldId)),
@@ -412,13 +438,19 @@ export async function fetchWorld(
       constructionCompletesAt: tile.constructionCompletesAt ?? null,
       assignedWorkers: tile.assignedWorkers ?? 0,
       defaultWorkerSeeded: tile.defaultWorkerSeeded ?? false,
-      poiId: (tile.poiId as PoiId | null) ?? null
+      poiId: (tile.poiId as PoiId | null) ?? null,
+      riverMask: tile.riverMask ?? 0,
+      processorInputRate: tile.processorInputRate ?? 0,
+      processorInputBuffer: tile.processorInputBuffer ?? 0,
+      processorInputSettledAt: tile.processorInputSettledAt ?? null,
+      craftCompletesAt: tile.craftCompletesAt ?? null
     })),
     regions: regions.map((region) => ({
       centerQ: region.centerQ,
       centerR: region.centerR,
       biome: region.biome as BiomeId
-    }))
+    })),
+    riverTips: normalizeRiverTips(world.riverTips)
   };
 }
 
@@ -438,6 +470,31 @@ export async function listWorldsByOwner(
     .orderBy(desc(worlds.updatedAt));
 
   return rows;
+}
+
+/** Mondes dont le propriétaire est inscrit (Firebase) et a un pseudo. */
+export async function listNamedWorldsForLeaderboard(
+  db: Database["db"]
+): Promise<Array<{ worldId: string; ownerId: string; pseudo: string }>> {
+  const rows = await db
+    .select({
+      worldId: worlds.id,
+      ownerId: worlds.ownerId,
+      pseudo: players.pseudo
+    })
+    .from(worlds)
+    .innerJoin(players, eq(worlds.ownerId, players.id))
+    .where(and(isNotNull(players.pseudo), isNotNull(players.firebaseUid)));
+
+  return rows
+    .filter((row): row is { worldId: string; ownerId: string; pseudo: string } =>
+      typeof row.pseudo === "string" && row.pseudo.length > 0
+    )
+    .map((row) => ({
+      worldId: row.worldId,
+      ownerId: row.ownerId,
+      pseudo: row.pseudo
+    }));
 }
 
 export async function fetchWorldForOwner(
@@ -521,6 +578,47 @@ export async function setTileWorkerState(
     .where(eq(worlds.id, worldId));
 }
 
+export async function setTileProcessorState(
+  db: WorldDb,
+  worldId: string,
+  origin: { q: number; r: number },
+  state: {
+    processorInputRate?: number;
+    processorInputBuffer?: number;
+    processorInputSettledAt?: Date | null;
+    craftCompletesAt?: Date | null;
+  }
+): Promise<void> {
+  await db
+    .update(worldTiles)
+    .set({
+      ...(state.processorInputRate !== undefined
+        ? { processorInputRate: state.processorInputRate }
+        : {}),
+      ...(state.processorInputBuffer !== undefined
+        ? { processorInputBuffer: state.processorInputBuffer }
+        : {}),
+      ...(state.processorInputSettledAt !== undefined
+        ? { processorInputSettledAt: state.processorInputSettledAt }
+        : {}),
+      ...(state.craftCompletesAt !== undefined
+        ? { craftCompletesAt: state.craftCompletesAt }
+        : {})
+    })
+    .where(
+      and(
+        eq(worldTiles.worldId, worldId),
+        eq(worldTiles.q, origin.q),
+        eq(worldTiles.r, origin.r)
+      )
+    );
+
+  await db
+    .update(worlds)
+    .set({ updatedAt: new Date() })
+    .where(eq(worlds.id, worldId));
+}
+
 /** @deprecated Prefer setTileWorkerState */
 export async function setTileAssignedWorkers(
   db: WorldDb,
@@ -555,6 +653,10 @@ export async function setTileBuilding(
       constructionCompletesAt: tile.constructionCompletesAt,
       assignedWorkers: tile.assignedWorkers ?? 0,
       defaultWorkerSeeded: tile.defaultWorkerSeeded ?? false,
+      processorInputRate: 0,
+      processorInputBuffer: 0,
+      processorInputSettledAt: null,
+      craftCompletesAt: null,
       ...(tile.poiId !== undefined ? { poiId: tile.poiId } : {})
     })
     .where(
@@ -583,7 +685,11 @@ export async function clearTileBuilding(
       buildingId: null,
       constructionCompletesAt: null,
       assignedWorkers: 0,
-      defaultWorkerSeeded: false
+      defaultWorkerSeeded: false,
+      processorInputRate: 0,
+      processorInputBuffer: 0,
+      processorInputSettledAt: null,
+      craftCompletesAt: null
     })
     .where(
       and(
@@ -603,7 +709,13 @@ export async function clearTileBuilding(
 export async function setTileBiomeDev(
   db: WorldDb,
   worldId: string,
-  tile: { q: number; r: number; biome: BiomeId; poiId?: PoiId | null }
+  tile: {
+    q: number;
+    r: number;
+    biome: BiomeId;
+    poiId?: PoiId | null;
+    riverMask?: number;
+  }
 ): Promise<void> {
   await db
     .update(worldTiles)
@@ -613,7 +725,12 @@ export async function setTileBiomeDev(
       constructionCompletesAt: null,
       assignedWorkers: 0,
       defaultWorkerSeeded: false,
-      poiId: tile.poiId ?? null
+      processorInputRate: 0,
+      processorInputBuffer: 0,
+      processorInputSettledAt: null,
+      craftCompletesAt: null,
+      poiId: tile.poiId ?? null,
+      ...(tile.riverMask !== undefined ? { riverMask: tile.riverMask } : {})
     })
     .where(
       and(
@@ -656,7 +773,12 @@ export async function appendRegion(
         constructionCompletesAt: tile.constructionCompletesAt,
         assignedWorkers: tile.assignedWorkers ?? 0,
         defaultWorkerSeeded: tile.defaultWorkerSeeded ?? false,
-        poiId: tile.poiId ?? null
+        poiId: tile.poiId ?? null,
+        riverMask: tile.riverMask ?? 0,
+        processorInputRate: tile.processorInputRate ?? 0,
+        processorInputBuffer: tile.processorInputBuffer ?? 0,
+        processorInputSettledAt: tile.processorInputSettledAt ?? null,
+        craftCompletesAt: tile.craftCompletesAt ?? null
       }))
     );
   }
@@ -665,6 +787,79 @@ export async function appendRegion(
     .update(worlds)
     .set({ updatedAt: new Date() })
     .where(eq(worlds.id, worldId));
+}
+
+/** Met à jour les river_mask de tuiles existantes (arêtes partagées). */
+export async function setTileRiverMasks(
+  db: WorldDb,
+  worldId: string,
+  updates: readonly { q: number; r: number; riverMask: number }[]
+): Promise<void> {
+  for (const tile of updates) {
+    await db
+      .update(worldTiles)
+      .set({ riverMask: tile.riverMask })
+      .where(
+        and(
+          eq(worldTiles.worldId, worldId),
+          eq(worldTiles.q, tile.q),
+          eq(worldTiles.r, tile.r)
+        )
+      );
+  }
+}
+
+/** Met à jour le POI d’une tuile (ex. estuaire sur mer déjà révélée). */
+export async function setTilePoiId(
+  db: WorldDb,
+  worldId: string,
+  tile: { q: number; r: number; poiId: PoiId | null }
+): Promise<void> {
+  await db
+    .update(worldTiles)
+    .set({ poiId: tile.poiId })
+    .where(
+      and(
+        eq(worldTiles.worldId, worldId),
+        eq(worldTiles.q, tile.q),
+        eq(worldTiles.r, tile.r)
+      )
+    );
+}
+
+export async function updateWorldRiverTips(
+  db: WorldDb,
+  worldId: string,
+  riverTips: RiverTip[]
+): Promise<void> {
+  await db
+    .update(worlds)
+    .set({ riverTips, updatedAt: new Date() })
+    .where(eq(worlds.id, worldId));
+}
+
+function normalizeRiverTips(value: unknown): RiverTip[] {
+  if (!Array.isArray(value)) return [];
+  const tips: RiverTip[] = [];
+  for (const entry of value) {
+    if (!entry || typeof entry !== "object") continue;
+    const q = (entry as { q?: unknown }).q;
+    const r = (entry as { r?: unknown }).r;
+    const dir = (entry as { dir?: unknown }).dir;
+    if (
+      typeof q !== "number" ||
+      typeof r !== "number" ||
+      typeof dir !== "number" ||
+      !Number.isInteger(dir) ||
+      dir < 0 ||
+      dir > 5
+    ) {
+      continue;
+    }
+    const atVertex = (entry as { atVertex?: unknown }).atVertex === true;
+    tips.push(atVertex ? { q, r, dir, atVertex: true } : { q, r, dir });
+  }
+  return tips;
 }
 
 /** Utilitaire tests / debug — compte les lignes inventaire. */

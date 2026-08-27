@@ -145,8 +145,8 @@
             </article>
             <article class="card">
               <h3>Dernière décision importante</h3>
-              <p><span class="badge badge-accent">DEC-022</span> Arbre technologique : prod HDV +1 / 10&nbsp;min, cible manuelle, frise <code>TechTimelinePanel</code>, gate build.</p>
-              <p>Aussi : <span class="badge badge-accent">DEC-025</span> Admin Firebase + <code>ADMIN_EMAILS</code>. Pop 4 · 1 worker / site (niv. 1).</p>
+              <p><span class="badge badge-accent">DEC-027</span> Points de civilisation (PC) : Science + Production + Population + Militaire ; classement dérivé.</p>
+              <p>Aussi : <span class="badge badge-accent">DEC-026</span> Influence. <span class="badge badge-accent">DEC-022</span> Arbre tech. Pop 4 · 1 worker / site (niv. 1).</p>
             </article>
           </div>
 
@@ -160,9 +160,10 @@
                 <li><span>04</span> Tutoriel play + parallax gyro + pages légales — fait</li>
                 <li><span>05</span> Arbre technologique + prod science HDV (DEC-022) — fait</li>
                 <li><span>06</span> Sécuriser <code>/admin</code> (Firebase + <code>ADMIN_EMAILS</code>) — fait</li>
-                <li><span>07</span> Mine (fer) — extracteur runtime + mesh</li>
-                <li><span>08</span> Processors (scierie, moulin, fonderie, forge)</li>
-                <li><span>09</span> Bonus d’adjacence Civ (voisins → rate)</li>
+                <li><span>07</span> PC / leaderboard réel (DEC-027)</li>
+                <li><span>08</span> Mine (fer) — extracteur runtime + mesh</li>
+                <li><span>09</span> Processors (scierie, moulin, fonderie, forge)</li>
+                <li><span>10</span> Bonus d’adjacence Civ (voisins → rate)</li>
               </ol>
             </article>
             <article class="card notes-card">
@@ -283,7 +284,7 @@
           <div class="grid grid-2">
             <article class="card">
               <h3>Monde personnel</h3>
-              <p>Chaque joueur possède son propre monde. La carte n’est pas un territoire unique où tout le monde construit. Le multijoueur pourra exister plus tard via visites, commerce, <strong>score de monde + classements</strong>, interactions économiques, événements, éventuellement du PvP instancié. Le monde principal reste l’espace de progression.</p>
+              <p>Chaque joueur possède son propre monde. La carte n’est pas un territoire unique où tout le monde construit. Le multijoueur pourra exister plus tard via visites, commerce, <strong>points de civilisation (PC) + classements</strong> (DEC-027), interactions économiques, événements, éventuellement du PvP instancié. Le monde principal reste l’espace de progression.</p>
             </article>
             <article class="card">
               <h3>Structure d’une région</h3>
@@ -887,9 +888,65 @@
         <section id="decisions">
           <p class="section-kicker">Decision log</p>
           <h2>Technical Decisions</h2>
-          <p>Dupliquer le bloc en pointillés en bas de liste pour ajouter une décision. Incrémenter l’ID (DEC-025, etc.).</p>
+          <p>Dupliquer le bloc en pointillés en bas de liste pour ajouter une décision. Incrémenter l’ID (DEC-028, etc.).</p>
 
           <div class="decision-grid">
+            <article class="decision">
+              <header>
+                <span class="id">DEC-027</span>
+                <span class="status status-accepted">Accepted</span>
+                <span class="badge badge-neutral">2026-08-27</span>
+              </header>
+              <h3>Points de civilisation (PC) — score dérivé &amp; classements</h3>
+              <dl>
+                <dt>Contexte</dt>
+                <dd>
+                  Le fantôme de progression long terme et le classement (landing <code>/leaderboard</code>, score de monde)
+                  ont besoin d’une métrique unique, lisible, non spendable — pas une ressource d’économie.
+                  Les sources doivent récompenser l’état du monde (pop, sites actifs, techs) plutôt que le temps AFK brut.
+                </dd>
+                <dt>Décision</dt>
+                <dd>
+                  <ul>
+                    <li><strong>Formule v0</strong> :
+                      <code>PC = Science + Production + Population + Militaire</code>.
+                      Pas de Bonheur / Culture pour l’instant (prévus plus tard).</li>
+                    <li><strong>Population</strong> : <code>pop × 10</code>.</li>
+                    <li><strong>Science</strong> :
+                      <code>Σ scienceCost</code> des techs <em>unlock</em>
+                      + points des bâtiments science <em>actifs</em> (ex. bibliothèque, futur centre de recherche).</li>
+                    <li><strong>Production</strong> :
+                      points par bâtiment extracteur / processor <em>actif</em>
+                      (plusieurs occurrences du même type comptent chacune).</li>
+                    <li><strong>Militaire</strong> :
+                      points par bâtiment militaire <em>actif</em> (ex. caserne) ; souvent 0 en early.</li>
+                    <li><strong>Actif</strong> = bâtiment achevé + au moins 1 worker assigné.
+                      Chantier / 0 worker / hors influence (orphelins DEC-026) → 0 PC bâtiment.</li>
+                    <li><strong>Hors score v0</strong> : territoire / régions révélées, influence, monuments / merveilles,
+                      bonheur (jardin, thermes…), culture / commerce (marché). Les merveilles pourront alimenter Culture / Prestige plus tard.</li>
+                    <li><strong>PC</strong> = score dérivé recalculable (settle / snapshot), <strong>pas</strong> une ressource inventaire ni un sink.</li>
+                    <li>Constantes points/bâtiment et <code>N</code> pop : catalogue content (calibrage itératif).</li>
+                  </ul>
+                </dd>
+                <dt>Raison</dt>
+                <dd>
+                  Quatre catégories couvrent le fantôme Civ-light sans diluer le early game (bonheur / culture trop vides aujourd’hui).
+                  Exiger un worker actif force l’assignation, pas seulement la pose.
+                  Exclure territoire / influence évite de punir ou sur-récompenser l’expand technique (éclats) vs la colonisation.
+                </dd>
+                <dt>Conséquences</dt>
+                <dd>
+                  Runtime livré : <code>computeCivilizationPoints</code> (game-core),
+                  snapshot <code>civilizationPoints</code> sur chaque monde,
+                  <code>GET /v1/leaderboard</code> (comptes Firebase uniquement, pas les guests),
+                  UI play (sous le pseudo) + pages classement.
+                  Content : table <code>buildingId → { category, points }</code> ;
+                  techs déjà via <code>scienceCost</code>.
+                  Pas de dépense PC. Futur : catégories Culture / Bonheur / merveilles (additifs).
+                </dd>
+              </dl>
+            </article>
+
             <article class="decision">
               <header>
                 <span class="id">DEC-001</span>
@@ -1303,6 +1360,57 @@
                 </dt>
                 <dt>Raison</dt><dd>Forcer un retour joueur à chaque unlock (pause post-tech) plutôt qu’un enchaînement idle invisible. Pas de stock = tension sur le timing (prod perdue si oubli de cibler). HDV seul au MVP limite la surface d’implémentation ; le centre de recherche viendra accélérer sans changer le modèle cible + barre. Sépare clairement expansion / build / research.</dd>
                 <dt>Conséquences</dt><dd>Shared : <code>TechId</code> (+ <code>fishing</code>), action <code>set_research_target</code>. DB : <code>worlds.research_target_tech_id</code>, <code>world_unlocked_techs</code>, <code>world_tech_progress</code> — pas de <code>science</code> dans <code>world_inventory</code>. Content : techs + <code>requiredTechId</code> sur bâtiments gated. game-core : settle prod HDV → progress cible, complete + pause. API : gate <code>build</code> sur unlocks. UI : frise branchée sur snapshot monde. <code>research_center</code> reste catalogue « planned », non implémenté au MVP.</dd>
+              </dl>
+            </article>
+
+            <article class="decision">
+              <header>
+                <span class="id">DEC-026</span>
+                <span class="status status-done">Accepted</span>
+                <span class="badge badge-neutral">2026-08-27</span>
+              </header>
+              <h3>Influence de civilisation — emprise par construction</h3>
+              <dl>
+                <dt>Contexte</dt>
+                <dd>
+                  Sans contrainte d’emprise, le joueur peut construire sur toute tuile révélée valide (terrain / tech / POI).
+                  Il faut une mécanique simple qui force à densifier et à pousser la frontière via bâtiments et routes,
+                  sans complexifier la génération de régions (déjà gated par adjacence + éclats, DEC-020).
+                </dd>
+                <dt>Décision</dt>
+                <dd>
+                  <ul>
+                    <li><strong>Emprise connectée</strong> : seed = disque <code>R=1</code> autour du village <code>(0,0)</code>. Chaque bâtiment <em>achevé</em> dont la tuile est déjà influencée étend son disque (<code>influenceRadius</code>, défaut 1). Les îlots isolés ne comptent pas.</li>
+                    <li><strong>Rayons</strong> :
+                      <ul>
+                        <li>Toute construction standard (camp, ferme, scierie, maison, extracteurs, processors…) → <code>R = 1</code> (case + 6 voisins).</li>
+                        <li><strong>Avant-poste</strong> (futur) → <code>R = 2</code>.</li>
+                        <li><strong>Route</strong> (futur) → <code>R = 1</code> (permet de construire à côté et d’avancer la frontière).</li>
+                        <li>Village de départ <code>(0,0)</code> → traité comme ancre <code>R = 1</code> (confort early à revoir si trop serré).</li>
+                      </ul>
+                    </li>
+                    <li><strong>Chantier</strong> : pas d’influence tant que le bâtiment / la route n’est pas <em>achevé</em>.</li>
+                    <li><strong>Construire</strong> : uniquement sur une tuile influencée. Sinon erreur / UI <code>outside_influence</code>.</li>
+                    <li><strong>Générer une région</strong> : <strong>hors</strong> de cette mécanique — règles actuelles uniquement (adjacence lattice + coût éclats / hop). L’influence ne bloque pas l’expand.</li>
+                    <li><strong>Démolition</strong> : retirer le bâtiment / la route recalcule l’union d’emprise immédiatement.</li>
+                    <li><strong>Orphelins</strong> : si un bâtiment achevé se retrouve hors influence après un recalcul (ex. démo d’un maillon), il devient <strong>inutilisable</strong> :
+                      plus de prod / craft ; les ouvriers assignés sont renvoyés « chez eux » (pool libre du village, dans l’influence).
+                      Le bâtiment reste sur la carte jusqu’à démo ou restauration d’emprise (reconstruire une route / un avant-poste qui le re-couvre).</li>
+                  </ul>
+                </dd>
+                <dt>Raison</dt>
+                <dd>
+                  Emprise connectée au village = lisible (Civ / colony-light) et compose avec les routes / avant-postes, tout en permettant les orphelins après démo d’un maillon.
+                  Séparer l’expand évite de mélanger révélation de carte et colonisation.
+                  Orphelins inutilisables plutôt que suppression auto = feedback clair sans punition destructrice.
+                </dd>
+                <dt>Conséquences</dt>
+                <dd>
+                  Catalogue : champ <code>influenceRadius</code> (défaut 1 ; avant-poste 2 ; route 1).
+                  game-core : <code>computeInfluencedTiles</code> (composante connectée), gate build, settle qui désactive les sites hors emprise + libère workers.
+                  UI : overlay d’influence en mode construction ; bâtiments hors emprise « hors civilisation » ; pas de gate expand.
+                  Contenus futurs : <code>outpost</code>, <code>road</code>.
+                </dd>
               </dl>
             </article>
 
@@ -1891,6 +1999,16 @@
                 <li>Biome primaire choisi par le joueur</li>
                 <li>Les hex déjà créés dans l’empreinte ne sont <strong>jamais</strong> écrasés</li>
                 <li>Coût : <strong>éclats de monde</strong> = hop (DEC-020)</li>
+                <li><strong>Hors</strong> de l’influence de civilisation (DEC-026) — expand ≠ coloniser</li>
+              </ul>
+            </article>
+            <article class="card wiki-entry">
+              <h3>Influence de civilisation <span class="badge badge-neutral">DEC-026</span></h3>
+              <ul class="tech-list">
+                <li>Composante connectée depuis le village (pas union naïve)</li>
+                <li>Rayons : standard / route <code>R=1</code> · avant-poste <code>R=2</code></li>
+                <li>Chantier : pas d’emprise ; démo → recalcul immédiat</li>
+                <li>Build uniquement dans l’emprise ; hors emprise → bâtiment inutilisable, ouvriers rentrent</li>
               </ul>
             </article>
             <article class="card wiki-entry">
@@ -2214,8 +2332,10 @@
             <article class="roadmap-item">
               <div class="roadmap-head"><h3>Phase 5 — Civilization</h3><span class="status status-planned">Planned</span></div>
               <ul>
+                <li>Influence de civilisation (DEC-026) — emprise build, orphelins inutilisables</li>
+                <li>Points de civilisation PC (DEC-027) — score dérivé + leaderboard réel</li>
                 <li>Villages</li>
-                <li>Routes</li>
+                <li>Routes (+ avant-poste, rayons d’emprise)</li>
                 <li>Bâtiments multi-hexagones</li>
                 <li>Logistique</li>
                 <li>Nouveaux biomes primaires (désert, jungle, glace, neige, marais…) + fusions / rivages</li>
@@ -2226,7 +2346,7 @@
               <ul>
                 <li>Comptes Firebase (lien invité Google / email) — fait (DEC-024)</li>
                 <li>Persistance multi-appareil via compte — fait (même monde lié)</li>
-                <li><strong>Score de joueur</strong> basé sur l’ensemble du monde + <strong>leaderboard</strong> / classements</li>
+                <li><strong>Points de civilisation (PC)</strong> (DEC-027) + <strong>leaderboard</strong> / classements par catégorie</li>
                 <li>Interaction entre joueurs</li>
                 <li>Commerce</li>
               </ul>
@@ -2321,6 +2441,10 @@
           <div class="kanban" id="kanban">
             <div class="kanban-col" data-column="ideas">
               <h3>Ideas</h3>
+              <article class="task" draggable="true" data-id="task-civ-influence">
+                <strong>Influence de civilisation</strong>
+                <p>DEC-026 — gate build sur emprise achevée ; expand hors scope ; démo recalcule ; orphelins inutilisables + workers rentrent.</p>
+              </article>
               <article class="task" draggable="true" data-id="task-research-center">
                 <strong>Centre de recherche</strong>
                 <p>Bâtiment <code>research_center</code> — accélère la prod science (2 / worker / min). DEC-022 post-MVP.</p>
@@ -2346,8 +2470,8 @@
                 <p>Désert, jungle, glace, neige, marais (+ volcanique ?). Roue, fusions, rivages, raison économique. Wiki · Biomes.</p>
               </article>
               <article class="task" draggable="true" data-id="task-world-score-leaderboard">
-                <strong>Score monde + leaderboard</strong>
-                <p>Score agrégé sur tout le diorama (pop, bâtiments, régions, prod…). Classements globaux / périodiques. Voir Ideas &amp; PvP V1.</p>
+                <strong>PC + leaderboard</strong>
+                <p>DEC-027 : PC = Science + Production + Population + Militaire. Runtime + classements réels (remplace mock). Voir Ideas &amp; PvP V1.</p>
               </article>
             </div>
             <div class="kanban-col" data-column="todo">
@@ -2541,8 +2665,8 @@
           <div class="grid grid-3" id="ideas-grid">
               <article class="card idea" data-status="confirmed">
                 <span class="status status-confirmed">Confirmed</span>
-                <h3>Score de monde + leaderboard</h3>
-                <p>Chaque joueur a un <strong>score</strong> calculé sur l’ensemble de son monde (taille, population, bâtiments, progression économique, etc. — formule à préciser). Classements (global, hebdo, amis…) pour comparer sans envahir le diorama d’autrui. Socle du PvP indirect (V1). Phase 6.</p>
+                <h3>Points de civilisation (PC) + leaderboard</h3>
+                <p><span class="badge badge-neutral">DEC-027</span> Score dérivé <code>PC = Science + Production + Population + Militaire</code> (pas de ressource spendable). Pop ×&nbsp;10 ; techs = Σ&nbsp;<code>scienceCost</code> ; bâtiments actifs (≥&nbsp;1 worker). Hors v0 : territoire, influence, bonheur, culture, merveilles. Classements (global, hebdo, amis…). Socle du PvP indirect (V1). Phase 5–6.</p>
               </article>
               <article class="card idea" data-status="confirmed">
                 <span class="status status-confirmed">Confirmed</span>
@@ -2625,7 +2749,7 @@
           <div class="grid grid-3">
             <article class="card">
               <h3>V1 — Indirect</h3>
-              <p>Compétition sans invasion : <strong>score de monde</strong>, <strong>leaderboards</strong>, économie, commerce, performances. Le classement récompense la qualité / l’ampleur du diorama, pas le raid.</p>
+              <p>Compétition sans invasion : <strong>points de civilisation (PC)</strong> (DEC-027), <strong>leaderboards</strong>, économie, commerce. Le classement récompense l’état du diorama (science, prod, pop, militaire), pas le raid.</p>
             </article>
             <article class="card">
               <h3>V2 — Instancié</h3>
@@ -2777,7 +2901,7 @@
         </section>
 
         <footer class="page-foot">
-          Hexald — Project Hub. Site statique de documentation, pas le jeu. Ouvrir <code>docs/index.html</code> dans le navigateur. Dernière mise à jour du contenu : 26 août 2026 (DEC-022 science · DEC-025 admin · pop 4 / 1 worker · UX carte · Phase 4 Industry).
+          Hexald — Project Hub. Site statique de documentation, pas le jeu. Ouvrir <code>docs/index.html</code> dans le navigateur. Dernière mise à jour du contenu : 27 août 2026 (DEC-026 influence · DEC-022 science · DEC-025 admin · Phase 4 Industry).
         </footer>
       </div>
     </div>

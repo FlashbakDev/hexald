@@ -364,6 +364,12 @@ async function sendTestMail() {
           </h1>
           <p class="mt-2 max-w-xl text-[#6b7c76]">
             Stats live, présence approximative ({{ ttlMinutes }}&nbsp;min).
+            <NuxtLink
+              to="/admin/content"
+              class="ml-1 text-[#4a7c6f] underline-offset-2 hover:underline"
+            >
+              Parcourir le contenu 3D
+            </NuxtLink>
           </p>
           <p v-if="email" class="mt-1 text-xs text-[#6b7c76]">
             {{ email }}
@@ -374,6 +380,9 @@ async function sendTestMail() {
           <p v-if="data" class="text-sm text-[#6b7c76]">
             Maj {{ formatWhen(data.generatedAt) }}
           </p>
+          <UButton color="primary" variant="soft" to="/admin/content">
+            Contenu
+          </UButton>
           <UButton
             v-if="showTestMail"
             color="primary"

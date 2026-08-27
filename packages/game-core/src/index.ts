@@ -40,6 +40,7 @@ export {
   stoneRateFromState,
   foodProductionPerMinute,
   fishingFoodRateFromState,
+  clayRateFromState,
   wheatFoodEquivalentPerMinute,
   foodConsumptionPerMinute,
   foodNetRatePerMinute,
@@ -47,6 +48,9 @@ export {
   tileProductionMultiplier,
   countPastureTiles,
   extractorSitesFromTiles,
+  processorSitesFromTiles,
+  processorCraftRatePerMinute,
+  settleProcessors,
   LUMBER_CAMP_MAX_WORKERS,
   FARM_MAX_WORKERS,
   QUARRY_MAX_WORKERS,
@@ -73,12 +77,20 @@ export {
   type SpendResourceResult
 } from "./economy.ts";
 export {
+  settleProcessorTiles,
+  clampProcessorInputRate,
+  maxProcessorInputRate,
+  type ProcessorTileState,
+  type SettleProcessorsOptions
+} from "./processorCraft.ts";
+export {
   buildingWoodCost,
   woodRefundOnDestroy,
   countBuildings,
   getBuildingDefinition,
   isPlaceableBuilding,
   isPlaceableExtractor,
+  isPlaceableProcessor,
   listBuildOptionsForTile,
   terrainAllowsBuilding,
   validateBuildPlacement,
@@ -86,6 +98,16 @@ export {
   type BuildPlacementInput,
   type BuildPlacementResult
 } from "./build.ts";
+export {
+  computeInfluencedTiles,
+  influenceRadiusForBuilding,
+  isBuildingOrphan,
+  isBuildingOutsideInfluence,
+  isTileInfluenced,
+  releaseWorkersOutsideInfluence,
+  ORIGIN_INFLUENCE_RADIUS,
+  type InfluenceTileInput
+} from "./influence.ts";
 export {
   countBuildingSites,
   hasCompletedBuilding,
@@ -106,6 +128,7 @@ export {
   REGION_STEP,
   START_REGION_BIOME,
   START_REGION_CENTER,
+  START_VILLAGE_BUILDING_ID,
   adjacentRegionCenters,
   biomeInfluences,
   canPlaceRegion,
@@ -115,6 +138,10 @@ export {
   assignCoastalFishBanks,
   assignPlainsCowHerds,
   assignMountainIronDeposits,
+  assignPlainsClayDeposits,
+  isStartVillageCoord,
+  isVillageBuildingId,
+  startingTileBuildingId,
   tileTouchesLand,
   isBuildableBiome,
   isBiomeId,
@@ -127,6 +154,18 @@ export {
   resolveCellBiome,
   type GeneratedTile
 } from "./world.ts";
+export {
+  assignRivers,
+  clearRiverEdgesAt,
+  filterTipsAwayFromTile,
+  lakeOutflowVertexFromMask,
+  lakeSpawnChance,
+  riverEdgeBits,
+  terrainHeight,
+  withLakeOutflowVertex,
+  type AssignRiversInput,
+  type AssignRiversResult
+} from "./rivers.ts";
 export {
   computeRegionExpansionCost,
   listDevelopmentSites,
@@ -143,6 +182,13 @@ export {
   setResearchTarget,
   settleResearch,
   techProgressFor,
+  type ResearchSettleOptions,
   type ResearchState,
   type SetResearchTargetResult
 } from "./research.ts";
+export {
+  computeCivilizationPoints,
+  type CivilizationPointsBreakdown,
+  type CivilizationPointsInput,
+  type CivilizationPointsTileInput
+} from "./civilizationPoints.ts";

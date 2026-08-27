@@ -8,30 +8,42 @@ export {
   FISH_BANK_SPAWN_CHANCE,
   COW_HERD_SPAWN_CHANCE,
   IRON_DEPOSIT_SPAWN_CHANCE,
+  CLAY_DEPOSIT_SPAWN_CHANCE,
   type PoiDefinition,
   type PoiKind
 } from "./pois.ts";
+export {
+  RIVER_LAKE_BASE_CHANCE,
+  RIVER_LAKE_DIST_SCALE,
+  RIVER_FROM_LAKE_CHANCE,
+  RIVER_ARM_SPAWN_CHANCE,
+  RIVER_SPAWN_CHANCE
+} from "./rivers.ts";
 export {
   buildings,
   getBuildingDefinition,
   listPlaceableBuildings,
   isPlaceableBuildingId,
   isPlaceableExtractorId,
+  isPlaceableProcessorId,
   buildingWoodCostFromCatalog,
   buildingDurationMsFromCatalog,
   buildingMaxWorkersFromCatalog,
   buildingRateFromCatalog,
   buildingPopulationCapBonus,
   buildingRequiredTech,
+  buildingInfluenceRadius,
   PLACEABLE_BUILDINGS,
   PLACEABLE_EXTRACTORS,
+  PLACEABLE_PROCESSORS,
   BUILD_COST_WOOD,
   BUILD_DURATION_MS,
   type BuildingDefinition,
   type BuildingStatus,
   type BuildingRole,
   type PlaceableBuildingId,
-  type PlaceableExtractorId
+  type PlaceableExtractorId,
+  type PlaceableProcessorId
 } from "./buildings.ts";
 export {
   chains,
@@ -41,6 +53,8 @@ export {
   getProcessorStepForBuilding,
   listProcessorRecipes,
   resourceOutputForBuilding,
+  recipeInputCount,
+  recipeOutputCount,
   type ProductionChain,
   type RecipeStep
 } from "./recipes.ts";
@@ -59,10 +73,12 @@ export {
   FARM_MAX_WORKERS,
   QUARRY_MAX_WORKERS,
   FISHING_HUT_MAX_WORKERS,
+  CLAY_MINE_MAX_WORKERS,
   WOOD_RATE_PER_WORKER_PER_MINUTE,
   WHEAT_RATE_PER_WORKER_PER_MINUTE,
   STONE_RATE_PER_WORKER_PER_MINUTE,
   FISHING_HUT_FOOD_RATE_PER_WORKER_PER_MINUTE,
+  CLAY_RATE_PER_WORKER_PER_MINUTE,
   WOOD_STOCK_CAP,
   WHEAT_STOCK_CAP,
   STONE_STOCK_CAP,
@@ -77,6 +93,9 @@ export {
   BUILD_IDLE_POP_REQUIREMENT,
   BUILD_DESTROY_COMPLETED_REFUND_RATIO,
   DEV_BUILD_DURATION_MS,
+  DEV_RESEARCH_DURATION_MS,
+  SAWMILL_CRAFT_DURATION_MS,
+  DEV_CRAFT_DURATION_MS,
   WORLDSHARD_STOCK_CAP,
   TOWN_HALL_WORLDSHARD_INTERVAL_MS,
   TOWN_HALL_SCIENCE_INTERVAL_MS,
@@ -125,3 +144,9 @@ export {
   type CityImprovementId,
   type CityImprovementStatus
 } from "./cityImprovements.ts";
+export {
+  CIVILIZATION_POINTS_POP_MULTIPLIER,
+  CIVILIZATION_POINTS_BY_BUILDING,
+  civilizationPointsForBuilding,
+  type CivilizationPointCategory
+} from "./civilizationPoints.ts";

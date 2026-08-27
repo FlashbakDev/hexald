@@ -30,6 +30,19 @@ export function validateAction(action: GameAction): ActionResult {
     return { ok: true };
   }
 
+  if (action.type === "set_processor_input_rate") {
+    if (!isHexCoord(action.origin)) {
+      return { ok: false, reason: "invalid_origin" };
+    }
+    if (
+      !Number.isInteger(action.ratePerMinute) ||
+      action.ratePerMinute < 0
+    ) {
+      return { ok: false, reason: "invalid_rate" };
+    }
+    return { ok: true };
+  }
+
   if (action.type === "build") {
     if (!isHexCoord(action.origin)) {
       return { ok: false, reason: "invalid_origin" };

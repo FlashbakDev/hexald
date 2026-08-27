@@ -21,6 +21,11 @@ const props = defineProps<{
   } | null;
   viewSize?: number;
   frameBiasY?: number;
+  frameBiasX?: number;
+  /** Centre caméra axial (défaut 0,0). */
+  lookAt?: HexCoord | null;
+  /** Écarte la brume de N anneaux de régions (preview admin). */
+  fogClearRegionPadding?: number;
   /** Parallax gyro / souris (défaut true). */
   deviceTilt?: boolean;
 }>();
@@ -51,8 +56,11 @@ function mountScene(create = createHexScene) {
   api = create(canvas.value, {
     onSelect: (tile) => emit("select", tile),
     initialWorld: props.initialWorld ?? undefined,
+    initialLookAt: props.lookAt ?? undefined,
+    fogClearRegionPadding: props.fogClearRegionPadding,
     viewSize: props.viewSize,
     frameBiasY: props.frameBiasY,
+    frameBiasX: props.frameBiasX,
     getDeviceTilt: () => (tilt.enabled.value ? tilt.getTilt() : { x: 0, y: 0 })
   });
   if (import.meta.dev) {
@@ -61,9 +69,9 @@ function mountScene(create = createHexScene) {
 }
 
 watch(
-  () => [props.viewSize, props.frameBiasY] as const,
-  ([viewSize, frameBiasY]) => {
-    api?.setFraming({ viewSize, frameBiasY });
+  () => [props.viewSize, props.frameBiasY, props.frameBiasX] as const,
+  ([viewSize, frameBiasY, frameBiasX]) => {
+    api?.setFraming({ viewSize, frameBiasY, frameBiasX });
   }
 );
 
@@ -127,13 +135,17 @@ defineExpose({
   applyBuilding: (q: number, r: number, buildingId: BuildingId) =>
     api?.applyBuilding(q, r, buildingId) ?? false,
   removeBuilding: (q: number, r: number) => api?.removeBuilding(q, r) ?? false,
-  applyTileBiome: (q: number, r: number, biome: BiomeId) =>
-    api?.applyTileBiome(q, r, biome) ?? false,
+  applyTileBiome: (q: number, r: number, biome: BiomeId, riverMask?: number) =>
+    api?.applyTileBiome(q, r, biome, riverMask) ?? false,
+  syncRiverMasks: (tiles: readonly WorldTileSnapshot[]) =>
+    api?.syncRiverMasks(tiles),
   projectTile: (q: number, r: number) => api?.projectTile(q, r) ?? null,
   setTutorialHighlights: (coords: readonly HexCoord[]) =>
     api?.setTutorialHighlights(coords),
   setBuildHighlights: (valid: readonly HexCoord[], invalid?: readonly HexCoord[]) =>
     api?.setBuildHighlights(valid, invalid),
+  setInfluenceHighlights: (coords: readonly HexCoord[]) =>
+    api?.setInfluenceHighlights(coords),
   setDeviceTiltEnabled: (next: boolean) => tilt.setEnabled(next),
   deviceTilt: tilt
 });

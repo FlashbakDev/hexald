@@ -1,4 +1,11 @@
 import { and, eq, isNull, sql } from "drizzle-orm";
+import {
+  assignProfileAvatarForClaim,
+  isProfileAvatarId,
+  pickRandomProfileAvatarId,
+  resolveProfileAvatarForPseudo,
+  type ProfileAvatarId
+} from "@hexald/shared";
 import type { Database } from "./client.ts";
 import { players } from "./schema/index.ts";
 
@@ -6,6 +13,7 @@ export type PersistedPlayer = {
   id: string;
   kind: string;
   pseudo: string | null;
+  avatarId: string | null;
   firebaseUid: string | null;
   email: string | null;
   createdAt: Date;
@@ -15,6 +23,7 @@ function toPlayer(row: {
   id: string;
   kind: string;
   pseudo: string | null;
+  avatarId: string | null;
   firebaseUid: string | null;
   email: string | null;
   createdAt: Date;
@@ -23,6 +32,7 @@ function toPlayer(row: {
     id: row.id,
     kind: row.kind,
     pseudo: row.pseudo,
+    avatarId: row.avatarId,
     firebaseUid: row.firebaseUid,
     email: row.email,
     createdAt: row.createdAt
@@ -75,7 +85,8 @@ export async function insertFirebasePlayer(
     .values({
       kind: "firebase",
       firebaseUid: input.firebaseUid,
-      email: input.email
+      email: input.email,
+      avatarId: pickRandomProfileAvatarId()
     })
     .returning();
   if (!player) throw new Error("failed_to_create_firebase_player");
@@ -173,6 +184,14 @@ export type ClaimPseudoResult =
   | { ok: true; player: PersistedPlayer }
   | { ok: false; reason: "pseudo_taken" | "pseudo_locked" };
 
+function nextAvatarIdForClaim(
+  current: PersistedPlayer,
+  pseudo: string
+): ProfileAvatarId {
+  if (isProfileAvatarId(current.avatarId)) return current.avatarId;
+  return assignProfileAvatarForClaim(pseudo);
+}
+
 export async function claimPlayerPseudo(
   db: Database["db"],
   playerId: string,
@@ -183,7 +202,7 @@ export async function claimPlayerPseudo(
 
   if (current.pseudo) {
     if (current.pseudo.toLowerCase() === pseudo.toLowerCase()) {
-      return { ok: true, player: current };
+      return { ok: true, player: await ensurePlayerAvatar(db, current) };
     }
     return { ok: false, reason: "pseudo_locked" };
   }
@@ -193,17 +212,19 @@ export async function claimPlayerPseudo(
     return { ok: false, reason: "pseudo_taken" };
   }
 
+  const avatarId = nextAvatarIdForClaim(current, pseudo);
+
   try {
     const [updated] = await db
       .update(players)
-      .set({ pseudo })
+      .set({ pseudo, avatarId })
       .where(and(eq(players.id, playerId), isNull(players.pseudo)))
       .returning();
     if (!updated) {
       const refreshed = await fetchPlayer(db, playerId);
       if (refreshed?.pseudo) {
         if (refreshed.pseudo.toLowerCase() === pseudo.toLowerCase()) {
-          return { ok: true, player: refreshed };
+          return { ok: true, player: await ensurePlayerAvatar(db, refreshed) };
         }
         return { ok: false, reason: "pseudo_locked" };
       }
@@ -217,4 +238,60 @@ export async function claimPlayerPseudo(
     }
     throw error;
   }
+}
+
+/**
+ * Backfill avatar manquant (comptes créés avant la colonne).
+ * Sans pseudo : on attend le claim (guest → personnage, cloud → aléatoire déjà posé à la création firebase).
+ */
+export async function ensurePlayerAvatar(
+  db: Database["db"],
+  player: PersistedPlayer
+): Promise<PersistedPlayer> {
+  if (isProfileAvatarId(player.avatarId)) return player;
+  if (!player.pseudo) return player;
+
+  const avatarId: ProfileAvatarId =
+    resolveProfileAvatarForPseudo(player.pseudo) ?? pickRandomProfileAvatarId();
+
+  const [updated] = await db
+    .update(players)
+    .set({ avatarId })
+    .where(and(eq(players.id, player.id), isNull(players.avatarId)))
+    .returning();
+
+  if (updated) return toPlayer(updated);
+
+  const refreshed = await fetchPlayer(db, player.id);
+  return refreshed ?? { ...player, avatarId };
+}
+
+export type UpdateAvatarResult =
+  | { ok: true; player: PersistedPlayer }
+  | { ok: false; reason: "invalid_avatar" };
+
+export async function updatePlayerAvatar(
+  db: Database["db"],
+  playerId: string,
+  avatarId: string
+): Promise<UpdateAvatarResult> {
+  if (!isProfileAvatarId(avatarId)) {
+    return { ok: false, reason: "invalid_avatar" };
+  }
+
+  const current = await fetchPlayer(db, playerId);
+  if (!current) throw new Error("player_not_found");
+
+  if (current.avatarId === avatarId) {
+    return { ok: true, player: current };
+  }
+
+  const [updated] = await db
+    .update(players)
+    .set({ avatarId })
+    .where(eq(players.id, playerId))
+    .returning();
+
+  if (!updated) throw new Error("failed_to_update_avatar");
+  return { ok: true, player: toPlayer(updated) };
 }

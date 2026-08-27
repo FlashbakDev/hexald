@@ -1,6 +1,6 @@
 /**
- * Firebase Auth → cookie Hexald, puis /play si le compte a un pseudo.
- * Couvre le redirect Google et le cas « user Firebase déjà là, cookie absent ».
+ * Firebase Auth → cookie Hexald (bridge).
+ * Pas de redirection auto vers /play : l’utilisateur choisit via la landing.
  */
 export default defineNuxtPlugin(async () => {
   if (!import.meta.client) return;
@@ -16,11 +16,7 @@ export default defineNuxtPlugin(async () => {
   const { session, bridged } = await ensureHexaldSession();
   if (!session) return;
 
-  if (session.pseudo && (bridged || route.path === "/")) {
-    await navigateTo("/play", { replace: true });
-    return;
-  }
-
+  // Compte cloud sans pseudo : ramener sur la landing pour choisir / claim.
   if (!session.pseudo && bridged && route.path !== "/") {
     authError.value = null;
     await navigateTo("/", { replace: true });

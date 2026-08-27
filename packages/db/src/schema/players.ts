@@ -7,6 +7,8 @@ export const players = pgTable(
     id: uuid("id").defaultRandom().primaryKey(),
     kind: text("kind").notNull().default("anonymous"),
     pseudo: text("pseudo"),
+    /** Clé catalogue portrait (ex. Napoleon). */
+    avatarId: text("avatar_id"),
     firebaseUid: text("firebase_uid"),
     email: text("email"),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull()

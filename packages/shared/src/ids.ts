@@ -34,6 +34,7 @@ export type ResourceId =
   | "food"
   | "stone"
   | "stone_blocks"
+  | "clay"
   | "iron_ore"
   | "iron_ingot"
   | "tools"
@@ -41,13 +42,20 @@ export type ResourceId =
   | "worldshard";
 
 /** Points d’intérêt naturels / landmarks (couche sur la tuile). */
-export type PoiId = "fish_bank" | "cow_herd" | "iron_deposit";
+export type PoiId =
+  | "fish_bank"
+  | "cow_herd"
+  | "iron_deposit"
+  | "clay_deposit"
+  | "lake"
+  | "estuary";
 
 export type BuildingId =
   | "village"
   | "lumber_camp"
   | "sawmill"
   | "mine"
+  | "clay_mine"
   | "farm"
   | "mill"
   | "bakery"

@@ -2,13 +2,18 @@ import {
   boolean,
   doublePrecision,
   integer,
+  jsonb,
   pgTable,
   primaryKey,
   text,
   timestamp,
   uuid
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 import { players } from "./players.ts";
+
+/** Pointe de rivière à prolonger (écoulement sortant). */
+export type RiverTipRow = { q: number; r: number; dir: number; atVertex?: boolean };
 
 export const worlds = pgTable("worlds", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -33,7 +38,12 @@ export const worlds = pgTable("worlds", {
     withTimezone: true
   })
     .defaultNow()
+    .notNull(),
+  /** Pointes de rivières à prolonger à la prochaine expansion. */
+  riverTips: jsonb("river_tips")
+    .$type<RiverTipRow[]>()
     .notNull()
+    .default(sql`'[]'::jsonb`)
 });
 
 /** Inventaire générique — une ligne par (monde, ressource). */
@@ -73,7 +83,23 @@ export const worldTiles = pgTable(
     /** Worker par défaut déjà géré (évite réassigner si le joueur retire). */
     defaultWorkerSeeded: boolean("default_worker_seeded").notNull().default(false),
     /** POI naturel / landmark (ex. fish_bank). */
-    poiId: text("poi_id")
+    poiId: text("poi_id"),
+    /** Bits 0–5 : arêtes terre–terre avec rivière (HEX_DIRECTIONS). */
+    riverMask: integer("river_mask").notNull().default(0),
+    /** Valve d’entrée processor : unités input / min depuis le stock village. */
+    processorInputRate: integer("processor_input_rate").notNull().default(0),
+    /** Buffer d’input local (ex. bois dans la scierie). */
+    processorInputBuffer: doublePrecision("processor_input_buffer")
+      .notNull()
+      .default(0),
+    /** Horloge d’accumulation du buffer. */
+    processorInputSettledAt: timestamp("processor_input_settled_at", {
+      withTimezone: true
+    }),
+    /** Fin du craft en cours ; null = idle. */
+    craftCompletesAt: timestamp("craft_completes_at", {
+      withTimezone: true
+    })
   },
   (table) => [primaryKey({ columns: [table.worldId, table.q, table.r] })]
 );

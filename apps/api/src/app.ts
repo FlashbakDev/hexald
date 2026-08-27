@@ -5,6 +5,7 @@ import { env } from "./env.ts";
 import { adminRoutes } from "./routes/admin.ts";
 import { contentRoutes } from "./routes/content.ts";
 import { healthRoutes } from "./routes/health.ts";
+import { leaderboardRoutes } from "./routes/leaderboard.ts";
 import { supportRoutes } from "./routes/support.ts";
 import { worldRoutes } from "./routes/worlds.ts";
 import { sessionPlugin, sessionRoutes } from "./session/index.ts";
@@ -79,6 +80,7 @@ export async function buildApp() {
   await app.register(sessionRoutes, { prefix: "/v1" });
   await app.register(contentRoutes, { prefix: "/v1" });
   await app.register(worldRoutes, { prefix: "/v1" });
+  await app.register(leaderboardRoutes, { prefix: "/v1" });
   await app.register(supportRoutes, { prefix: "/v1" });
   await app.register(adminRoutes, { prefix: "/v1" });
 

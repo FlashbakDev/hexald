@@ -3,8 +3,14 @@ import {
   type PlaceableExtractorId
 } from "@hexald/content";
 import type { BuildingId, HexCoord } from "@hexald/shared";
+import { hexKey } from "@hexald/shared";
 import { isBuildingComplete } from "./construction.ts";
-import { isPlaceableBuilding, isPlaceableExtractor } from "./build.ts";
+import {
+  isPlaceableBuilding,
+  isPlaceableExtractor,
+  isPlaceableProcessor
+} from "./build.ts";
+import { computeInfluencedTiles } from "./influence.ts";
 
 export type TileWorkerState = {
   q: number;
@@ -21,6 +27,14 @@ export function maxWorkersForBuilding(buildingId: BuildingId): number {
   return buildingMaxWorkersFromCatalog(buildingId);
 }
 
+/** Bâtiment qui accepte une affectation permanente de workers. */
+export function acceptsPermanentWorkers(buildingId: BuildingId): boolean {
+  return (
+    isPlaceableExtractor(buildingId) ||
+    (isPlaceableProcessor(buildingId) && maxWorkersForBuilding(buildingId) > 0)
+  );
+}
+
 export function workerTotalsFromTiles(
   tiles: readonly TileWorkerState[],
   now: number
@@ -29,23 +43,28 @@ export function workerTotalsFromTiles(
   farmers: number;
   quarriers: number;
   fishers: number;
+  miners: number;
 } {
   let woodcutters = 0;
   let farmers = 0;
   let quarriers = 0;
   let fishers = 0;
+  let miners = 0;
+  const influenced = computeInfluencedTiles(tiles, now);
 
   for (const tile of tiles) {
     if (!tile.buildingId || !isPlaceableExtractor(tile.buildingId)) continue;
     if (!isBuildingComplete(tile.constructionCompletesAt, now)) continue;
+    if (!influenced.has(hexKey(tile.q, tile.r))) continue;
     const workers = clampTileWorkers(tile.assignedWorkers ?? 0, tile.buildingId);
     if (tile.buildingId === "lumber_camp") woodcutters += workers;
     else if (tile.buildingId === "farm") farmers += workers;
     else if (tile.buildingId === "fishing_hut") fishers += workers;
+    else if (tile.buildingId === "clay_mine") miners += workers;
     else quarriers += workers;
   }
 
-  return { woodcutters, farmers, quarriers, fishers };
+  return { woodcutters, farmers, quarriers, fishers, miners };
 }
 
 /** Workers engagés sur un site (chantier ou bâtiment achevé) — hors pool HDV. */
@@ -53,7 +72,7 @@ export function committedWorkersFromTiles(tiles: readonly TileWorkerState[]): nu
   let total = 0;
   for (const tile of tiles) {
     if (!tile.buildingId || !isPlaceableBuilding(tile.buildingId)) continue;
-    if (isPlaceableExtractor(tile.buildingId)) {
+    if (acceptsPermanentWorkers(tile.buildingId)) {
       total += clampTileWorkers(tile.assignedWorkers ?? 0, tile.buildingId);
       continue;
     }
@@ -73,7 +92,7 @@ export function releaseHousingConstructionWorkers<T extends TileWorkerState>(
   let changed = false;
   const next = tiles.map((tile) => {
     if (!tile.buildingId || !isPlaceableBuilding(tile.buildingId)) return tile;
-    if (isPlaceableExtractor(tile.buildingId)) return tile;
+    if (acceptsPermanentWorkers(tile.buildingId)) return tile;
     if (!isBuildingComplete(tile.constructionCompletesAt, now)) return tile;
     if ((tile.assignedWorkers ?? 0) <= 0 && tile.defaultWorkerSeeded) return tile;
     changed = true;
@@ -108,23 +127,31 @@ export type AssignTileWorkersResult =
         | "no_building"
         | "under_construction"
         | "invalid_count"
-        | "over_population";
+        | "over_population"
+        | "outside_influence";
     };
 
-/** Assigne 0 ou 1 worker sur un extracteur (chantier ou achevé). */
+/** Assigne 0 ou 1 worker sur un extracteur / processor (chantier ou achevé). */
 export function assignWorkersAtTile(
   tiles: readonly TileWorkerState[],
   origin: HexCoord,
   count: number,
   population: number,
-  _now = Date.now()
+  now = Date.now()
 ): AssignTileWorkersResult {
   const index = tiles.findIndex((tile) => tile.q === origin.q && tile.r === origin.r);
   if (index < 0) return { ok: false, reason: "tile_not_found" };
 
   const tile = tiles[index]!;
-  if (!tile.buildingId || !isPlaceableExtractor(tile.buildingId)) {
+  if (!tile.buildingId || !acceptsPermanentWorkers(tile.buildingId)) {
     return { ok: false, reason: "no_building" };
+  }
+
+  if (count > 0) {
+    const influenced = computeInfluencedTiles(tiles, now);
+    if (!influenced.has(hexKey(origin.q, origin.r))) {
+      return { ok: false, reason: "outside_influence" };
+    }
   }
 
   const max = maxWorkersForBuilding(tile.buildingId);
@@ -146,24 +173,36 @@ export function assignWorkersAtTile(
 
 export function extractorJobForBuildingId(
   buildingId: PlaceableExtractorId
-): "woodcutter" | "farmer" | "quarrier" | "fisher" {
+): "woodcutter" | "farmer" | "quarrier" | "fisher" | "miner" {
   if (buildingId === "lumber_camp") return "woodcutter";
   if (buildingId === "farm") return "farmer";
   if (buildingId === "fishing_hut") return "fisher";
+  if (buildingId === "clay_mine") return "miner";
   return "quarrier";
 }
 
-/** Assigne 1 worker par défaut sur chaque extracteur achevé non encore « seedé ». */
+/** Assigne 1 worker par défaut sur chaque extracteur / processor achevé non encore « seedé ». */
 export function seedDefaultWorkersForCompletedTiles<
   T extends TileWorkerState
 >(tiles: readonly T[], population: number, now: number): { tiles: T[]; changed: boolean } {
   let current = tiles.map((tile) => ({ ...tile }));
   let changed = false;
+  const influenced = computeInfluencedTiles(current, now);
 
   for (const tile of current) {
     if (tile.defaultWorkerSeeded) continue;
-    if (!tile.buildingId || !isPlaceableExtractor(tile.buildingId)) continue;
+    if (!tile.buildingId || !acceptsPermanentWorkers(tile.buildingId)) continue;
     if (!isBuildingComplete(tile.constructionCompletesAt, now)) continue;
+
+    if (!influenced.has(hexKey(tile.q, tile.r))) {
+      current = current.map((entry) =>
+        entry.q === tile.q && entry.r === tile.r
+          ? ({ ...entry, assignedWorkers: 0, defaultWorkerSeeded: true } as T)
+          : entry
+      );
+      changed = true;
+      continue;
+    }
 
     const result = assignWorkersAtTile(
       current,

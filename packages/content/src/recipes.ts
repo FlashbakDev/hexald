@@ -5,6 +5,10 @@ export type RecipeStep = {
   buildingId: BuildingId;
   input: ResourceId | null;
   output: ResourceId;
+  /** Unités d’input consommées par cycle craft (processors). Défaut 1. */
+  inputCount?: number;
+  /** Unités d’output produites par cycle. Défaut 1. */
+  outputCount?: number;
 };
 
 export type ProductionChain = {
@@ -28,7 +32,13 @@ export const chains: ProductionChain[] = [
     label: "Bois",
     steps: [
       { buildingId: "lumber_camp", input: null, output: "wood" },
-      { buildingId: "sawmill", input: "wood", output: "planks" }
+      {
+        buildingId: "sawmill",
+        input: "wood",
+        output: "planks",
+        inputCount: 5,
+        outputCount: 1
+      }
     ]
   },
   {
@@ -47,8 +57,23 @@ export const chains: ProductionChain[] = [
     steps: [
       { buildingId: "quarry", input: null, output: "stone" }
     ]
+  },
+  {
+    id: "clay",
+    label: "Argile",
+    steps: [
+      { buildingId: "clay_mine", input: null, output: "clay" }
+    ]
   }
 ];
+
+export function recipeInputCount(step: RecipeStep): number {
+  return Math.max(1, Math.floor(step.inputCount ?? 1));
+}
+
+export function recipeOutputCount(step: RecipeStep): number {
+  return Math.max(1, Math.floor(step.outputCount ?? 1));
+}
 
 export function getChain(id: string): ProductionChain | undefined {
   return chains.find((chain) => chain.id === id);

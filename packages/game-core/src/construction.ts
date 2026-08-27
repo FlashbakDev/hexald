@@ -7,7 +7,7 @@ import {
 import type { BuildingId } from "@hexald/shared";
 
 export type ConstructionTimeInput = {
-  /** `true` en environnement de développement (override 5 s). */
+  /** `true` = accélération debug (5 s), pas seulement NODE_ENV. */
   isDev?: boolean;
 };
 

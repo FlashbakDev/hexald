@@ -6,6 +6,8 @@ import {
   validatePseudo
 } from "@hexald/shared";
 import { getFirebaseAuthClient } from "~/utils/firebase.client";
+import { fetchLeaderboard, LEADERBOARD_SCORE_LABEL } from "~/data/leaderboard";
+import type { LeaderboardEntrySnapshot } from "@hexald/shared";
 
 definePageMeta({
   layout: "default"
@@ -17,7 +19,6 @@ useHead({
 
 const {
   pseudo,
-  kind,
   hasAccount,
   ready,
   probeSession,
@@ -221,17 +222,86 @@ async function onEmailSubmit() {
 
 onMounted(async () => {
   if (!ready.value) await probeSession();
-  if (kind.value === "firebase" && !hasPseudo.value) {
-    submitting.value = true;
-    try {
-      const ok = await claimCloudPseudo();
-      if (ok) await goPlay();
-      else formError.value = mapError("session_failed");
-    } finally {
-      submitting.value = false;
-    }
+});
+
+const howSection = ref<HTMLElement | null>(null);
+const howVisible = ref(false);
+const discoverHidden = ref(false);
+let howObserver: IntersectionObserver | null = null;
+
+function scrollToHow() {
+  howSection.value?.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function onLandingScroll() {
+  discoverHidden.value = window.scrollY > 48;
+}
+
+onMounted(() => {
+  if (!import.meta.client) return;
+  window.addEventListener("scroll", onLandingScroll, { passive: true });
+  onLandingScroll();
+  nextTick(() => {
+    const el = howSection.value;
+    if (!el) return;
+    howObserver = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) {
+          howVisible.value = true;
+          howObserver?.disconnect();
+          howObserver = null;
+        }
+      },
+      { threshold: 0.28, rootMargin: "0px 0px -8% 0px" }
+    );
+    howObserver.observe(el);
+  });
+});
+
+onBeforeUnmount(() => {
+  howObserver?.disconnect();
+  howObserver = null;
+  if (import.meta.client) {
+    window.removeEventListener("scroll", onLandingScroll);
   }
 });
+
+const howSteps = [
+  {
+    n: "01",
+    icon: "i-lucide-hammer",
+    title: "Pose",
+    text: "Ancre ton village, construis camps et fermes sur les hex qui t’entourent."
+  },
+  {
+    n: "02",
+    icon: "i-lucide-wheat",
+    title: "Produis",
+    text: "Assigne ta population, remplis les stocks, fais croître ta civilisation."
+  },
+  {
+    n: "03",
+    icon: "i-lucide-orbit",
+    title: "Étends",
+    text: "Révèle de nouvelles régions, recherche des technologies, élargis ton monde."
+  }
+] as const;
+
+const { data: leaderboardData } = await useAsyncData("landing-leaderboard", () =>
+  fetchLeaderboard({ page: 1, pageSize: 3 }).catch(() => null)
+);
+
+const leaderboardPreview = computed(() => {
+  const entries = leaderboardData.value?.entries ?? [];
+  const byRank = Object.fromEntries(
+    entries.filter((e) => e.rank <= 3).map((e) => [e.rank, e])
+  ) as Record<number, LeaderboardEntrySnapshot>;
+  return [byRank[2], byRank[1], byRank[3]].filter(Boolean);
+});
+
+const leaderboardScoreLabel = computed(
+  () => leaderboardData.value?.scoreLabel ?? LEADERBOARD_SCORE_LABEL
+);
 </script>
 
 <template>
@@ -240,10 +310,10 @@ onMounted(async () => {
       <LandingWorld />
 
       <div
-        class="pointer-events-none absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-[#e8f0ec]/30 lg:bg-gradient-to-r lg:from-[#e8f0ec]/75 lg:via-[#e8f0ec]/25 lg:to-transparent"
+        class="pointer-events-none absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-[#dfe8e4]/35 lg:bg-gradient-to-r lg:from-[#dfe8e4]/70 lg:via-[#dfe8e4]/20 lg:to-transparent"
       />
       <div
-        class="pointer-events-none absolute inset-x-0 bottom-0 h-[38%] bg-gradient-to-t from-[#dfe8e4] from-40% via-[#dfe8e4]/85 to-transparent lg:h-44 lg:from-[#dfe8e4]/65 lg:via-transparent"
+        class="pointer-events-none absolute inset-x-0 bottom-0 h-[42%] bg-gradient-to-t from-[#dfe8e4] from-35% via-[#dfe8e4]/90 to-transparent lg:h-52 lg:from-[#dfe8e4] lg:via-[#dfe8e4]/55"
       />
       <div
         class="pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-[#eef4f1]/40 to-transparent lg:h-32"
@@ -264,62 +334,99 @@ onMounted(async () => {
         <div class="landing-cloud landing-cloud--8"><LandingCloud :variant="2" /></div>
       </div>
 
-      <div class="relative z-10 flex h-full flex-col justify-end lg:justify-center">
-        <main class="w-full max-w-xl px-6 pb-14 pt-28 sm:px-10 sm:pb-20 lg:px-16 lg:pb-24">
-          <div class="landing-rise flex items-center gap-4 sm:gap-5">
-            <img
-              src="/icon.png"
-              alt=""
-              width="72"
-              height="72"
-              class="size-14 shrink-0 rounded-2xl object-cover shadow-[0_8px_24px_rgb(28_43_40_/_0.18)] sm:size-[4.5rem]"
-              aria-hidden="true"
-            />
-            <h1
-              class="font-display text-6xl font-medium tracking-tight text-[#1c2b28] sm:text-7xl lg:text-8xl"
+      <div class="relative z-10 flex h-full flex-col">
+        <div class="landing-col relative z-30 flex justify-end pt-[max(1rem,env(safe-area-inset-top))]">
+          <nav class="landing-topnav" aria-label="Navigation">
+            <NuxtLink
+              to="/"
+              class="landing-topnav__link is-active"
+              aria-current="page"
             >
-              Hexald
-            </h1>
-          </div>
+              Accueil
+            </NuxtLink>
+            <NuxtLink to="/leaderboard" class="landing-topnav__link">
+              Classement
+            </NuxtLink>
+          </nav>
+        </div>
 
-          <p
-            class="landing-rise landing-rise-delay-1 mt-6 max-w-md text-lg leading-relaxed text-[#3d524c] sm:text-xl"
+        <div
+          class="landing-col flex flex-1 flex-col justify-end pb-24 pt-10 sm:pb-28 lg:justify-end lg:pb-[22vh] lg:pt-16"
+        >
+          <main class="w-full max-w-xl">
+            <div class="landing-rise flex items-center gap-4 sm:gap-5">
+              <img
+                src="/icon.png"
+                alt=""
+                width="72"
+                height="72"
+                class="size-14 shrink-0 rounded-2xl object-cover shadow-[0_8px_24px_rgb(28_43_40_/_0.18)] sm:size-[4.5rem]"
+                aria-hidden="true"
+              />
+              <h1
+                class="font-display text-6xl font-medium tracking-tight text-[#1c2b28] sm:text-7xl lg:text-8xl"
+              >
+                Hexald
+              </h1>
+            </div>
+
+            <p
+              class="landing-rise landing-rise-delay-1 mt-6 max-w-md text-lg leading-relaxed text-[#3d524c] sm:text-xl"
+            >
+              Pose ton village, conquiers des biomes, étends ton empire.
+            </p>
+
+            <div class="landing-rise landing-rise-delay-2 relative z-20 mt-14">
+              <!-- Retour : cookie / compte déjà là → direct en jeu -->
+              <button
+                v-if="ready && hasAccount && hasPseudo"
+                type="button"
+                class="landing-cta inline-flex h-14 w-full cursor-pointer items-center justify-center rounded-full bg-[#2d5248] px-9 font-display text-base font-medium tracking-wide text-[#f2f7f4] transition hover:bg-[#243f38] active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-55 sm:w-auto sm:min-w-48"
+                :disabled="submitting"
+                @click="continueExisting"
+              >
+                {{ submitting ? "…" : "Continuer à jouer" }}
+              </button>
+
+              <!-- Nouveau (ou compte sans pseudo) → sheet de connexion -->
+              <button
+                v-else-if="ready"
+                type="button"
+                class="landing-cta inline-flex h-14 w-full cursor-pointer items-center justify-center rounded-full bg-[#2d5248] px-9 font-display text-base font-medium tracking-wide text-[#f2f7f4] transition hover:bg-[#243f38] active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-55 sm:w-auto sm:min-w-48"
+                @click="openSheet"
+              >
+                Commencer à jouer
+              </button>
+
+              <button
+                v-else
+                type="button"
+                class="landing-cta inline-flex h-14 w-full cursor-pointer items-center justify-center rounded-full bg-[#2d5248] px-9 font-display text-base font-medium tracking-wide text-[#f2f7f4] opacity-55 sm:w-auto sm:min-w-48"
+                disabled
+              >
+                …
+              </button>
+            </div>
+          </main>
+        </div>
+
+        <div
+          class="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex justify-center pb-[max(1.1rem,env(safe-area-inset-bottom))]"
+        >
+          <button
+            type="button"
+            class="landing-discover pointer-events-auto"
+            :class="{ 'is-hidden': discoverHidden }"
+            :tabindex="discoverHidden ? -1 : 0"
+            :aria-hidden="discoverHidden"
+            @click="scrollToHow"
           >
-            Pose ton village, conquiers des biomes, étends ton empire.
-          </p>
-
-          <div class="landing-rise landing-rise-delay-2 relative z-20 mt-14">
-            <!-- Retour : cookie / compte déjà là → direct en jeu -->
-            <button
-              v-if="ready && hasAccount && hasPseudo"
-              type="button"
-              class="landing-cta inline-flex h-14 w-full cursor-pointer items-center justify-center rounded-full bg-[#2d5248] px-9 font-display text-base font-medium tracking-wide text-[#f2f7f4] transition hover:bg-[#243f38] active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-55 sm:w-auto sm:min-w-48"
-              :disabled="submitting"
-              @click="continueExisting"
-            >
-              {{ submitting ? "…" : "Continuer à jouer" }}
-            </button>
-
-            <!-- Nouveau (ou compte sans pseudo) → sheet de connexion -->
-            <button
-              v-else-if="ready"
-              type="button"
-              class="landing-cta inline-flex h-14 w-full cursor-pointer items-center justify-center rounded-full bg-[#2d5248] px-9 font-display text-base font-medium tracking-wide text-[#f2f7f4] transition hover:bg-[#243f38] active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-55 sm:w-auto sm:min-w-48"
-              @click="openSheet"
-            >
-              Commencer à jouer
-            </button>
-
-            <button
-              v-else
-              type="button"
-              class="landing-cta inline-flex h-14 w-full cursor-pointer items-center justify-center rounded-full bg-[#2d5248] px-9 font-display text-base font-medium tracking-wide text-[#f2f7f4] opacity-55 sm:w-auto sm:min-w-48"
-              disabled
-            >
-              …
-            </button>
-          </div>
-        </main>
+            Découvrir
+            <span class="landing-discover__chevron" aria-hidden="true">
+              <UIcon name="i-lucide-chevron-down" class="size-4" />
+            </span>
+          </button>
+        </div>
       </div>
     </section>
 
@@ -454,7 +561,105 @@ onMounted(async () => {
       </Transition>
     </Teleport>
 
-    <SiteFooter />
+    <div class="landing-after">
+      <section
+        id="decouvrir"
+        ref="howSection"
+        class="landing-how"
+        :class="{ 'is-visible': howVisible }"
+        aria-labelledby="landing-how-title"
+      >
+        <div class="landing-how__inner landing-col">
+          <p class="landing-how__kicker">Le principe</p>
+          <h2 id="landing-how-title" class="landing-how__title font-display">
+            Trois gestes pour bâtir ton monde
+          </h2>
+          <p class="landing-how__lead">
+            Hexald tourne autour d’une boucle simple — poser, produire, étendre —
+            sur une carte hexagonale qui grandit avec toi.
+          </p>
+
+          <ol class="landing-how__steps">
+            <li
+              v-for="(step, i) in howSteps"
+              :key="step.n"
+              class="landing-how__step"
+              :style="{ '--how-i': String(i) }"
+            >
+              <div class="landing-how__rail" aria-hidden="true">
+                <span class="landing-how__num">{{ step.n }}</span>
+                <span v-if="i < howSteps.length - 1" class="landing-how__line" />
+              </div>
+              <div class="landing-how__body">
+                <div class="landing-how__icon" aria-hidden="true">
+                  <UIcon :name="step.icon" class="size-6 sm:size-7" />
+                </div>
+                <h3 class="landing-how__step-title font-display">
+                  {{ step.title }}
+                </h3>
+                <p class="landing-how__step-text">
+                  {{ step.text }}
+                </p>
+              </div>
+            </li>
+          </ol>
+        </div>
+      </section>
+
+      <section
+        class="landing-board"
+        aria-labelledby="landing-board-title"
+      >
+        <div class="landing-col">
+          <div class="landing-board__head">
+            <div>
+              <p class="landing-board__kicker">Classement</p>
+              <h2
+                id="landing-board-title"
+                class="landing-board__title font-display"
+              >
+                Qui domine Hexald&nbsp;?
+              </h2>
+              <p class="landing-board__lead">
+                Classement live par points de civilisation (PC) —
+                Science, Production, Population, Militaire.
+              </p>
+            </div>
+            <NuxtLink to="/leaderboard" class="landing-board__cta">
+              Voir le classement
+              <UIcon name="i-lucide-arrow-right" class="size-4" aria-hidden="true" />
+            </NuxtLink>
+          </div>
+
+          <div
+            v-if="leaderboardPreview.length > 0"
+            class="landing-board__podium"
+            aria-label="Top 3"
+          >
+            <div
+              v-for="entry in leaderboardPreview"
+              :key="entry.rank"
+              class="landing-board__slot"
+              :class="`landing-board__slot--${entry.rank}`"
+            >
+              <span class="landing-board__rank" aria-hidden="true">{{
+                entry.rank
+              }}</span>
+              <p class="landing-board__name font-display">{{ entry.pseudo }}</p>
+              <p class="landing-board__score">
+                {{ entry.score.toLocaleString("fr-FR") }}
+                <span>{{ leaderboardScoreLabel }}</span>
+              </p>
+            </div>
+          </div>
+          <p v-else class="landing-board__empty mt-6 text-sm text-[#3d524c]">
+            Pas encore de classement — sois le premier empire.
+          </p>
+        </div>
+      </section>
+    </div>
+
+    <SiteFooter variant="section" />
   </div>
 </template>
 

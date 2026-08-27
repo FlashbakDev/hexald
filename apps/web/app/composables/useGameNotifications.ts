@@ -9,6 +9,7 @@ const STOCK_NOTIFY_RESOURCES: readonly ResourceId[] = [
   "wood",
   "wheat",
   "stone",
+  "clay",
   "food",
   "worldshard"
 ];

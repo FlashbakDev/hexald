@@ -24,7 +24,7 @@ export const biomes: BiomeDefinition[] = [
   {
     id: "plains",
     label: "Plaine",
-    description: "Herbes ouvertes. Terrain de choix pour les fermes.",
+    description: "Herbes ouvertes. Fermes, et gisements d’argile pour la mine.",
     kind: "land",
     primary: true
   },

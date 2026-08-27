@@ -1,4 +1,11 @@
-import type { BiomeId, BuildingId, PoiId, ResourceId, TechId, WorkerJob } from "@hexald/shared";
+import type {
+  BiomeId,
+  BuildingId,
+  PoiId,
+  ResourceId,
+  TechId,
+  WorkerJob,
+} from "@hexald/shared";
 
 export type BuildingStatus = "mvp" | "planned" | "later";
 
@@ -35,6 +42,11 @@ export type BuildingDefinition = {
   requiredPoiId?: PoiId;
   /** Tech requise pour poser le bâtiment (DEC-022). Absent = hors gate. */
   requiredTechId?: TechId;
+  /**
+   * Rayon d’emprise une fois achevé (DEC-026). Absent = 1.
+   * Avant-poste futur = 2 ; route = 1.
+   */
+  influenceRadius?: number;
 };
 export const buildings: BuildingDefinition[] = [
   {
@@ -46,7 +58,7 @@ export const buildings: BuildingDefinition[] = [
     hexSize: "multi",
     status: "planned",
     role: "settlement",
-    placeable: false
+    placeable: false,
   },
   {
     id: "lumber_camp",
@@ -59,10 +71,10 @@ export const buildings: BuildingDefinition[] = [
     role: "extractor",
     placeable: true,
     woodCost: 15,
-    buildDurationMs: 60_000,
+    buildDurationMs: 30_000,
     maxWorkers: 1,
     ratePerWorkerPerMinute: 5,
-    workerJob: "woodcutter"
+    workerJob: "woodcutter",
   },
   {
     id: "sawmill",
@@ -73,8 +85,14 @@ export const buildings: BuildingDefinition[] = [
     hexSize: 1,
     status: "mvp",
     role: "processor",
-    placeable: false,
-    requiredTechId: "animal_husbandry"
+    placeable: true,
+    woodCost: 25,
+    buildDurationMs: 60_000,
+    maxWorkers: 1,
+    /** Legacy ; craft scierie = durée fixe, output = ouvriers. */
+    ratePerWorkerPerMinute: 1,
+    workerJob: "artisan",
+    requiredTechId: "animal_husbandry",
   },
   {
     id: "mine",
@@ -93,7 +111,25 @@ export const buildings: BuildingDefinition[] = [
     ratePerWorkerPerMinute: 5,
     workerJob: "miner",
     requiredPoiId: "iron_deposit",
-    requiredTechId: "mining"
+    requiredTechId: "mining",
+  },
+  {
+    id: "clay_mine",
+    label: "Mine d’argile",
+    terrain: "plains",
+    input: "workers",
+    output: "clay",
+    hexSize: 1,
+    status: "mvp",
+    role: "extractor",
+    placeable: true,
+    woodCost: 30,
+    buildDurationMs: 60_000,
+    maxWorkers: 1,
+    ratePerWorkerPerMinute: 5,
+    workerJob: "miner",
+    requiredPoiId: "clay_deposit",
+    requiredTechId: "pottery",
   },
   {
     id: "farm",
@@ -106,10 +142,10 @@ export const buildings: BuildingDefinition[] = [
     role: "extractor",
     placeable: true,
     woodCost: 20,
-    buildDurationMs: 60_000,
+    buildDurationMs: 30_000,
     maxWorkers: 1,
     ratePerWorkerPerMinute: 5,
-    workerJob: "farmer"
+    workerJob: "farmer",
   },
   {
     id: "mill",
@@ -121,7 +157,7 @@ export const buildings: BuildingDefinition[] = [
     status: "planned",
     role: "processor",
     placeable: false,
-    requiredTechId: "pottery"
+    requiredTechId: "pottery",
   },
   {
     id: "bakery",
@@ -133,7 +169,7 @@ export const buildings: BuildingDefinition[] = [
     status: "planned",
     role: "processor",
     placeable: false,
-    requiredTechId: "pottery"
+    requiredTechId: "pottery",
   },
   {
     id: "quarry",
@@ -146,10 +182,10 @@ export const buildings: BuildingDefinition[] = [
     role: "extractor",
     placeable: true,
     woodCost: 25,
-    buildDurationMs: 60_000,
+    buildDurationMs: 30_000,
     maxWorkers: 1,
     ratePerWorkerPerMinute: 5,
-    workerJob: "quarrier"
+    workerJob: "quarrier",
   },
   {
     id: "fishing_hut",
@@ -167,7 +203,7 @@ export const buildings: BuildingDefinition[] = [
     ratePerWorkerPerMinute: 2,
     workerJob: "fisher",
     requiredPoiId: "fish_bank",
-    requiredTechId: "sailing"
+    requiredTechId: "sailing",
   },
   {
     id: "brickworks",
@@ -179,7 +215,7 @@ export const buildings: BuildingDefinition[] = [
     status: "planned",
     role: "processor",
     placeable: false,
-    requiredTechId: "pottery"
+    requiredTechId: "pottery",
   },
   {
     id: "house",
@@ -193,7 +229,7 @@ export const buildings: BuildingDefinition[] = [
     placeable: true,
     woodCost: 30,
     buildDurationMs: 60_000,
-    populationCapBonus: 1
+    populationCapBonus: 1,
   },
   {
     id: "smelter",
@@ -205,7 +241,7 @@ export const buildings: BuildingDefinition[] = [
     status: "mvp",
     role: "processor",
     placeable: false,
-    requiredTechId: "metallurgy"
+    requiredTechId: "metallurgy",
   },
   {
     id: "forge",
@@ -217,7 +253,7 @@ export const buildings: BuildingDefinition[] = [
     status: "mvp",
     role: "processor",
     placeable: false,
-    requiredTechId: "metallurgy"
+    requiredTechId: "metallurgy",
   },
   {
     id: "library",
@@ -229,7 +265,7 @@ export const buildings: BuildingDefinition[] = [
     status: "planned",
     role: "special",
     placeable: false,
-    requiredTechId: "writing"
+    requiredTechId: "writing",
   },
   {
     id: "garden",
@@ -246,7 +282,7 @@ export const buildings: BuildingDefinition[] = [
     maxWorkers: 1,
     ratePerWorkerPerMinute: 3,
     workerJob: "farmer",
-    requiredTechId: "irrigation"
+    requiredTechId: "irrigation",
   },
   {
     id: "barracks",
@@ -258,7 +294,7 @@ export const buildings: BuildingDefinition[] = [
     status: "planned",
     role: "special",
     placeable: false,
-    requiredTechId: "bronze_working"
+    requiredTechId: "bronze_working",
   },
   {
     id: "market",
@@ -270,7 +306,7 @@ export const buildings: BuildingDefinition[] = [
     status: "planned",
     role: "special",
     placeable: false,
-    requiredTechId: "currency"
+    requiredTechId: "currency",
   },
   {
     id: "baths",
@@ -282,7 +318,7 @@ export const buildings: BuildingDefinition[] = [
     status: "planned",
     role: "special",
     placeable: false,
-    requiredTechId: "currency"
+    requiredTechId: "currency",
   },
   {
     id: "monument",
@@ -293,12 +329,12 @@ export const buildings: BuildingDefinition[] = [
     hexSize: "multi",
     status: "later",
     role: "special",
-    placeable: false
-  }
+    placeable: false,
+  },
 ];
 
 export function getBuildingDefinition(
-  id: BuildingId
+  id: BuildingId,
 ): BuildingDefinition | undefined {
   return buildings.find((building) => building.id === id);
 }
@@ -310,7 +346,7 @@ export function listPlaceableBuildings(): BuildingDefinition[] {
       building.placeable &&
       building.status !== "later" &&
       building.woodCost != null &&
-      building.buildDurationMs != null
+      building.buildDurationMs != null,
   );
 }
 
@@ -319,29 +355,43 @@ export type PlaceableBuildingId =
   | "farm"
   | "quarry"
   | "fishing_hut"
-  | "house";
+  | "house"
+  | "sawmill"
+  | "clay_mine";
 
 export type PlaceableExtractorId =
   | "lumber_camp"
   | "farm"
   | "quarry"
-  | "fishing_hut";
+  | "fishing_hut"
+  | "clay_mine";
+
+export type PlaceableProcessorId = "sawmill";
 
 /** Dérivé du catalogue (`placeable: true`). */
 export const PLACEABLE_BUILDINGS: readonly PlaceableBuildingId[] =
-  listPlaceableBuildings().map((building) => building.id as PlaceableBuildingId);
+  listPlaceableBuildings().map(
+    (building) => building.id as PlaceableBuildingId,
+  );
 
 export const PLACEABLE_EXTRACTORS: readonly PlaceableExtractorId[] =
   listPlaceableBuildings()
     .filter((building) => building.role === "extractor")
     .map((building) => building.id as PlaceableExtractorId);
 
+export const PLACEABLE_PROCESSORS: readonly PlaceableProcessorId[] =
+  listPlaceableBuildings()
+    .filter((building) => building.role === "processor")
+    .map((building) => building.id as PlaceableProcessorId);
+
 const EXPECTED_PLACEABLES: readonly PlaceableBuildingId[] = [
   "lumber_camp",
   "farm",
   "quarry",
   "fishing_hut",
-  "house"
+  "house",
+  "sawmill",
+  "clay_mine",
 ];
 
 for (const id of EXPECTED_PLACEABLES) {
@@ -352,21 +402,27 @@ for (const id of EXPECTED_PLACEABLES) {
 for (const id of PLACEABLE_BUILDINGS) {
   if (!EXPECTED_PLACEABLES.includes(id)) {
     throw new Error(
-      `catalog placeable "${id}" not in PlaceableBuildingId union — extend the type`
+      `catalog placeable "${id}" not in PlaceableBuildingId union — extend the type`,
     );
   }
 }
 
 export function isPlaceableBuildingId(
-  id: BuildingId
+  id: BuildingId,
 ): id is PlaceableBuildingId {
   return PLACEABLE_BUILDINGS.includes(id as PlaceableBuildingId);
 }
 
 export function isPlaceableExtractorId(
-  id: BuildingId
+  id: BuildingId,
 ): id is PlaceableExtractorId {
   return PLACEABLE_EXTRACTORS.includes(id as PlaceableExtractorId);
+}
+
+export function isPlaceableProcessorId(
+  id: BuildingId,
+): id is PlaceableProcessorId {
+  return PLACEABLE_PROCESSORS.includes(id as PlaceableProcessorId);
 }
 
 export function buildingWoodCostFromCatalog(id: BuildingId): number {
@@ -393,13 +449,20 @@ export function buildingRequiredTech(id: BuildingId): TechId | null {
   return getBuildingDefinition(id)?.requiredTechId ?? null;
 }
 
+/** Rayon d’emprise une fois achevé (DEC-026). Défaut 1. */
+export function buildingInfluenceRadius(id: BuildingId): number {
+  const value = getBuildingDefinition(id)?.influenceRadius;
+  if (value == null || !Number.isFinite(value) || value < 0) return 1;
+  return Math.floor(value);
+}
+
 /** Maps dérivés — compat API historique. */
 export const BUILD_COST_WOOD: Record<PlaceableBuildingId, number> =
   Object.fromEntries(
-    PLACEABLE_BUILDINGS.map((id) => [id, buildingWoodCostFromCatalog(id)])
+    PLACEABLE_BUILDINGS.map((id) => [id, buildingWoodCostFromCatalog(id)]),
   ) as Record<PlaceableBuildingId, number>;
 
 export const BUILD_DURATION_MS: Record<PlaceableBuildingId, number> =
   Object.fromEntries(
-    PLACEABLE_BUILDINGS.map((id) => [id, buildingDurationMsFromCatalog(id)])
+    PLACEABLE_BUILDINGS.map((id) => [id, buildingDurationMsFromCatalog(id)]),
   ) as Record<PlaceableBuildingId, number>;

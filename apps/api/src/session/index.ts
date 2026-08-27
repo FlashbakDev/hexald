@@ -2,8 +2,11 @@ import cookie from "@fastify/cookie";
 import type { FastifyInstance } from "fastify";
 import {
   claimPlayerPseudo,
+  ensurePlayerAvatar,
   isPseudoAvailable,
-  linkOrCreateFirebasePlayer
+  linkOrCreateFirebasePlayer,
+  updatePlayerAvatar,
+  type PersistedPlayer
 } from "@hexald/db";
 import type {
   FirebaseSessionResult,
@@ -30,18 +33,18 @@ export type PseudoAvailability = {
   reason?: string;
 };
 
-function toSession(player: {
-  id: string;
-  pseudo: string | null;
-  kind: string;
-  email: string | null;
-}): SessionSnapshot {
+async function toSession(
+  db: Parameters<typeof ensurePlayerAvatar>[0],
+  player: PersistedPlayer
+): Promise<SessionSnapshot> {
+  const withAvatar = await ensurePlayerAvatar(db, player);
   return {
-    playerId: player.id,
-    pseudo: player.pseudo,
-    kind: player.kind,
-    email: player.email,
-    isAdmin: isAdminPlayer(player)
+    playerId: withAvatar.id,
+    pseudo: withAvatar.pseudo,
+    kind: withAvatar.kind,
+    email: withAvatar.email,
+    avatarId: withAvatar.avatarId,
+    isAdmin: isAdminPlayer(withAvatar)
   };
 }
 
@@ -56,13 +59,13 @@ export async function sessionPlugin(app: FastifyInstance) {
 export async function sessionRoutes(app: FastifyInstance) {
   app.post("/session", async (request, reply) => {
     const player = await ensureAnonymousPlayer(app, request, reply);
-    return toSession(player);
+    return toSession(app.db, player);
   });
 
   app.get("/session", async (request, reply) => {
     const player = await requirePlayer(app, request, reply);
     if (!player) return;
-    return toSession(player);
+    return toSession(app.db, player);
   });
 
   app.delete("/session", async (request, reply) => {
@@ -102,7 +105,7 @@ export async function sessionRoutes(app: FastifyInstance) {
     touchPresence(result.player.id);
 
     return {
-      ...toSession(result.player),
+      ...(await toSession(app.db, result.player)),
       outcome: result.outcome
     } satisfies FirebaseSessionResult;
   });
@@ -156,6 +159,20 @@ export async function sessionRoutes(app: FastifyInstance) {
       return reply.code(409).send({ error: result.reason });
     }
 
-    return toSession(result.player);
+    return toSession(app.db, result.player);
+  });
+
+  app.post("/session/avatar", async (request, reply) => {
+    const player = await requirePlayer(app, request, reply);
+    if (!player) return;
+
+    const body = request.body as { avatarId?: unknown } | null;
+    const avatarId = typeof body?.avatarId === "string" ? body.avatarId : "";
+    const result = await updatePlayerAvatar(app.db, player.id, avatarId);
+    if (!result.ok) {
+      return reply.code(400).send({ error: result.reason });
+    }
+
+    return toSession(app.db, result.player);
   });
 }

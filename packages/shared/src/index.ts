@@ -11,6 +11,7 @@ export type {
 export {
   HEX_DIRECTIONS,
   cubeDistance,
+  hexDisk,
   hexKey,
   hexNeighbors,
   regionCells,
@@ -21,6 +22,7 @@ export type {
   GameAction,
   BuildAction,
   AssignWorkersAction,
+  SetProcessorInputRateAction,
   GenerateRegionAction,
   SetResearchTargetAction,
   ApplyActionSuccess,
@@ -45,7 +47,11 @@ export type {
   DestroyBuildingRequest,
   DestroyBuildingResult,
   PlaceableBuildingId,
-  ExtractorJob
+  ExtractorJob,
+  RiverTip,
+  CivilizationPointsSnapshot,
+  LeaderboardEntrySnapshot,
+  LeaderboardSnapshot
 } from "./world.ts";
 export type {
   SessionSnapshot,
@@ -74,3 +80,11 @@ export {
   validatePseudo,
   type PseudoValidation
 } from "./pseudo.ts";
+export {
+  PROFILE_AVATAR_IDS,
+  isProfileAvatarId,
+  pickRandomProfileAvatarId,
+  resolveProfileAvatarForPseudo,
+  assignProfileAvatarForClaim,
+  type ProfileAvatarId
+} from "./profileAvatars.ts";

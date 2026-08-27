@@ -5,13 +5,20 @@ import {
   getBuildingDefinition,
   isPlaceableBuildingId,
   isPlaceableExtractorId,
+  isPlaceableProcessorId,
   listPlaceableBuildings,
   buildingRequiredTech,
   type BuildingDefinition,
   type PlaceableBuildingId,
-  type PlaceableExtractorId
+  type PlaceableExtractorId,
+  type PlaceableProcessorId
 } from "@hexald/content";
 import type { BiomeId, BuildingId, HexCoord, PoiId, PrimaryBiomeId, TechId } from "@hexald/shared";
+import { hexKey } from "@hexald/shared";
+import {
+  computeInfluencedTiles,
+  type InfluenceTileInput
+} from "./influence.ts";
 import { biomeInfluences, isBuildableBiome, isWaterBiome } from "./world.ts";
 
 export type BuildPlacementInput = {
@@ -23,6 +30,9 @@ export type BuildPlacementInput = {
   poiId?: PoiId | null;
   /** Techs débloquées monde-wide (DEC-022). */
   unlockedTechIds?: readonly TechId[];
+  /** Tuiles monde pour l’emprise (DEC-026). Absent = pas de gate influence. */
+  tiles?: readonly InfluenceTileInput[];
+  now?: number;
 };
 
 export type BuildPlacementResult =
@@ -36,7 +46,8 @@ export type BuildPlacementResult =
         | "missing_poi"
         | "tile_occupied"
         | "has_village"
-        | "tech_not_unlocked";
+        | "tech_not_unlocked"
+        | "outside_influence";
     };
 
 export { getBuildingDefinition };
@@ -49,6 +60,12 @@ export function isPlaceableExtractor(
   id: BuildingId
 ): id is PlaceableExtractorId {
   return isPlaceableExtractorId(id);
+}
+
+export function isPlaceableProcessor(
+  id: BuildingId
+): id is PlaceableProcessorId {
+  return isPlaceableProcessorId(id);
 }
 
 export function buildingWoodCost(buildingId: PlaceableBuildingId): number {
@@ -99,16 +116,40 @@ export function isBuildingUnlocked(
   return unlockedTechIds.includes(required);
 }
 
-/** Bâtiments posables sur ce biome (+ POI + tech) — bois / pop libre : UI + spend côté API. */
+function tileIsInfluenced(input: {
+  origin: HexCoord;
+  tiles?: readonly InfluenceTileInput[];
+  now?: number;
+}): boolean {
+  if (!input.tiles) return true;
+  const now = input.now ?? Date.now();
+  const influenced = computeInfluencedTiles(input.tiles, now);
+  return influenced.has(hexKey(input.origin.q, input.origin.r));
+}
+
+/** Bâtiments posables sur ce biome (+ POI + tech + influence) — bois / pop libre : UI + spend côté API. */
 export function listBuildOptionsForTile(input: {
   biome: BiomeId;
   hasVillage: boolean;
   existingBuildingId: BuildingId | null;
   poiId?: PoiId | null;
   unlockedTechIds?: readonly TechId[];
+  origin?: HexCoord;
+  tiles?: readonly InfluenceTileInput[];
+  now?: number;
 }): PlaceableBuildingId[] {
   const unlockedTechIds = input.unlockedTechIds ?? [];
   if (input.hasVillage || input.existingBuildingId) return [];
+  if (
+    input.origin &&
+    !tileIsInfluenced({
+      origin: input.origin,
+      tiles: input.tiles,
+      now: input.now
+    })
+  ) {
+    return [];
+  }
 
   return listPlaceableBuildings()
     .filter((definition) => {
@@ -167,6 +208,16 @@ export function validateBuildPlacement(
 
   if (!isWaterBiome(input.biome) && !isBuildableBiome(input.biome)) {
     return { ok: false, reason: "not_buildable" };
+  }
+
+  if (
+    !tileIsInfluenced({
+      origin: input.origin,
+      tiles: input.tiles,
+      now: input.now
+    })
+  ) {
+    return { ok: false, reason: "outside_influence" };
   }
 
   return {

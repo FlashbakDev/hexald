@@ -12,6 +12,6 @@
 
 # Les règles
 
-- Toute décision design → article `DEC-0XX` dans `#decisions` (prochain : DEC-025)
+- Toute décision design → article `DEC-0XX` dans `#decisions` (prochain : DEC-028)
 - Actus joueurs → Markdown dans `apps/web/content/news/` uniquement
-- Dernière DEC live : DEC-024 (Firebase comptes)
+- Dernière DEC design : DEC-027 (points de civilisation PC) ; DEC-026 (influence) ; dernière auth/ops : DEC-025 (admin)

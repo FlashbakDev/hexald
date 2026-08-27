@@ -12,6 +12,10 @@ import {
 } from "@hexald/game-core";
 import { ensureAnonymousPlayer, requirePlayer } from "../session/player.ts";
 import {
+  readDevAccelerateHeader,
+  runWithDevTimers
+} from "../devTimers.ts";
+import {
   applyWorldAction,
   createWorldService,
   destroyBuildingService,
@@ -29,6 +33,7 @@ const uuidRe =
 const actionTypes = new Set([
   "build",
   "assign_workers",
+  "set_processor_input_rate",
   "generate_region",
   "set_research_target"
 ]);
@@ -49,6 +54,11 @@ function isGameAction(value: unknown): value is GameAction {
 
   if (body.type === "assign_workers") {
     return isHexCoord(body.origin) && Number.isInteger(body.count);
+  }
+  if (body.type === "set_processor_input_rate") {
+    return (
+      isHexCoord(body.origin) && Number.isInteger(body.ratePerMinute)
+    );
   }
   if (body.type === "build") {
     return (
@@ -77,13 +87,15 @@ function statusForActionError(error: string): number {
     error === "invalid_origin" ||
     error === "invalid_center" ||
     error === "invalid_count" ||
+    error === "invalid_rate" ||
     error === "invalid_biome" ||
     error === "unknown_building" ||
     error === "unknown_tech" ||
     error === "invalid_tech" ||
     error === "not_researchable" ||
     error === "unknown_action" ||
-    error === "under_construction"
+    error === "under_construction" ||
+    error === "outside_influence"
   ) {
     return 400;
   }
@@ -125,7 +137,10 @@ export async function worldRoutes(app: FastifyInstance) {
         return reply.code(400).send({ error: "invalid_world_id" });
       }
 
-      const outcome = await resetWorldService(app.db, id, player.id);
+      const outcome = await runWithDevTimers(
+        readDevAccelerateHeader(request),
+        () => resetWorldService(app.db, id, player.id)
+      );
       if (!outcome.ok) {
         const status = outcome.error === "world_not_found" ? 404 : 403;
         return reply.code(status).send({ error: outcome.error });
@@ -150,7 +165,10 @@ export async function worldRoutes(app: FastifyInstance) {
         return reply.code(400).send({ error: "invalid_world_id" });
       }
 
-      const outcome = await grantDevResourcesService(app.db, id, player.id);
+      const outcome = await runWithDevTimers(
+        readDevAccelerateHeader(request),
+        () => grantDevResourcesService(app.db, id, player.id)
+      );
       if (!outcome.ok) {
         const status =
           outcome.error === "world_not_found"
@@ -195,11 +213,15 @@ export async function worldRoutes(app: FastifyInstance) {
       return reply.code(400).send({ error: "invalid_body" });
     }
 
-    const outcome = await setTileBiomeDevService(app.db, id, player.id, {
-      q: body.q as number,
-      r: body.r as number,
-      biome
-    });
+    const outcome = await runWithDevTimers(
+      readDevAccelerateHeader(request),
+      () =>
+        setTileBiomeDevService(app.db, id, player.id, {
+          q: body.q as number,
+          r: body.r as number,
+          biome
+        })
+    );
 
     if (!outcome.ok) {
       const status =
@@ -225,7 +247,9 @@ export async function worldRoutes(app: FastifyInstance) {
       return reply.code(400).send({ error: "invalid_world_id" });
     }
 
-    const world = await getWorldService(app.db, id, player.id);
+    const world = await runWithDevTimers(readDevAccelerateHeader(request), () =>
+      getWorldService(app.db, id, player.id)
+    );
     if (!world) {
       return reply.code(404).send({ error: "world_not_found" });
     }
@@ -253,7 +277,10 @@ export async function worldRoutes(app: FastifyInstance) {
         return reply.code(400).send({ error: shape.reason });
       }
 
-      const outcome = await applyWorldAction(app.db, id, player.id, request.body);
+      const outcome = await runWithDevTimers(
+        readDevAccelerateHeader(request),
+        () => applyWorldAction(app.db, id, player.id, request.body)
+      );
       if (!outcome.ok) {
         return reply
           .code(statusForActionError(outcome.error))
@@ -283,9 +310,13 @@ export async function worldRoutes(app: FastifyInstance) {
         return reply.code(400).send({ error: "invalid_body" });
       }
 
-      const outcome = await destroyBuildingService(app.db, id, player.id, {
-        origin: body.origin
-      });
+      const outcome = await runWithDevTimers(
+        readDevAccelerateHeader(request),
+        () =>
+          destroyBuildingService(app.db, id, player.id, {
+            origin: body.origin
+          })
+      );
 
       if (!outcome.ok) {
         const status =

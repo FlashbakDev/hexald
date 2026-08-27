@@ -17,15 +17,19 @@ export {
   linkOrCreateFirebasePlayer,
   isPseudoAvailable,
   claimPlayerPseudo,
+  ensurePlayerAvatar,
+  updatePlayerAvatar,
   type PersistedPlayer,
   type ClaimPseudoResult,
-  type LinkFirebaseResult
+  type LinkFirebaseResult,
+  type UpdateAvatarResult
 } from "./players.ts";
 export {
   insertWorldWithTerrain,
   fetchWorld,
   fetchWorldForOwner,
   listWorldsByOwner,
+  listNamedWorldsForLeaderboard,
   appendRegion,
   updateWorldEconomy,
   updateWorldResearch,
@@ -33,7 +37,11 @@ export {
   setTileBiomeDev,
   clearTileBuilding,
   setTileWorkerState,
+  setTileProcessorState,
   setTileAssignedWorkers,
+  setTileRiverMasks,
+  setTilePoiId,
+  updateWorldRiverTips,
   deleteWorldForOwner,
   withWorldLock,
   WORLD_LOCK_TIMEOUT_MS,

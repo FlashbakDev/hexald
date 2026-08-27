@@ -31,13 +31,19 @@ import {
   plantationFoodBonusPerMinute,
   getBuildingDefinition,
   resourceOutputForBuilding,
+  getProcessorStepForBuilding,
+  recipeInputCount,
+  recipeOutputCount,
   stockCapFor,
-  type PlaceableExtractorId
+  type PlaceableExtractorId,
+  type PlaceableProcessorId
 } from "@hexald/content";
 import type { BiomeId, BuildingId, ExtractorJob, ResourceId, TechId } from "@hexald/shared";
+import { hexKey } from "@hexald/shared";
 import { applyOfflineProduction } from "./production.ts";
 import { isBuildingComplete } from "./construction.ts";
-import { isPlaceableExtractor } from "./build.ts";
+import { isPlaceableExtractor, isPlaceableProcessor } from "./build.ts";
+import { computeInfluencedTiles } from "./influence.ts";
 import { isFusionBiome } from "./world.ts";
 
 export type StockEntry = {
@@ -51,6 +57,16 @@ export type ExtractorSite = {
   biome: BiomeId;
   workers: number;
   complete: boolean;
+  /** False si hors emprise connectée (DEC-026). */
+  influenced: boolean;
+};
+
+/** Site processor (craft) — workers requis pour opérer. */
+export type ProcessorSite = {
+  buildingId: PlaceableProcessorId;
+  workers: number;
+  complete: boolean;
+  influenced: boolean;
 };
 
 export type EconomyState = {
@@ -60,6 +76,7 @@ export type EconomyState = {
   farmers: number;
   quarriers: number;
   fishers: number;
+  miners: number;
   /** Inventaire générique (resource_id → stock). */
   stocks: Partial<Record<ResourceId, StockEntry>>;
   unlockedTechIds: readonly TechId[];
@@ -70,15 +87,19 @@ export type EconomyState = {
   farmSites: number;
   quarrySites: number;
   fishingHutSites: number;
+  clayMineSites: number;
   /** Au moins un site achevé — requis pour produire. */
   hasLumberCamp: boolean;
   hasFarm: boolean;
   hasQuarry: boolean;
   hasFishingHut: boolean;
+  hasClayMine: boolean;
   /** DEC-017 — surplus food cumulé vers le prochain habitant. */
   foodSurplusAccumulated: number;
   /** Sites extracteurs (biome + workers) pour bonus fusion. */
   extractorSites: ExtractorSite[];
+  /** Sites processors (scierie, …). */
+  processorSites: ProcessorSite[];
 };
 
 export function tileProductionMultiplier(biome: BiomeId): number {
@@ -99,6 +120,8 @@ export function countPastureTiles(
 
 export function extractorSitesFromTiles(
   tiles: readonly {
+    q?: number;
+    r?: number;
     buildingId?: BuildingId | string | null;
     biome: BiomeId;
     assignedWorkers?: number;
@@ -106,19 +129,102 @@ export function extractorSitesFromTiles(
   }[],
   now: number
 ): ExtractorSite[] {
+  const influenced = computeInfluencedTiles(
+    tiles.flatMap((tile) =>
+      tile.q == null || tile.r == null
+        ? []
+        : [
+            {
+              q: tile.q,
+              r: tile.r,
+              buildingId: (tile.buildingId as BuildingId | null | undefined) ?? null,
+              constructionCompletesAt: tile.constructionCompletesAt
+            }
+          ]
+    ),
+    now
+  );
   const sites: ExtractorSite[] = [];
   for (const tile of tiles) {
     const buildingId = tile.buildingId;
     if (!buildingId || !isPlaceableExtractor(buildingId as BuildingId)) continue;
     const complete = isBuildingComplete(tile.constructionCompletesAt, now);
+    const onMap = tile.q != null && tile.r != null;
     sites.push({
       buildingId: buildingId as PlaceableExtractorId,
       biome: tile.biome,
       workers: Math.max(0, Math.floor(tile.assignedWorkers ?? 0)),
-      complete
+      complete,
+      influenced: onMap ? influenced.has(hexKey(tile.q!, tile.r!)) : true
     });
   }
   return sites;
+}
+
+export function processorSitesFromTiles(
+  tiles: readonly {
+    q?: number;
+    r?: number;
+    buildingId?: BuildingId | string | null;
+    assignedWorkers?: number;
+    constructionCompletesAt?: number | string | Date | null;
+  }[],
+  now: number
+): ProcessorSite[] {
+  const influenced = computeInfluencedTiles(
+    tiles.flatMap((tile) =>
+      tile.q == null || tile.r == null
+        ? []
+        : [
+            {
+              q: tile.q,
+              r: tile.r,
+              buildingId: (tile.buildingId as BuildingId | null | undefined) ?? null,
+              constructionCompletesAt: tile.constructionCompletesAt
+            }
+          ]
+    ),
+    now
+  );
+  const sites: ProcessorSite[] = [];
+  for (const tile of tiles) {
+    const buildingId = tile.buildingId;
+    if (!buildingId || !isPlaceableProcessor(buildingId as BuildingId)) continue;
+    const complete = isBuildingComplete(tile.constructionCompletesAt, now);
+    const onMap = tile.q != null && tile.r != null;
+    sites.push({
+      buildingId: buildingId as PlaceableProcessorId,
+      workers: Math.max(0, Math.floor(tile.assignedWorkers ?? 0)),
+      complete,
+      influenced: onMap ? influenced.has(hexKey(tile.q!, tile.r!)) : true
+    });
+  }
+  return sites;
+}
+
+/** Cycles craft / min pour un processor (somme workers × rate catalogue). */
+export function processorCraftRatePerMinute(
+  state: EconomyState,
+  buildingId: PlaceableProcessorId
+): number {
+  const base = buildingRateFromCatalog(buildingId);
+  if (base <= 0) return 0;
+  let total = 0;
+  for (const site of state.processorSites) {
+    if (site.buildingId !== buildingId || !site.complete || !site.influenced) {
+      continue;
+    }
+    total += site.workers * base;
+  }
+  return total;
+}
+
+/**
+ * @deprecated Prefer settleProcessorTiles (valve + buffer + durée).
+ * Ancien settle instantané — no-op pour ne pas double-consommer.
+ */
+export function settleProcessors(state: EconomyState, _now: number): EconomyState {
+  return state;
 }
 
 function completedSiteCount(
@@ -126,12 +232,13 @@ function completedSiteCount(
   buildingId: PlaceableExtractorId
 ): number {
   const sites = state.extractorSites.filter(
-    (site) => site.buildingId === buildingId && site.complete
+    (site) => site.buildingId === buildingId && site.complete && site.influenced
   );
   if (sites.length > 0) return sites.length;
   if (buildingId === "lumber_camp") return state.hasLumberCamp ? 1 : 0;
   if (buildingId === "farm") return state.hasFarm ? 1 : 0;
   if (buildingId === "fishing_hut") return state.hasFishingHut ? 1 : 0;
+  if (buildingId === "clay_mine") return state.hasClayMine ? 1 : 0;
   return state.hasQuarry ? 1 : 0;
 }
 
@@ -156,7 +263,7 @@ function rateFromSites(
   const base = buildingRateFromCatalog(buildingId);
   if (base <= 0) return 0;
   const sites = state.extractorSites.filter(
-    (site) => site.buildingId === buildingId && site.complete
+    (site) => site.buildingId === buildingId && site.complete && site.influenced
   );
   if (sites.length === 0) {
     const { workers, active } = workersAndActiveForBuilding(buildingId, state);
@@ -195,6 +302,9 @@ function workersAndActiveForBuilding(
   if (buildingId === "fishing_hut") {
     return { workers: state.fishers, active: state.hasFishingHut };
   }
+  if (buildingId === "clay_mine") {
+    return { workers: state.miners, active: state.hasClayMine };
+  }
   return { workers: state.quarriers, active: state.hasQuarry };
 }
 
@@ -203,7 +313,8 @@ function buildExtractorProducers(): ExtractorProducer[] {
     "lumber_camp",
     "farm",
     "quarry",
-    "fishing_hut"
+    "fishing_hut",
+    "clay_mine"
   ];
   const producers: ExtractorProducer[] = [];
   for (const buildingId of ids) {
@@ -277,6 +388,7 @@ export function createInitialEconomy(now = Date.now()): EconomyState {
     farmers: 0,
     quarriers: 0,
     fishers: 0,
+    miners: 0,
     stocks: {
       wood: { amount: STARTING_WOOD, lastCalculatedAt: now },
       wheat: { amount: STARTING_WHEAT, lastCalculatedAt: now },
@@ -288,12 +400,15 @@ export function createInitialEconomy(now = Date.now()): EconomyState {
     farmSites: 0,
     quarrySites: 0,
     fishingHutSites: 0,
+    clayMineSites: 0,
     hasLumberCamp: false,
     hasFarm: false,
     hasQuarry: false,
     hasFishingHut: false,
+    hasClayMine: false,
     foodSurplusAccumulated: 0,
     extractorSites: [],
+    processorSites: [],
     unlockedTechIds: ["foundations"],
     pastureTileCount: 0
   };
@@ -338,6 +453,10 @@ export function stoneRateFromState(state: EconomyState): number {
 
 export function fishingFoodRateFromState(state: EconomyState): number {
   return rateFromSites(state, "fishing_hut");
+}
+
+export function clayRateFromState(state: EconomyState): number {
+  return rateFromSites(state, "clay_mine");
 }
 
 export function wheatFoodEquivalentPerMinute(state: EconomyState): number {
@@ -617,6 +736,7 @@ export function settleEconomy(state: EconomyState, now: number): EconomyState {
     });
   }
   next = settleWorldshard(next, now);
+  next = settleProcessors(next, now);
   return settleFoodAndGrowth(next, now);
 }
 
@@ -635,6 +755,7 @@ function siteCountForJob(job: ExtractorJob, state: EconomyState): number {
   if (job === "woodcutter") return state.lumberCampSites;
   if (job === "farmer") return state.farmSites;
   if (job === "fisher") return state.fishingHutSites;
+  if (job === "miner") return state.clayMineSites;
   return state.quarrySites;
 }
 
@@ -642,6 +763,7 @@ function currentWorkersForJob(state: EconomyState, job: ExtractorJob): number {
   if (job === "woodcutter") return state.woodcutters;
   if (job === "farmer") return state.farmers;
   if (job === "fisher") return state.fishers;
+  if (job === "miner") return state.miners;
   return state.quarriers;
 }
 
@@ -665,17 +787,25 @@ function jobConfig(job: ExtractorJob, state: EconomyState) {
         ? "farmers"
         : job === "fisher"
           ? "fishers"
-          : "quarriers";
+          : job === "miner"
+            ? "miners"
+            : "quarriers";
   return {
     hasBuilding: sites > 0,
     maxWorkers: maxAssignableWorkersForJob(job, state),
     current: currentWorkersForJob(state, job),
-    key: key as "woodcutters" | "farmers" | "quarriers" | "fishers"
+    key: key as "woodcutters" | "farmers" | "quarriers" | "fishers" | "miners"
   };
 }
 
 export function assignedWorkers(state: EconomyState): number {
-  return state.woodcutters + state.farmers + state.quarriers + state.fishers;
+  return (
+    state.woodcutters +
+    state.farmers +
+    state.quarriers +
+    state.fishers +
+    state.miners
+  );
 }
 
 export function idleWorkers(state: EconomyState): number {
@@ -690,7 +820,8 @@ export function extractorJobForBuilding(
     definition?.workerJob === "woodcutter" ||
     definition?.workerJob === "farmer" ||
     definition?.workerJob === "quarrier" ||
-    definition?.workerJob === "fisher"
+    definition?.workerJob === "fisher" ||
+    definition?.workerJob === "miner"
   ) {
     return definition.workerJob;
   }
@@ -698,6 +829,7 @@ export function extractorJobForBuilding(
   if (output === "wood") return "woodcutter";
   if (output === "wheat") return "farmer";
   if (output === "food") return "fisher";
+  if (output === "clay") return "miner";
   return "quarrier";
 }
 

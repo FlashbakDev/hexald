@@ -1,4 +1,4 @@
-import type { BiomeId, HexCoord, PoiId, PrimaryBiomeId, Region } from "@hexald/shared";
+import type { BiomeId, BuildingId, HexCoord, PoiId, PrimaryBiomeId, Region } from "@hexald/shared";
 import {
   HEX_DIRECTIONS,
   cubeDistance,
@@ -9,11 +9,30 @@ import {
 import {
   FISH_BANK_SPAWN_CHANCE,
   COW_HERD_SPAWN_CHANCE,
-  IRON_DEPOSIT_SPAWN_CHANCE
+  IRON_DEPOSIT_SPAWN_CHANCE,
+  CLAY_DEPOSIT_SPAWN_CHANCE
 } from "@hexald/content";
 
 export const START_REGION_CENTER: HexCoord = { q: 0, r: 0 };
 export const START_REGION_BIOME: PrimaryBiomeId = "forest";
+
+/** Bâtiment HDV / village de départ — doit être dans les données tuile, pas inventé au rendu. */
+export const START_VILLAGE_BUILDING_ID: BuildingId = "village";
+
+export function isStartVillageCoord(q: number, r: number): boolean {
+  return q === START_REGION_CENTER.q && r === START_REGION_CENTER.r;
+}
+
+export function isVillageBuildingId(
+  buildingId: BuildingId | null | undefined
+): boolean {
+  return buildingId === START_VILLAGE_BUILDING_ID;
+}
+
+/** BuildingId à poser sur une tuile du monde de départ (HDV en 0,0). */
+export function startingTileBuildingId(q: number, r: number): BuildingId | null {
+  return isStartVillageCoord(q, r) ? START_VILLAGE_BUILDING_ID : null;
+}
 
 /** Rayon d’une région (centre + anneau). Taille 1 → 7 hex. */
 export const REGION_RADIUS = 1;
@@ -333,6 +352,32 @@ export function assignMountainIronDeposits(
   );
 }
 
+/**
+ * Pose au plus un gisement d’argile sur une plaine **nouvellement** créée.
+ */
+export function assignPlainsClayDeposits(
+  created: GeneratedTile[],
+  random: () => number = Math.random
+): GeneratedTile[] {
+  if (created.length === 0) return created;
+
+  const withPoi = created.map((tile) => ({ ...tile, poiId: tile.poiId ?? null }));
+  const candidates = withPoi.filter(
+    (tile) => tile.biome === "plains" && tile.poiId == null
+  );
+  if (candidates.length === 0) return withPoi;
+  if (random() >= CLAY_DEPOSIT_SPAWN_CHANCE) return withPoi;
+
+  const pick = candidates[Math.floor(random() * candidates.length)];
+  if (!pick) return withPoi;
+
+  return withPoi.map((tile) =>
+    tile.q === pick.q && tile.r === pick.r
+      ? { ...tile, poiId: "clay_deposit" as const }
+      : tile
+  );
+}
+
 /** Crée uniquement les hex encore non révélés de l’empreinte (+ POI naturels). */
 export function generateRegionTiles(
   tiles: ReadonlyMap<string, BiomeId>,
@@ -362,7 +407,10 @@ export function generateRegionTiles(
   }
 
   return assignMountainIronDeposits(
-    assignPlainsCowHerds(assignCoastalFishBanks(tiles, created, random), random),
+    assignPlainsClayDeposits(
+      assignPlainsCowHerds(assignCoastalFishBanks(tiles, created, random), random),
+      random
+    ),
     random
   );
 }

@@ -2,6 +2,7 @@ import type {
   ApplyActionOutcome,
   AssignWorkersRequest,
   BiomeId,
+  BuildingId,
   BuildRequest,
   BuildResult,
   DestroyBuildingRequest,
@@ -13,18 +14,22 @@ import type {
   PrimaryBiomeId,
   ResourceId,
   TechId,
+  LeaderboardSnapshot,
   WorldEconomySnapshot,
   WorldResearchSnapshot,
   WorldSnapshot,
   WorldSummary
 } from "@hexald/shared";
+import { wantDevTimers } from "../devTimers.ts";
 import {
   assignWorkersAtTile,
   buildingWoodCost,
+  computeCivilizationPoints,
   countBuildingSites,
   createInitialEconomy,
   createStartingWorld,
   extractorSitesFromTiles,
+  processorSitesFromTiles,
   countPastureTiles,
   foodConsumptionPerMinute,
   foodNetRatePerMinute,
@@ -37,16 +42,22 @@ import {
   isBuildingUnderConstruction,
   isPrimaryBiome,
   isBiomeId,
+  isStartVillageCoord,
+  isVillageBuildingId,
   maxAssignableWorkersForJob,
   POP_GROWTH_SURPLUS_FOOD_REQUIRED,
   researchStateChanged,
   scienceProductionPerMinute,
   settleEconomy,
+  settleProcessorTiles,
+  clampProcessorInputRate,
+  isPlaceableProcessor,
   settleResearch,
   setResearchTarget,
   spendResource,
   spendWood,
   startConstruction,
+  startingTileBuildingId,
   stockCapFor,
   techProgressFor,
   validateAction,
@@ -56,8 +67,12 @@ import {
   committedWorkersFromTiles,
   seedDefaultWorkersForCompletedTiles,
   releaseHousingConstructionWorkers,
+  releaseWorkersOutsideInfluence,
   computePopulationCap,
   computeRegionExpansionCost,
+  assignRivers,
+  clearRiverEdgesAt,
+  filterTipsAwayFromTile,
   type EconomyState,
   type ResearchState,
   type StockEntry
@@ -78,21 +93,34 @@ import {
   fetchWorldForOwner,
   insertWorldWithTerrain,
   listWorldsByOwner,
+  listNamedWorldsForLeaderboard,
+  fetchWorld,
   setTileBuilding,
   setTileBiomeDev,
   clearTileBuilding,
   setTileWorkerState,
+  setTileProcessorState,
+  setTileRiverMasks,
+  setTilePoiId,
+  updateWorldRiverTips,
   updateWorldEconomy,
   updateWorldResearch,
   withWorldLock
 } from "@hexald/db";
-import { hexKey } from "@hexald/shared";
+import { hexKey, HEX_DIRECTIONS } from "@hexald/shared";
+import type { RiverTip } from "@hexald/shared";
 import { env } from "../env.ts";
 
-const START_VILLAGE = { q: 0, r: 0 };
-
 function isStartVillage(q: number, r: number) {
-  return q === START_VILLAGE.q && r === START_VILLAGE.r;
+  return isStartVillageCoord(q, r);
+}
+
+function tileHasVillage(tile: {
+  q: number;
+  r: number;
+  buildingId?: BuildingId | null;
+}) {
+  return isVillageBuildingId(tile.buildingId) || isStartVillage(tile.q, tile.r);
 }
 
 function buildingFlags(world: PersistedWorld, now = Date.now()) {
@@ -101,10 +129,12 @@ function buildingFlags(world: PersistedWorld, now = Date.now()) {
     farmSites: countBuildingSites(world.tiles, "farm"),
     quarrySites: countBuildingSites(world.tiles, "quarry"),
     fishingHutSites: countBuildingSites(world.tiles, "fishing_hut"),
+    clayMineSites: countBuildingSites(world.tiles, "clay_mine"),
     hasLumberCamp: hasCompletedBuilding(world.tiles, "lumber_camp", now),
     hasFarm: hasCompletedBuilding(world.tiles, "farm", now),
     hasQuarry: hasCompletedBuilding(world.tiles, "quarry", now),
-    hasFishingHut: hasCompletedBuilding(world.tiles, "fishing_hut", now)
+    hasFishingHut: hasCompletedBuilding(world.tiles, "fishing_hut", now),
+    hasClayMine: hasCompletedBuilding(world.tiles, "clay_mine", now)
   };
 }
 
@@ -177,16 +207,108 @@ function toResearchSnapshot(state: ResearchState): WorldResearchSnapshot {
 }
 
 function tileSnapshot(tile: WorldTileRow) {
+  const buildingId =
+    tile.buildingId ??
+    (isStartVillage(tile.q, tile.r) ? startingTileBuildingId(tile.q, tile.r) : null);
   return {
     q: tile.q,
     r: tile.r,
     biome: tile.biome,
-    buildingId: tile.buildingId,
+    buildingId,
     constructionCompletesAt: tile.constructionCompletesAt
       ? tile.constructionCompletesAt.toISOString()
       : null,
     assignedWorkers: tile.assignedWorkers ?? 0,
-    poiId: tile.poiId ?? null
+    poiId: tile.poiId ?? null,
+    riverMask: tile.riverMask ?? 0,
+    processorInputRatePerMinute: tile.processorInputRate ?? 0,
+    processorInputBuffer: tile.processorInputBuffer ?? 0,
+    processorInputSettledAt: tile.processorInputSettledAt
+      ? tile.processorInputSettledAt.toISOString()
+      : null,
+    craftCompletesAt: tile.craftCompletesAt
+      ? tile.craftCompletesAt.toISOString()
+      : null
+  };
+}
+
+function toProcessorTile(tile: WorldTileRow) {
+  return {
+    ...tile,
+    processorInputRatePerMinute: tile.processorInputRate ?? 0,
+    processorInputBuffer: tile.processorInputBuffer ?? 0,
+    processorInputSettledAt: tile.processorInputSettledAt?.getTime() ?? null,
+    craftCompletesAt: tile.craftCompletesAt?.getTime() ?? null
+  };
+}
+
+function applyProcessorSettleToRows(
+  tiles: WorldTileRow[],
+  settledTiles: ReturnType<typeof toProcessorTile>[]
+): WorldTileRow[] {
+  return tiles.map((tile, i) => {
+    const next = settledTiles[i];
+    if (!next) return tile;
+    return {
+      ...tile,
+      processorInputRate: next.processorInputRatePerMinute ?? 0,
+      processorInputBuffer: next.processorInputBuffer ?? 0,
+      processorInputSettledAt:
+        next.processorInputSettledAt != null
+          ? new Date(next.processorInputSettledAt)
+          : null,
+      craftCompletesAt:
+        next.craftCompletesAt != null ? new Date(next.craftCompletesAt) : null
+    };
+  });
+}
+
+function processorTileChanged(before: WorldTileRow, after: WorldTileRow) {
+  return (
+    (before.processorInputRate ?? 0) !== (after.processorInputRate ?? 0) ||
+    Math.abs((before.processorInputBuffer ?? 0) - (after.processorInputBuffer ?? 0)) >
+      1e-9 ||
+    (before.processorInputSettledAt?.getTime() ?? null) !==
+      (after.processorInputSettledAt?.getTime() ?? null) ||
+    (before.craftCompletesAt?.getTime() ?? null) !==
+      (after.craftCompletesAt?.getTime() ?? null)
+  );
+}
+
+async function persistProcessorTileChanges(
+  db: WorldDb,
+  worldId: string,
+  before: WorldTileRow[],
+  after: WorldTileRow[]
+) {
+  for (const tile of after) {
+    const prev = before.find((entry) => entry.q === tile.q && entry.r === tile.r);
+    if (!prev || !processorTileChanged(prev, tile)) continue;
+    await setTileProcessorState(db, worldId, { q: tile.q, r: tile.r }, {
+      processorInputRate: tile.processorInputRate,
+      processorInputBuffer: tile.processorInputBuffer,
+      processorInputSettledAt: tile.processorInputSettledAt,
+      craftCompletesAt: tile.craftCompletesAt
+    });
+  }
+}
+
+function settleEconomyWithProcessors(
+  state: EconomyState,
+  tiles: WorldTileRow[],
+  now: number
+): { state: EconomyState; tiles: WorldTileRow[]; changed: boolean } {
+  const settled = settleEconomy(state, now);
+  const proc = settleProcessorTiles(
+    settled,
+    tiles.map(toProcessorTile),
+    now,
+    { accelerate: wantDevTimers() }
+  );
+  return {
+    state: proc.state,
+    tiles: applyProcessorSettleToRows(tiles, proc.tiles),
+    changed: proc.changed
   };
 }
 
@@ -238,9 +360,11 @@ function rowToEconomyState(
     farmers: totals.farmers,
     quarriers: totals.quarriers,
     fishers: totals.fishers,
+    miners: totals.miners,
     stocks,
     foodSurplusAccumulated: row.foodSurplusAccumulated ?? 0,
     extractorSites: extractorSitesFromTiles(tiles, now),
+    processorSites: processorSitesFromTiles(tiles, now),
     unlockedTechIds,
     pastureTileCount: countPastureTiles(tiles),
     ...flags
@@ -278,7 +402,17 @@ function toEconomySnapshot(state: EconomyState): WorldEconomySnapshot {
   const stone = stockSnapshot(state, "stone");
   const food = stockSnapshot(state, "food");
   const worldshard = stockSnapshot(state, "worldshard");
-  const known: ResourceId[] = ["wood", "wheat", "stone", "food", "worldshard"];
+  const planks = stockSnapshot(state, "planks");
+  const clay = stockSnapshot(state, "clay");
+  const known: ResourceId[] = [
+    "wood",
+    "wheat",
+    "stone",
+    "food",
+    "worldshard",
+    "planks",
+    "clay"
+  ];
   const extras = (Object.keys(state.stocks) as ResourceId[]).filter(
     (id) => !known.includes(id)
   );
@@ -290,20 +424,25 @@ function toEconomySnapshot(state: EconomyState): WorldEconomySnapshot {
     farmers: state.farmers,
     quarriers: state.quarriers,
     fishers: state.fishers,
+    miners: state.miners,
     lumberCampMaxWorkers: maxAssignableWorkersForJob("woodcutter", state),
     farmMaxWorkers: maxAssignableWorkersForJob("farmer", state),
     quarryMaxWorkers: maxAssignableWorkersForJob("quarrier", state),
     fishingHutMaxWorkers: maxAssignableWorkersForJob("fisher", state),
+    clayMineMaxWorkers: maxAssignableWorkersForJob("miner", state),
     hasLumberCamp: state.hasLumberCamp,
     hasFarm: state.hasFarm,
     hasQuarry: state.hasQuarry,
     hasFishingHut: state.hasFishingHut,
+    hasClayMine: state.hasClayMine,
     stocks: [
       wood,
       wheat,
       stone,
       food,
       worldshard,
+      planks,
+      clay,
       ...extras.map((id) => stockSnapshot(state, id))
     ],
     wood: wood.amount,
@@ -329,8 +468,15 @@ function toEconomySnapshot(state: EconomyState): WorldEconomySnapshot {
 function toSnapshot(
   world: PersistedWorld,
   economy: EconomyState,
-  research: ResearchState
+  research: ResearchState,
+  now = Date.now()
 ): WorldSnapshot {
+  const civilizationPoints = computeCivilizationPoints({
+    population: economy.population,
+    unlockedTechIds: research.unlockedTechIds,
+    tiles: world.tiles,
+    now
+  });
   return {
     id: world.id,
     ownerId: world.ownerId,
@@ -342,7 +488,9 @@ function toSnapshot(
       biome: region.biome
     })),
     economy: toEconomySnapshot(economy),
-    research: toResearchSnapshot(research)
+    research: toResearchSnapshot(research),
+    riverTips: world.riverTips ?? [],
+    civilizationPoints
   };
 }
 
@@ -417,16 +565,25 @@ async function settleAndPersist(
     now,
     world.research.unlockedTechIds
   );
-  const settled = settleEconomy(before, now);
+  const settledFull = settleEconomyWithProcessors(before, tiles, now);
+  const settled = settledFull.state;
+  const tilesBeforeProc = tiles;
+  tiles = settledFull.tiles;
+  if (settledFull.changed) {
+    await persistProcessorTileChanges(db, world.id, tilesBeforeProc, tiles);
+  }
   const capChanged = world.economy.populationCap !== settled.populationCap;
 
   const researchBefore = rowToResearchState(world.research);
-  const researchAfter = settleResearch(researchBefore, now);
+  const researchAfter = settleResearch(researchBefore, now, {
+    accelerate: wantDevTimers()
+  });
 
   const economyChanged =
     stocksChanged(before, settled) ||
     released.changed ||
     seeded.changed ||
+    settledFull.changed ||
     capChanged;
   const researchChanged = researchStateChanged(researchBefore, researchAfter);
 
@@ -443,14 +600,21 @@ async function settleAndPersist(
         ...world,
         tiles,
         economy: row,
-        research: researchStateToRow(researchAfter),
+        research: researchChanged
+          ? researchStateToRow(researchAfter)
+          : world.research,
         updatedAt: new Date()
       },
       economy: settled,
       research: researchAfter
     };
   }
-  return { world: { ...world, tiles }, economy: settled, research: researchAfter };
+
+  return {
+    world: tiles === world.tiles ? world : { ...world, tiles },
+    economy: settled,
+    research: researchAfter
+  };
 }
 
 async function settleResearchAndPersist(
@@ -460,7 +624,7 @@ async function settleResearchAndPersist(
   now: number
 ): Promise<{ world: PersistedWorld; research: ResearchState }> {
   const before = rowToResearchState(world.research);
-  const after = settleResearch(before, now);
+  const after = settleResearch(before, now, { accelerate: wantDevTimers() });
   if (!researchStateChanged(before, after)) {
     return { world, research: after };
   }
@@ -485,11 +649,16 @@ export async function createWorldService(
       q: q!,
       r: r!,
       biome,
-      buildingId: null,
+      buildingId: startingTileBuildingId(q!, r!),
       constructionCompletesAt: null,
       assignedWorkers: 0,
       defaultWorkerSeeded: false,
-      poiId: null
+      poiId: null,
+      riverMask: 0,
+      processorInputRate: 0,
+      processorInputBuffer: 0,
+      processorInputSettledAt: null,
+      craftCompletesAt: null
     });
   }
 
@@ -536,7 +705,9 @@ export async function getWorldService(
       ),
       now
     );
-    const research = settleResearch(rowToResearchState(world.research), now);
+    const research = settleResearch(rowToResearchState(world.research), now, {
+      accelerate: wantDevTimers()
+    });
     return toSnapshot(world, economy, research);
   }
 
@@ -554,6 +725,84 @@ export async function listWorldsService(
     createdAt: world.createdAt.toISOString(),
     updatedAt: world.updatedAt.toISOString()
   }));
+}
+
+export const LEADERBOARD_PAGE_SIZE = 20;
+
+/** Classement public par PC — comptes Firebase uniquement (pas les guests). */
+export async function getLeaderboardService(
+  db: Database["db"],
+  options: { page?: number; pageSize?: number } = {}
+): Promise<LeaderboardSnapshot> {
+  const pageSize = Math.min(
+    100,
+    Math.max(1, Math.floor(options.pageSize ?? LEADERBOARD_PAGE_SIZE))
+  );
+  const page = Math.max(1, Math.floor(options.page ?? 1));
+  const now = Date.now();
+  const candidates = await listNamedWorldsForLeaderboard(db);
+  const bestByOwner = new Map<
+    string,
+    {
+      pseudo: string;
+      science: number;
+      production: number;
+      population: number;
+      military: number;
+      total: number;
+    }
+  >();
+
+  for (const candidate of candidates) {
+    const world = await fetchWorld(db, candidate.worldId);
+    if (!world) continue;
+    const points = computeCivilizationPoints({
+      population: world.economy.populationTotal,
+      unlockedTechIds: world.research.unlockedTechIds,
+      tiles: world.tiles,
+      now
+    });
+    const prev = bestByOwner.get(candidate.ownerId);
+    if (!prev || points.total > prev.total) {
+      bestByOwner.set(candidate.ownerId, {
+        pseudo: candidate.pseudo,
+        science: points.science,
+        production: points.production,
+        population: points.population,
+        military: points.military,
+        total: points.total
+      });
+    }
+  }
+
+  const ranked = [...bestByOwner.values()].sort(
+    (a, b) => b.total - a.total || a.pseudo.localeCompare(b.pseudo, "fr")
+  );
+
+  const total = ranked.length;
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const safePage = Math.min(page, totalPages);
+  const start = (safePage - 1) * pageSize;
+
+  const entries = ranked.slice(start, start + pageSize).map((row, index) => ({
+    rank: start + index + 1,
+    pseudo: row.pseudo,
+    score: row.total,
+    science: row.science,
+    production: row.production,
+    population: row.population,
+    military: row.military
+  }));
+
+  return {
+    entries,
+    scoreLabel: "PC",
+    generatedAt: new Date(now).toISOString(),
+    page: safePage,
+    pageSize,
+    total,
+    totalPages
+  };
 }
 
 export type ResetWorldError = "world_not_found" | "not_available";
@@ -670,6 +919,9 @@ export async function setTileBiomeDevService(
     if (!tile) {
       return { ok: false as const, error: "tile_not_found" as const };
     }
+    if (tileHasVillage(tile)) {
+      return { ok: false as const, error: "invalid_biome" as const };
+    }
 
     const now = Date.now();
     const flags = buildingFlags(world, now);
@@ -689,16 +941,54 @@ export async function setTileBiomeDevService(
         ? null
         : tile.poiId === "cow_herd" && input.biome !== "plains"
           ? null
-          : tile.poiId === "iron_deposit" && input.biome !== "mountain"
+          : tile.poiId === "clay_deposit" && input.biome !== "plains"
             ? null
-            : tile.poiId;
+            : tile.poiId === "iron_deposit" && input.biome !== "mountain"
+              ? null
+              : tile.poiId === "lake" && input.biome === "water"
+                ? null
+                : tile.poiId === "estuary" && input.biome !== "water"
+                  ? null
+                  : tile.poiId;
+
+    // Si → water (ou plus land), retirer les arêtes rivière locales.
+    const masks = new Map<string, number>();
+    for (const entry of world.tiles) {
+      if (entry.riverMask) masks.set(hexKey(entry.q, entry.r), entry.riverMask);
+    }
+    let nextRiverMask = tile.riverMask ?? 0;
+    let nextTips: RiverTip[] = world.riverTips ?? [];
+    if (input.biome === "water" || (tile.riverMask ?? 0) !== 0) {
+      clearRiverEdgesAt(masks, input.q, input.r);
+      nextRiverMask = masks.get(hexKey(input.q, input.r)) ?? 0;
+      nextTips = filterTipsAwayFromTile(nextTips, input.q, input.r);
+    }
 
     await setTileBiomeDev(tx, worldId, {
       q: input.q,
       r: input.r,
       biome: input.biome,
-      poiId: nextPoiId
+      poiId: nextPoiId,
+      riverMask: nextRiverMask
     });
+
+    const neighborRiverUpdates: { q: number; r: number; riverMask: number }[] =
+      [];
+    for (const dir of HEX_DIRECTIONS) {
+      const nq = input.q + dir.q;
+      const nr = input.r + dir.r;
+      const nKey = hexKey(nq, nr);
+      const prev = world.tiles.find((entry) => entry.q === nq && entry.r === nr);
+      if (!prev) continue;
+      const nextMask = masks.get(nKey) ?? 0;
+      if (nextMask !== (prev.riverMask ?? 0)) {
+        neighborRiverUpdates.push({ q: nq, r: nr, riverMask: nextMask });
+      }
+    }
+    if (neighborRiverUpdates.length > 0) {
+      await setTileRiverMasks(tx, worldId, neighborRiverUpdates);
+    }
+    await updateWorldRiverTips(tx, worldId, nextTips);
 
     const updatedTile: WorldTileRow = {
       ...tile,
@@ -707,11 +997,20 @@ export async function setTileBiomeDevService(
       constructionCompletesAt: null,
       assignedWorkers: 0,
       defaultWorkerSeeded: false,
-      poiId: nextPoiId
+      poiId: nextPoiId,
+      riverMask: nextRiverMask,
+      processorInputRate: 0,
+      processorInputBuffer: 0,
+      processorInputSettledAt: null,
+      craftCompletesAt: null
     };
-    const updatedTiles = world.tiles.map((entry) =>
-      entry.q === tile.q && entry.r === tile.r ? updatedTile : entry
-    );
+    const updatedTiles = world.tiles.map((entry) => {
+      if (entry.q === tile.q && entry.r === tile.r) return updatedTile;
+      const upd = neighborRiverUpdates.find(
+        (u) => u.q === entry.q && u.r === entry.r
+      );
+      return upd ? { ...entry, riverMask: upd.riverMask } : entry;
+    });
     const after = rowToEconomyState(
       economyStateToRow(settled),
       buildingFlags({ ...world, tiles: updatedTiles }, now),
@@ -724,7 +1023,13 @@ export async function setTileBiomeDevService(
     const { world: withResearch, research } = await settleResearchAndPersist(
       tx,
       worldId,
-      { ...world, tiles: updatedTiles, economy: row, updatedAt: new Date() },
+      {
+        ...world,
+        tiles: updatedTiles,
+        economy: row,
+        riverTips: nextTips,
+        updatedAt: new Date()
+      },
       now
     );
 
@@ -792,37 +1097,98 @@ export async function expandRegionService(
       return { ok: false as const, error: "insufficient_resources" as const };
     }
 
+    // Carte biomes complète + assignation rivières (tips + nouvelles sources).
+    const fullBiomes = new Map(tilesMap);
+    for (const tile of created) {
+      fullBiomes.set(hexKey(tile.q, tile.r), tile.biome);
+    }
+    const existingMasks = new Map<string, number>();
+    for (const tile of world.tiles) {
+      if (tile.riverMask) {
+        existingMasks.set(hexKey(tile.q, tile.r), tile.riverMask);
+      }
+    }
+    const createdKeys = new Set(created.map((tile) => hexKey(tile.q, tile.r)));
+    const existingLakes = world.tiles
+      .filter((tile) => tile.poiId === "lake")
+      .map((tile) => ({ q: tile.q, r: tile.r }));
+    const riverResult = assignRivers({
+      biomes: fullBiomes,
+      existingMasks,
+      tips: world.riverTips ?? [],
+      createdKeys,
+      existingLakes
+    });
+
+    const riverMaskFor = (q: number, r: number) =>
+      riverResult.tileMasks.get(hexKey(q, r)) ?? 0;
+
+    const createdRows: WorldTileRow[] = created.map((tile) => {
+      const key = hexKey(tile.q, tile.r);
+      const riverPoi = riverResult.poiByKey.get(key);
+      return {
+        q: tile.q,
+        r: tile.r,
+        biome: tile.biome,
+        buildingId: null,
+        constructionCompletesAt: null,
+        assignedWorkers: 0,
+        defaultWorkerSeeded: false,
+        poiId: riverPoi ?? tile.poiId ?? null,
+        riverMask: riverMaskFor(tile.q, tile.r),
+        processorInputRate: 0,
+        processorInputBuffer: 0,
+        processorInputSettledAt: null,
+        craftCompletesAt: null
+      };
+    });
+
     await appendRegion(tx, worldId, {
       center: input.center,
       biome: input.biome,
-      tiles: created.map((tile) => ({
-        q: tile.q,
-        r: tile.r,
-        biome: tile.biome,
-        buildingId: null,
-        constructionCompletesAt: null,
-        assignedWorkers: 0,
-        defaultWorkerSeeded: false,
-        poiId: tile.poiId ?? null
-      }))
+      tiles: createdRows
     });
 
+    // Tuiles déjà révélées dont le mask a changé (arêtes partagées).
+    const existingUpdates: { q: number; r: number; riverMask: number }[] = [];
+    for (const tile of world.tiles) {
+      const nextMask = riverMaskFor(tile.q, tile.r);
+      const prev = tile.riverMask ?? 0;
+      if (nextMask !== prev) {
+        existingUpdates.push({ q: tile.q, r: tile.r, riverMask: nextMask });
+      }
+    }
+    if (existingUpdates.length > 0) {
+      await setTileRiverMasks(tx, worldId, existingUpdates);
+    }
+
+    // Estuaire éventuellement sur une mer déjà révélée collée à la région.
+    for (const [key, poi] of riverResult.poiByKey) {
+      if (createdKeys.has(key)) continue;
+      const [q, r] = key.split(",").map(Number) as [number, number];
+      const prev = world.tiles.find((t) => t.q === q && t.r === r);
+      if (!prev || prev.poiId === poi) continue;
+      await setTilePoiId(tx, worldId, { q, r, poiId: poi });
+    }
+
+    await updateWorldRiverTips(tx, worldId, riverResult.tips);
+
     const updatedTiles: WorldTileRow[] = [
-      ...world.tiles,
-      ...created.map((tile) => ({
-        q: tile.q,
-        r: tile.r,
-        biome: tile.biome,
-        buildingId: null,
-        constructionCompletesAt: null,
-        assignedWorkers: 0,
-        defaultWorkerSeeded: false,
-        poiId: tile.poiId ?? null
-      }))
+      ...world.tiles.map((tile) => {
+        const key = hexKey(tile.q, tile.r);
+        const poi = riverResult.poiByKey.get(key);
+        return {
+          ...tile,
+          riverMask: riverMaskFor(tile.q, tile.r),
+          ...(poi ? { poiId: poi } : {})
+        };
+      }),
+      ...createdRows
     ];
     const afterExpand = {
       ...spent.state,
-      extractorSites: extractorSitesFromTiles(updatedTiles, now)
+      extractorSites: extractorSitesFromTiles(updatedTiles, now),
+      processorSites: processorSitesFromTiles(updatedTiles, now)
     };
     const economyRow = economyStateToRow(afterExpand);
     await updateWorldEconomy(tx, worldId, economyRow);
@@ -839,6 +1205,7 @@ export async function expandRegionService(
         }
       ],
       economy: economyRow,
+      riverTips: riverResult.tips,
       updatedAt: new Date()
     };
     const { world: withResearch, research } = await settleResearchAndPersist(
@@ -853,15 +1220,7 @@ export async function expandRegionService(
       result: {
         center: input.center,
         biome: input.biome,
-        tiles: created.map((tile) => ({
-          q: tile.q,
-          r: tile.r,
-          biome: tile.biome,
-          buildingId: null,
-          constructionCompletesAt: null,
-          assignedWorkers: 0,
-          poiId: tile.poiId ?? null
-        })),
+        tiles: createdRows.map(tileSnapshot),
         cost,
         world: toSnapshot(withResearch, afterExpand, research)
       }
@@ -879,7 +1238,8 @@ export type AssignWorkersError =
   | "invalid_count"
   | "over_population"
   | "no_building"
-  | "under_construction";
+  | "under_construction"
+  | "outside_influence";
 
 export async function assignWorkersService(
   db: Database["db"],
@@ -900,20 +1260,24 @@ export async function assignWorkersService(
       now,
       world.research.unlockedTechIds
     );
-    const settled = settleEconomy(before, now);
+    const settledFull = settleEconomyWithProcessors(before, world.tiles, now);
+    let tiles = settledFull.tiles;
+    if (settledFull.changed) {
+      await persistProcessorTileChanges(tx, worldId, world.tiles, tiles);
+    }
 
     const result = assignWorkersAtTile(
-      world.tiles,
+      tiles,
       input.origin,
       input.count,
-      settled.population,
+      settledFull.state.population,
       now
     );
     if (!result.ok) {
       return { ok: false as const, error: result.reason };
     }
 
-    const updatedTiles: WorldTileRow[] = world.tiles.map((entry) => {
+    const updatedTiles: WorldTileRow[] = tiles.map((entry) => {
       const next = result.tiles.find((tile) => tile.q === entry.q && tile.r === entry.r);
       if (!next) return entry;
       return {
@@ -934,7 +1298,7 @@ export async function assignWorkersService(
       updatedAt: new Date()
     };
     const after = rowToEconomyState(
-      economyStateToRow(settled),
+      economyStateToRow(settledFull.state),
       buildingFlags(updatedWorld, now),
       updatedTiles,
       now,
@@ -959,6 +1323,105 @@ export async function assignWorkersService(
   return locked.value;
 }
 
+export type SetProcessorInputRateError =
+  | "world_not_found"
+  | "world_busy"
+  | "tile_not_found"
+  | "invalid_rate"
+  | "no_building"
+  | "under_construction";
+
+export async function setProcessorInputRateService(
+  db: Database["db"],
+  worldId: string,
+  ownerId: string,
+  input: { origin: HexCoord; ratePerMinute: number }
+): Promise<
+  | { ok: true; world: WorldSnapshot }
+  | { ok: false; error: SetProcessorInputRateError }
+> {
+  const locked = await withWorldLock(db, worldId, ownerId, async (tx, world) => {
+    const now = Date.now();
+    const tile = world.tiles.find(
+      (entry) => entry.q === input.origin.q && entry.r === input.origin.r
+    );
+    if (!tile) return { ok: false as const, error: "tile_not_found" as const };
+    if (!tile.buildingId || !isPlaceableProcessor(tile.buildingId)) {
+      return { ok: false as const, error: "no_building" as const };
+    }
+    if (isBuildingUnderConstruction(tile.constructionCompletesAt, now)) {
+      return { ok: false as const, error: "under_construction" as const };
+    }
+    if (!Number.isInteger(input.ratePerMinute) || input.ratePerMinute < 0) {
+      return { ok: false as const, error: "invalid_rate" as const };
+    }
+
+    const rate = clampProcessorInputRate(tile.buildingId, input.ratePerMinute);
+
+    const flags = buildingFlags(world, now);
+    const before = rowToEconomyState(
+      world.economy,
+      flags,
+      world.tiles,
+      now,
+      world.research.unlockedTechIds
+    );
+    const settledFull = settleEconomyWithProcessors(before, world.tiles, now);
+    let tiles = settledFull.tiles;
+    if (settledFull.changed) {
+      await persistProcessorTileChanges(tx, worldId, world.tiles, tiles);
+    }
+
+    tiles = tiles.map((entry) =>
+      entry.q === input.origin.q && entry.r === input.origin.r
+        ? {
+            ...entry,
+            processorInputRate: rate,
+            processorInputSettledAt:
+              entry.processorInputSettledAt ?? new Date(now)
+          }
+        : entry
+    );
+
+    await setTileProcessorState(tx, worldId, input.origin, {
+      processorInputRate: rate,
+      processorInputSettledAt:
+        tiles.find(
+          (entry) => entry.q === input.origin.q && entry.r === input.origin.r
+        )?.processorInputSettledAt ?? new Date(now)
+    });
+
+    const updatedWorld: PersistedWorld = {
+      ...world,
+      tiles,
+      economy: economyStateToRow(settledFull.state),
+      updatedAt: new Date()
+    };
+    await updateWorldEconomy(tx, worldId, updatedWorld.economy);
+    const { world: withResearch, research } = await settleResearchAndPersist(
+      tx,
+      worldId,
+      updatedWorld,
+      now
+    );
+    const after = rowToEconomyState(
+      withResearch.economy,
+      buildingFlags(withResearch, now),
+      withResearch.tiles,
+      now,
+      withResearch.research.unlockedTechIds
+    );
+
+    return {
+      ok: true as const,
+      world: toSnapshot(withResearch, after, research)
+    };
+  });
+
+  if (!locked.ok) return { ok: false, error: locked.error };
+  return locked.value;
+}
+
 export type BuildError =
   | "world_not_found"
   | "world_busy"
@@ -971,7 +1434,8 @@ export type BuildError =
   | "has_village"
   | "insufficient_resources"
   | "insufficient_population"
-  | "tech_not_unlocked";
+  | "tech_not_unlocked"
+  | "outside_influence";
 
 export async function buildService(
   db: Database["db"],
@@ -987,21 +1451,23 @@ export async function buildService(
       return { ok: false as const, error: "tile_not_found" as const };
     }
 
+    const now = Date.now();
     const placement = validateBuildPlacement({
       buildingId: input.buildingId,
       origin: input.origin,
       biome: tile.biome,
-      hasVillage: isStartVillage(tile.q, tile.r),
+      hasVillage: tileHasVillage(tile),
       existingBuildingId: tile.buildingId,
       poiId: tile.poiId ?? null,
-      unlockedTechIds: world.research.unlockedTechIds
+      unlockedTechIds: world.research.unlockedTechIds,
+      tiles: world.tiles,
+      now
     });
 
     if (!placement.ok) {
       return { ok: false as const, error: placement.reason };
     }
 
-    const now = Date.now();
     const flags = buildingFlags(world, now);
     const current = rowToEconomyState(
       world.economy,
@@ -1022,13 +1488,16 @@ export async function buildService(
     }
 
     const construction = startConstruction(placement.buildingId, now, {
-      isDev: env.isDev
+      isDev: wantDevTimers()
     });
     const completesAt = new Date(construction.constructionCompletesAt);
     const reserveWorker = 1;
-    // Troupeau / gisement : effacés par ferme / carrière (étable / mine plus tard).
+    // Troupeau / gisement fer : effacés par ferme / carrière.
+    // Gisement argile : conservé pour la mine d’argile (comme le banc pour la pêche).
     const clearTransientPoi =
-      tile.poiId === "cow_herd" || tile.poiId === "iron_deposit";
+      tile.poiId === "cow_herd" ||
+      tile.poiId === "iron_deposit" ||
+      (tile.poiId === "clay_deposit" && placement.buildingId !== "clay_mine");
     const nextPoiId = clearTransientPoi ? null : (tile.poiId ?? null);
 
     await setTileBuilding(tx, worldId, {
@@ -1050,7 +1519,11 @@ export async function buildService(
       constructionCompletesAt: completesAt,
       assignedWorkers: reserveWorker,
       defaultWorkerSeeded: reserveWorker > 0,
-      poiId: nextPoiId
+      poiId: nextPoiId,
+      processorInputRate: 0,
+      processorInputBuffer: 0,
+      processorInputSettledAt: null,
+      craftCompletesAt: null
     };
     const updatedTiles = world.tiles.map((entry) =>
       entry.q === tile.q && entry.r === tile.r ? updatedTile : entry
@@ -1111,7 +1584,7 @@ export async function destroyBuildingService(
     if (!tile) {
       return { ok: false as const, error: "tile_not_found" as const };
     }
-    if (isStartVillage(tile.q, tile.r)) {
+    if (tileHasVillage(tile)) {
       return { ok: false as const, error: "has_village" as const };
     }
     if (!tile.buildingId) {
@@ -1149,16 +1622,64 @@ export async function destroyBuildingService(
 
     await clearTileBuilding(tx, worldId, input.origin);
 
-    const updatedTile: WorldTileRow = {
+    const clearedTile: WorldTileRow = {
       ...tile,
       buildingId: null,
       constructionCompletesAt: null,
       assignedWorkers: 0,
-      defaultWorkerSeeded: false
+      defaultWorkerSeeded: false,
+      processorInputRate: 0,
+      processorInputBuffer: 0,
+      processorInputSettledAt: null,
+      craftCompletesAt: null
     };
-    const updatedTiles = world.tiles.map((entry) =>
-      entry.q === tile.q && entry.r === tile.r ? updatedTile : entry
+    let updatedTiles = world.tiles.map((entry) =>
+      entry.q === tile.q && entry.r === tile.r ? clearedTile : entry
     );
+
+    const orphanRelease = releaseWorkersOutsideInfluence(updatedTiles, now);
+    if (orphanRelease.changed) {
+      const nextTiles: WorldTileRow[] = [];
+      for (const entry of orphanRelease.tiles) {
+        const prev =
+          updatedTiles.find((row) => row.q === entry.q && row.r === entry.r) ??
+          clearedTile;
+        const next: WorldTileRow = {
+          ...prev,
+          assignedWorkers: entry.assignedWorkers ?? 0,
+          processorInputBuffer: entry.processorInputBuffer ?? 0,
+          craftCompletesAt:
+            entry.craftCompletesAt == null
+              ? null
+              : entry.craftCompletesAt instanceof Date
+                ? entry.craftCompletesAt
+                : new Date(entry.craftCompletesAt)
+        };
+        nextTiles.push(next);
+        if (prev.q === tile.q && prev.r === tile.r) continue;
+        if (prev.assignedWorkers !== next.assignedWorkers) {
+          await setTileWorkerState(tx, worldId, { q: next.q, r: next.r }, {
+            assignedWorkers: next.assignedWorkers,
+            defaultWorkerSeeded: prev.defaultWorkerSeeded
+          });
+        }
+        if (
+          prev.processorInputBuffer !== next.processorInputBuffer ||
+          (prev.craftCompletesAt?.getTime() ?? null) !==
+            (next.craftCompletesAt?.getTime() ?? null)
+        ) {
+          await setTileProcessorState(tx, worldId, { q: next.q, r: next.r }, {
+            processorInputBuffer: next.processorInputBuffer,
+            craftCompletesAt: next.craftCompletesAt
+          });
+        }
+      }
+      updatedTiles = nextTiles;
+    }
+
+    const updatedTile =
+      updatedTiles.find((entry) => entry.q === tile.q && entry.r === tile.r) ??
+      clearedTile;
     const after = rowToEconomyState(
       economyStateToRow(afterGrant),
       buildingFlags({ ...world, tiles: updatedTiles }, now),
@@ -1229,7 +1750,9 @@ export async function setResearchTargetService(
       now
     );
     const researchBefore = rowToResearchState(world.research);
-    const settledResearch = settleResearch(researchBefore, now);
+    const settledResearch = settleResearch(researchBefore, now, {
+      accelerate: wantDevTimers()
+    });
     const outcome = setResearchTarget(settledResearch, techId, now);
     if (!outcome.ok) {
       if (researchStateChanged(researchBefore, settledResearch)) {
@@ -1305,6 +1828,15 @@ export async function applyWorldAction(
     });
     if (!outcome.ok) return { ok: false, error: outcome.error };
     return { ok: true, type: "assign_workers", world: outcome.world };
+  }
+
+  if (action.type === "set_processor_input_rate") {
+    const outcome = await setProcessorInputRateService(db, worldId, ownerId, {
+      origin: action.origin,
+      ratePerMinute: action.ratePerMinute
+    });
+    if (!outcome.ok) return { ok: false, error: outcome.error };
+    return { ok: true, type: "set_processor_input_rate", world: outcome.world };
   }
 
   if (action.type === "generate_region") {

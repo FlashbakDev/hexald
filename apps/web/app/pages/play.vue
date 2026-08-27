@@ -24,6 +24,9 @@ import {
   WHEAT_RATE_PER_WORKER_PER_MINUTE,
   WOOD_RATE_PER_WORKER_PER_MINUTE,
   FISHING_HUT_FOOD_RATE_PER_WORKER_PER_MINUTE,
+  CLAY_RATE_PER_WORKER_PER_MINUTE,
+  SAWMILL_CRAFT_DURATION_MS,
+  DEV_CRAFT_DURATION_MS,
   TOWN_HALL_WORLDSHARD_INTERVAL_MS,
   type PlaceableBuildingId,
   type PlaceableExtractorId,
@@ -37,6 +40,8 @@ import {
   listBuildOptionsForTile,
   isBuildingUnlocked,
   isBuildingUnderConstruction,
+  isBuildingOrphan,
+  computeInfluencedTiles,
   isFusionBiome,
   committedWorkersFromTiles,
   tileProductionMultiplier,
@@ -51,13 +56,37 @@ import {
   PLAY_TUTORIAL_STEPS,
   usePlayTutorial
 } from "~/composables/usePlayTutorial";
+import { profileAvatarSrc } from "~/utils/profileAvatars";
 
 definePageMeta({
   layout: "blank"
 });
 
-const { pseudo, ensureSession } = useSession();
+const { pseudo, avatarId, ensureSession, setAvatar } = useSession();
 const { logoutFirebase } = useFirebaseAuth();
+const profileAvatarUrl = computed(() => profileAvatarSrc(avatarId.value));
+const avatarPickerOpen = ref(false);
+const avatarSaving = ref(false);
+
+async function onSelectAvatar(nextId: string) {
+  if (avatarSaving.value || nextId === avatarId.value) {
+    avatarPickerOpen.value = false;
+    return;
+  }
+  avatarSaving.value = true;
+  try {
+    await setAvatar(nextId);
+    avatarPickerOpen.value = false;
+  } catch {
+    // garde le sheet ouvert en cas d’échec réseau
+  } finally {
+    avatarSaving.value = false;
+  }
+}
+
+function openAvatarPicker() {
+  avatarPickerOpen.value = true;
+}
 const {
   ensureWorld,
   expandRegion,
@@ -237,13 +266,20 @@ const preview = useTemplateRef<{
   ) => boolean;
   applyBuilding: (q: number, r: number, buildingId: BuildingId) => boolean;
   removeBuilding: (q: number, r: number) => boolean;
-  applyTileBiome: (q: number, r: number, biome: BiomeId) => boolean;
+  applyTileBiome: (
+    q: number,
+    r: number,
+    biome: BiomeId,
+    riverMask?: number
+  ) => boolean;
+  syncRiverMasks: (tiles: readonly WorldTileSnapshot[]) => void;
   projectTile: (q: number, r: number) => HexScreenPoint | null;
   setTutorialHighlights: (coords: readonly HexCoord[]) => void;
   setBuildHighlights: (
     valid: readonly HexCoord[],
     invalid?: readonly HexCoord[]
   ) => void;
+  setInfluenceHighlights: (coords: readonly HexCoord[]) => void;
 }>("preview");
 
 const stage = useTemplateRef<HTMLElement>("stage");
@@ -255,7 +291,6 @@ const assigning = ref(false);
 const resetting = ref(false);
 const granting = ref(false);
 const debugBiomeOpen = ref(false);
-const debugChromeVisible = ref(true);
 const settingBiome = ref(false);
 const destroyConfirm = ref(false);
 const destroying = ref(false);
@@ -264,30 +299,12 @@ const projectedResearch = useProjectedResearch(
   computed(() => world.value?.research),
   nowTick
 );
-const isDevClient = import.meta.dev;
-const DEBUG_CHROME_STORAGE_KEY = "hexald-debug-chrome-visible";
-
-function toggleDebugChrome() {
-  debugChromeVisible.value = !debugChromeVisible.value;
-}
-
-if (import.meta.client && import.meta.dev) {
-  onMounted(() => {
-    try {
-      const saved = localStorage.getItem(DEBUG_CHROME_STORAGE_KEY);
-      if (saved === "0") debugChromeVisible.value = false;
-    } catch {
-      /* ignore */
-    }
-  });
-  watch(debugChromeVisible, (visible) => {
-    try {
-      localStorage.setItem(DEBUG_CHROME_STORAGE_KEY, visible ? "1" : "0");
-    } catch {
-      /* ignore */
-    }
-  });
-}
+const {
+  isDevClient,
+  debugChromeVisible,
+  accelerateTimers,
+  toggleDebugChrome
+} = useDebugMode();
 const { hasNoAds, setDevNoAds } = useAds();
 const {
   enabled: tiltEnabled,
@@ -334,7 +351,12 @@ let overlayRaf: number | null = null;
 
 function scheduleWorldRefresh() {
   if (refreshTimer) clearInterval(refreshTimer);
-  const ms = world.value?.research.researchTargetTechId ? 15_000 : 30_000;
+  const researching = Boolean(world.value?.research.researchTargetTechId);
+  const ms = researching
+    ? accelerateTimers.value
+      ? 1_000
+      : 15_000
+    : 30_000;
   refreshTimer = setInterval(() => {
     void refreshWorld();
   }, ms);
@@ -359,6 +381,8 @@ watch(
   () => world.value?.research.researchTargetTechId,
   () => scheduleWorldRefresh()
 );
+
+watch(accelerateTimers, () => scheduleWorldRefresh());
 
 watch(tutorialActive, (on, wasOn) => {
   if (wasOn && !on) maybeShowLinkAccount(900);
@@ -401,7 +425,13 @@ const populationCap = computed(() => {
   if (!tiles?.length) return economy.value?.populationCap ?? 0;
   return computePopulationCap(tiles, nowTick.value);
 });
-const worldName = computed(() => "No Name");
+const civilizationPointsTotal = computed(
+  () => world.value?.civilizationPoints?.total ?? 0
+);
+const civilizationPointsLabel = computed(() => {
+  const total = civilizationPointsTotal.value;
+  return `${total.toLocaleString("fr-FR")} PC`;
+});
 
 /** Icônes UI — labels / coûts viennent du catalogue `buildings`. */
 const buildingIcons: Record<PlaceableBuildingId, { icon: string; short: string }> = {
@@ -409,7 +439,9 @@ const buildingIcons: Record<PlaceableBuildingId, { icon: string; short: string }
   farm: { icon: "i-lucide-wheat", short: "Ferme" },
   quarry: { icon: "i-lucide-pickaxe", short: "Carrière" },
   fishing_hut: { icon: "i-lucide-fish", short: "Pêche" },
-  house: { icon: "i-lucide-home", short: "Maison" }
+  house: { icon: "i-lucide-home", short: "Maison" },
+  sawmill: { icon: "i-lucide-axe", short: "Scierie" },
+  clay_mine: { icon: "i-lucide-brick-wall", short: "Argile" }
 };
 
 function buildingUi(id: PlaceableBuildingId) {
@@ -482,6 +514,9 @@ const liveStoneRate = computed(() => {
   }
   return base + quarryMasonryBonusPerMinute(unlocked, quarryCount);
 });
+const liveClayRate = computed(() =>
+  extractorRatePerMinute("clay_mine", CLAY_RATE_PER_WORKER_PER_MINUTE)
+);
 
 const displayedWood = computed(() => {
   const eco = economy.value;
@@ -529,6 +564,23 @@ const stoneCap = computed(() => {
   const eco = economy.value;
   if (!eco) return 150;
   return eco.stocks?.find((s) => s.resourceId === "stone")?.cap ?? eco.stoneCap;
+});
+
+const displayedClay = computed(() => {
+  const eco = economy.value;
+  if (!eco) return 0;
+  const stock = eco.stocks?.find((s) => s.resourceId === "clay");
+  const amount = stock?.amount ?? 0;
+  const cap = stock?.cap ?? 80;
+  const last = stock?.lastCalculatedAt;
+  if (!last) return Math.floor(amount);
+  return projectedStock(amount, cap, last, liveClayRate.value);
+});
+
+const clayCap = computed(() => {
+  const eco = economy.value;
+  if (!eco) return 80;
+  return eco.stocks?.find((s) => s.resourceId === "clay")?.cap ?? 80;
 });
 
 const displayedFood = computed(() => {
@@ -623,6 +675,14 @@ const stoneStockUi = computed(() => {
   return { amount, cap, level, rate };
 });
 
+const clayStockUi = computed(() => {
+  const amount = displayedClay.value;
+  const cap = clayCap.value;
+  const level = stockFillLevel(amount, cap);
+  const rate = level === "full" ? "0/min" : formatRatePerMinute(liveClayRate.value);
+  return { amount, cap, level, rate };
+});
+
 const foodStockUi = computed(() => {
   const amount = displayedFood.value;
   const cap = foodCap.value;
@@ -647,6 +707,33 @@ const worldshardStockUi = computed(() => {
   const level = stockFillLevel(amount, cap);
   const rate = level === "full" ? "plein" : worldshardRateLabel.value;
   return { amount, cap, level, rate };
+});
+
+/** Prod HDV science — pas de stock ; progress/cost si une recherche est active. */
+const scienceStockUi = computed(() => {
+  const research = projectedResearch.value;
+  const ratePerMin = research?.scienceProductionPerMinute ?? 0;
+  const rate = formatRatePerMinute(ratePerMin);
+  const target = research?.researchTargetTechId;
+  if (!target || !research) {
+    return {
+      amount: null as number | null,
+      cap: null as number | null,
+      level: "ok" as StockFillLevel,
+      rate,
+      paused: true
+    };
+  }
+  const entry = research.techProgress.find((row) => row.techId === target);
+  const cap = entry?.scienceCost ?? getTechNode(target).scienceCost;
+  const amount = Math.floor(entry?.progress ?? 0);
+  return {
+    amount,
+    cap,
+    level: stockFillLevel(amount, cap),
+    rate,
+    paused: false
+  };
 });
 
 /** Un seul hint soft : priorité bois plein → dépenser (build). */
@@ -743,7 +830,9 @@ const selectedConstruction = computed(() => {
     buildingId !== "farm" &&
     buildingId !== "quarry" &&
     buildingId !== "fishing_hut" &&
-    buildingId !== "house"
+    buildingId !== "house" &&
+    buildingId !== "sawmill" &&
+    buildingId !== "clay_mine"
   ) {
     return null;
   }
@@ -751,7 +840,7 @@ const selectedConstruction = computed(() => {
   if (Number.isNaN(endsAt)) return null;
   const remainingMs = Math.max(0, endsAt - nowTick.value);
   if (remainingMs <= 0) return null;
-  const durationMs = import.meta.dev
+  const durationMs = accelerateTimers.value
     ? DEV_BUILD_DURATION_MS
     : BUILD_DURATION_MS[buildingId];
   const progress = Math.min(
@@ -822,7 +911,9 @@ function workersForBuilding(
     buildingId !== "lumber_camp" &&
     buildingId !== "farm" &&
     buildingId !== "quarry" &&
-    buildingId !== "fishing_hut"
+    buildingId !== "fishing_hut" &&
+    buildingId !== "sawmill" &&
+    buildingId !== "clay_mine"
   ) {
     return null;
   }
@@ -863,7 +954,8 @@ const mapBadges = computed((): MapBadge[] => {
         buildingId === "lumber_camp" ||
         buildingId === "farm" ||
         buildingId === "quarry" ||
-        buildingId === "fishing_hut";
+        buildingId === "fishing_hut" ||
+        buildingId === "clay_mine";
       if (isProductionBuilding) {
         out.push({
           key: `bonus:${key}`,
@@ -1009,11 +1101,37 @@ watch(activeConstructionCount, (count, prev) => {
 const buildOptionsForWorldTile = (tile: WorldTileSnapshot) =>
   listBuildOptionsForTile({
     biome: tile.biome,
-    hasVillage: tile.q === 0 && tile.r === 0,
+    hasVillage: tile.buildingId === "village",
     existingBuildingId: tile.buildingId ?? null,
     poiId: tile.poiId ?? null,
-    unlockedTechIds: world.value?.research.unlockedTechIds ?? ["foundations"]
+    unlockedTechIds: world.value?.research.unlockedTechIds ?? ["foundations"],
+    origin: { q: tile.q, r: tile.r },
+    tiles: world.value?.tiles,
+    now: nowTick.value
   });
+
+const influencedTileCoords = computed((): HexCoord[] => {
+  const tiles = world.value?.tiles;
+  if (!tiles) return [];
+  const set = computeInfluencedTiles(tiles, nowTick.value);
+  const out: HexCoord[] = [];
+  for (const key of set) {
+    const [qRaw, rRaw] = key.split(",");
+    const q = Number(qRaw);
+    const r = Number(rRaw);
+    if (!Number.isFinite(q) || !Number.isFinite(r)) continue;
+    out.push({ q, r });
+  }
+  return out;
+});
+
+const selectedOutsideInfluence = computed(() => {
+  const tile = selectedWorldTile.value;
+  const tiles = world.value?.tiles;
+  if (!tile?.buildingId || !tiles) return false;
+  const influenced = computeInfluencedTiles(tiles, nowTick.value);
+  return isBuildingOrphan(tile, influenced, nowTick.value);
+});
 
 const constructionCatalog = computed(() => {
   const unlockedTechIds = world.value?.research.unlockedTechIds ?? ["foundations"];
@@ -1093,79 +1211,228 @@ const selectedWorkerPanel = computed((): WorkerPanel | null => {
   const assigned = tile.assignedWorkers ?? 0;
   const max = WORKERS_PER_EXTRACTOR_L1;
   const mult = tileProductionMultiplier(tile.biome);
+  const orphan = selectedOutsideInfluence.value;
+  const orphanHint =
+    "Hors civilisation — les ouvriers sont rentrés. Reconnecte l’emprise pour réactiver.";
 
   if (tile.buildingId === "lumber_camp") {
     const stockFull = woodStockUi.value.level === "full";
     return {
       title: "Bûcheron",
-      hint: stockFull
-        ? "Stock bois plein — construis pour libérer de la place."
-        : "Assigne un habitant du village pour produire du bois sur ce camp.",
+      hint: orphan
+        ? orphanHint
+        : stockFull
+          ? "Stock bois plein — construis pour libérer de la place."
+          : "Assigne un habitant du village pour produire du bois sur ce camp.",
       count: assigned,
       max,
       rateLabel:
-        assigned > 0 && !stockFull
+        !orphan && assigned > 0 && !stockFull
           ? formatRatePerMinute(assigned * WOOD_RATE_PER_WORKER_PER_MINUTE * mult)
           : "0/min",
-      canAdd: !assigning.value && assigned < max && idlePop.value > 0,
-      canRemove: !assigning.value && assigned > 0
+      canAdd: !orphan && !assigning.value && assigned < max && idlePop.value > 0,
+      canRemove: !orphan && !assigning.value && assigned > 0
     };
   }
   if (tile.buildingId === "farm") {
     const stockFull = wheatStockUi.value.level === "full";
     return {
       title: "Fermier",
-      hint: stockFull
-        ? "Stock blé plein — transforme ou dépense pour libérer de la place."
-        : "Assigne un habitant du village pour produire du blé sur cette ferme.",
+      hint: orphan
+        ? orphanHint
+        : stockFull
+          ? "Stock blé plein — transforme ou dépense pour libérer de la place."
+          : "Assigne un habitant du village pour produire du blé sur cette ferme.",
       count: assigned,
       max,
       rateLabel:
-        assigned > 0 && !stockFull
+        !orphan && assigned > 0 && !stockFull
           ? formatRatePerMinute(assigned * WHEAT_RATE_PER_WORKER_PER_MINUTE * mult)
           : "0/min",
-      canAdd: !assigning.value && assigned < max && idlePop.value > 0,
-      canRemove: !assigning.value && assigned > 0
+      canAdd: !orphan && !assigning.value && assigned < max && idlePop.value > 0,
+      canRemove: !orphan && !assigning.value && assigned > 0
     };
   }
   if (tile.buildingId === "quarry") {
     const stockFull = stoneStockUi.value.level === "full";
     return {
       title: "Carrier",
-      hint: stockFull
-        ? "Stock pierre plein — construis pour libérer de la place."
-        : "Assigne un habitant du village pour produire de la pierre sur cette carrière.",
+      hint: orphan
+        ? orphanHint
+        : stockFull
+          ? "Stock pierre plein — construis pour libérer de la place."
+          : "Assigne un habitant du village pour produire de la pierre sur cette carrière.",
       count: assigned,
       max,
       rateLabel:
-        assigned > 0 && !stockFull
+        !orphan && assigned > 0 && !stockFull
           ? formatRatePerMinute(assigned * STONE_RATE_PER_WORKER_PER_MINUTE * mult)
           : "0/min",
-      canAdd: !assigning.value && assigned < max && idlePop.value > 0,
-      canRemove: !assigning.value && assigned > 0
+      canAdd: !orphan && !assigning.value && assigned < max && idlePop.value > 0,
+      canRemove: !orphan && !assigning.value && assigned > 0
     };
   }
   if (tile.buildingId === "fishing_hut") {
     const stockFull = foodStockUi.value.level === "full";
     return {
       title: "Pêcheur",
-      hint: stockFull
-        ? "Stock nourriture plein — la pêche attend."
-        : "Assigne un habitant pour pêcher sur ce banc de poisson.",
+      hint: orphan
+        ? orphanHint
+        : stockFull
+          ? "Stock nourriture plein — la pêche attend."
+          : "Assigne un habitant pour pêcher sur ce banc de poisson.",
       count: assigned,
       max,
       rateLabel:
-        assigned > 0 && !stockFull
+        !orphan && assigned > 0 && !stockFull
           ? formatRatePerMinute(
               assigned * FISHING_HUT_FOOD_RATE_PER_WORKER_PER_MINUTE * mult
             )
           : "0/min",
-      canAdd: !assigning.value && assigned < max && idlePop.value > 0,
-      canRemove: !assigning.value && assigned > 0
+      canAdd: !orphan && !assigning.value && assigned < max && idlePop.value > 0,
+      canRemove: !orphan && !assigning.value && assigned > 0
+    };
+  }
+  if (tile.buildingId === "clay_mine") {
+    const stockFull = clayStockUi.value.level === "full";
+    return {
+      title: "Mineur",
+      hint: orphan
+        ? orphanHint
+        : stockFull
+          ? "Stock argile plein — transforme ou dépense pour libérer de la place."
+          : "Assigne un habitant pour extraire l’argile sur ce gisement.",
+      count: assigned,
+      max,
+      rateLabel:
+        !orphan && assigned > 0 && !stockFull
+          ? formatRatePerMinute(assigned * CLAY_RATE_PER_WORKER_PER_MINUTE * mult)
+          : "0/min",
+      canAdd: !orphan && !assigning.value && assigned < max && idlePop.value > 0,
+      canRemove: !orphan && !assigning.value && assigned > 0
+    };
+  }
+  if (tile.buildingId === "sawmill") {
+    const wood = displayedWood.value;
+    const canCraft = wood + 1e-9 >= 5;
+    const crafting = Boolean(
+      tile.craftCompletesAt &&
+        Date.parse(tile.craftCompletesAt) > nowTick.value
+    );
+    return {
+      title: "Artisan",
+      hint: orphan
+        ? orphanHint
+        : crafting
+          ? "Sciage en cours…"
+          : assigned <= 0
+            ? "Assigne un artisan pour scier des planches."
+            : !canCraft
+              ? "Pas assez de bois (5 bois → 1 planche)."
+              : "1 artisan → 1 planche toutes les 2 min.",
+      count: assigned,
+      max,
+      rateLabel: "",
+      canAdd: !orphan && !assigning.value && assigned < max && idlePop.value > 0,
+      canRemove: !orphan && !assigning.value && assigned > 0
     };
   }
   return null;
 });
+
+/** Progression craft scierie (barre sous les steppers). */
+const selectedSawmillCraft = computed(() => {
+  const tile = selectedWorldTile.value;
+  if (!tile || tile.buildingId !== "sawmill") return null;
+  if (selectedConstruction.value) return null;
+  const craftEnds = tile.craftCompletesAt
+    ? Date.parse(tile.craftCompletesAt)
+    : NaN;
+  if (Number.isNaN(craftEnds) || craftEnds <= nowTick.value) return null;
+  const durationMs = accelerateTimers.value
+    ? DEV_CRAFT_DURATION_MS
+    : SAWMILL_CRAFT_DURATION_MS;
+  const progress = Math.min(
+    1,
+    Math.max(0, 1 - (craftEnds - nowTick.value) / Math.max(1, durationMs))
+  );
+  return {
+    progress,
+    label: formatRemaining(Math.max(0, craftEnds - nowTick.value)),
+    pendingPlanks: Math.max(0, Math.floor(tile.processorInputBuffer ?? 0))
+  };
+});
+
+/** Ligne « Production : X / temps » sous les steppers d’attribution. */
+const selectedProductionLine = computed((): string | null => {
+  const tile = selectedWorldTile.value;
+  if (!tile?.buildingId || selectedConstruction.value) return null;
+  if (selectedOutsideInfluence.value) return "—";
+
+  const assigned = tile.assignedWorkers ?? 0;
+  const mult = tileProductionMultiplier(tile.biome);
+
+  const continuous = (
+    active: boolean,
+    amount: number,
+    resource: string
+  ) =>
+    active && amount > 0
+      ? `${formatProductionAmount(amount)} ${resource} / min`
+      : "—";
+
+  if (tile.buildingId === "lumber_camp") {
+    return continuous(
+      assigned > 0 && woodStockUi.value.level !== "full",
+      assigned * WOOD_RATE_PER_WORKER_PER_MINUTE * mult,
+      "bois"
+    );
+  }
+  if (tile.buildingId === "farm") {
+    return continuous(
+      assigned > 0 && wheatStockUi.value.level !== "full",
+      assigned * WHEAT_RATE_PER_WORKER_PER_MINUTE * mult,
+      "blé"
+    );
+  }
+  if (tile.buildingId === "quarry") {
+    return continuous(
+      assigned > 0 && stoneStockUi.value.level !== "full",
+      assigned * STONE_RATE_PER_WORKER_PER_MINUTE * mult,
+      "pierre"
+    );
+  }
+  if (tile.buildingId === "fishing_hut") {
+    return continuous(
+      assigned > 0 && foodStockUi.value.level !== "full",
+      assigned * FISHING_HUT_FOOD_RATE_PER_WORKER_PER_MINUTE * mult,
+      "nourriture"
+    );
+  }
+  if (tile.buildingId === "clay_mine") {
+    return continuous(
+      assigned > 0 && clayStockUi.value.level !== "full",
+      assigned * CLAY_RATE_PER_WORKER_PER_MINUTE * mult,
+      "argile"
+    );
+  }
+  if (tile.buildingId === "sawmill") {
+    if (assigned <= 0) return "—";
+    if (displayedWood.value + 1e-9 < assigned * 5) return "—";
+    const durationMs = accelerateTimers.value
+      ? DEV_CRAFT_DURATION_MS
+      : SAWMILL_CRAFT_DURATION_MS;
+    const n = assigned;
+    const label = n === 1 ? "1 planche" : `${n} planches`;
+    return `${label} / ${formatRemaining(durationMs)}`;
+  }
+  return null;
+});
+
+function formatProductionAmount(amount: number): string {
+  const rounded = Math.round(amount * 10) / 10;
+  return Number.isInteger(rounded) ? `${rounded}` : `${rounded.toFixed(1)}`;
+}
 
 const buildingLabel = (id: BuildingId | null | undefined) => {
   if (!id) return null;
@@ -1459,9 +1726,71 @@ const buildingSheet = useTemplateRef<HTMLElement>("buildingSheet");
 const constructionBarRef = useTemplateRef<HTMLElement>("constructionBar");
 const wheelRoot = useTemplateRef<HTMLElement>("wheelRoot");
 
+function syncBottomSheetHeights() {
+  const root = stage.value;
+  if (!root) return;
+  const constructionH = constructionMenuOpen.value
+    ? (constructionBarRef.value?.offsetHeight ?? 0)
+    : 0;
+  const buildingH = showBuildingSheet.value
+    ? (buildingSheet.value?.offsetHeight ?? 0)
+    : 0;
+  const techEl = root.querySelector(".tech-frise-sheet") as HTMLElement | null;
+  const techH = techTimelineOpen.value ? (techEl?.offsetHeight ?? 0) : 0;
+  root.style.setProperty("--play-construction-bar-height", `${constructionH}px`);
+  root.style.setProperty("--play-tech-bar-height", `${techH}px`);
+  root.style.setProperty("--play-building-sheet-height", `${buildingH}px`);
+}
+
+let bottomSheetResizeObserver: ResizeObserver | null = null;
+
+function observeBottomSheets() {
+  bottomSheetResizeObserver?.disconnect();
+  if (typeof ResizeObserver === "undefined") {
+    syncBottomSheetHeights();
+    return;
+  }
+  bottomSheetResizeObserver = new ResizeObserver(() => {
+    syncBottomSheetHeights();
+  });
+  const targets = [
+    constructionBarRef.value,
+    buildingSheet.value,
+    stage.value?.querySelector(".tech-frise-sheet") as HTMLElement | null
+  ];
+  for (const el of targets) {
+    if (el) bottomSheetResizeObserver.observe(el);
+  }
+  syncBottomSheetHeights();
+}
+
+watch(
+  [
+    constructionMenuOpen,
+    techTimelineOpen,
+    showBuildingSheet,
+    selected,
+    destroyConfirm
+  ],
+  async () => {
+    await nextTick();
+    observeBottomSheets();
+  }
+);
+
+onMounted(() => {
+  void nextTick().then(() => observeBottomSheets());
+});
+
+onBeforeUnmount(() => {
+  bottomSheetResizeObserver?.disconnect();
+  bottomSheetResizeObserver = null;
+});
+
 function cancelConstructionMode() {
   constructionMode.value = null;
   preview.value?.setBuildHighlights([], []);
+  preview.value?.setInfluenceHighlights([]);
 }
 
 function closeConstructionMenu() {
@@ -1519,6 +1848,12 @@ function onStagePointerDown(event: PointerEvent) {
   if (wheelRoot.value?.contains(target)) return;
   if (buildingSheet.value?.contains(target)) return;
   if (constructionBarRef.value?.contains(target)) return;
+  if (
+    target instanceof Element &&
+    target.closest(".building-sheet__content, .tech-frise-sheet, .avatar-picker-sheet")
+  ) {
+    return;
+  }
   if (target instanceof HTMLCanvasElement) return;
   clearSelection();
 }
@@ -1591,7 +1926,14 @@ async function applyDebugBiome(biome: BiomeId) {
       expandError.value = worldError.value ?? "Impossible de changer le biome.";
       return;
     }
-    preview.value?.applyTileBiome(tile.q, tile.r, biome);
+    const updated = snapshot.tiles.find((t) => t.q === tile.q && t.r === tile.r);
+    preview.value?.applyTileBiome(
+      tile.q,
+      tile.r,
+      biome,
+      updated?.riverMask ?? 0
+    );
+    preview.value?.syncRiverMasks(snapshot.tiles);
     debugBiomeOpen.value = false;
     // Resync sélection depuis la scène (payload déjà émis par applyTileBiome).
   } finally {
@@ -1619,6 +1961,7 @@ async function generate(biome: PrimaryBiomeId) {
       return;
     }
     preview.value?.applyRegion(result.center, result.biome, result.tiles);
+    preview.value?.syncRiverMasks(result.world.tiles);
     tutorialOnRegionCreated(result.biome);
     clearSelection();
   } finally {
@@ -1659,7 +2002,7 @@ async function placeBuildingAt(buildingId: PlaceableBuildingId, tile: SelectedTi
     }
     preview.value?.applyBuilding(result.tile.q, result.tile.r, buildingId);
     tutorialOnBuildingPlaced(buildingId);
-    cancelConstructionMode();
+    closeConstructionMenu();
     selected.value = {
       ...tile,
       buildingId,
@@ -1879,14 +2222,16 @@ const tutorialHighlightCoords = computed(() => {
 const tutorialLockMap = computed(() => Boolean(tutorialHole.value));
 
 watch(
-  [validConstructionTiles, invalidConstructionTiles, constructionMode],
-  ([valid, invalid, mode]) => {
+  [validConstructionTiles, invalidConstructionTiles, constructionMode, influencedTileCoords],
+  ([valid, invalid, mode, influenced]) => {
     if (mode) {
       preview.value?.setBuildHighlights(valid, invalid);
+      preview.value?.setInfluenceHighlights(influenced);
       preview.value?.setTutorialHighlights([]);
       return;
     }
     preview.value?.setBuildHighlights([], []);
+    preview.value?.setInfluenceHighlights([]);
   },
   { flush: "post" }
 );
@@ -1904,6 +2249,7 @@ watch(tutorialActive, (on) => {
   if (!on) {
     preview.value?.setTutorialHighlights([]);
     preview.value?.setBuildHighlights([], []);
+    preview.value?.setInfluenceHighlights([]);
   }
 });
 
@@ -2022,29 +2368,31 @@ watch(
       <div class="play-cloud-header__sky" aria-hidden="true">
         <svg
           class="play-cloud-header__svg"
-          viewBox="0 0 1200 160"
+          viewBox="0 0 1200 220"
           preserveAspectRatio="none"
           xmlns="http://www.w3.org/2000/svg"
         >
           <defs>
             <linearGradient id="play-cloud-fill" x1="50%" y1="0%" x2="50%" y2="100%">
-              <stop offset="0%" stop-color="#ffffff" stop-opacity="0.97" />
-              <stop offset="55%" stop-color="#f4f8f5" stop-opacity="0.92" />
-              <stop offset="100%" stop-color="#e4eee8" stop-opacity="0.72" />
+              <stop offset="0%" stop-color="#ffffff" stop-opacity="1" />
+              <stop offset="32%" stop-color="#ffffff" stop-opacity="1" />
+              <stop offset="58%" stop-color="#ffffff" stop-opacity="0.78" />
+              <stop offset="82%" stop-color="#f4f8f5" stop-opacity="0.28" />
+              <stop offset="100%" stop-color="#e4eee8" stop-opacity="0.05" />
             </linearGradient>
             <filter id="play-cloud-soft" x="-5%" y="-30%" width="110%" height="170%">
-              <feGaussianBlur in="SourceGraphic" stdDeviation="6" />
+              <feGaussianBlur in="SourceGraphic" stdDeviation="7" />
             </filter>
           </defs>
           <path
             fill="url(#play-cloud-fill)"
             filter="url(#play-cloud-soft)"
-            d="M0 0H1200V70
-              C1120 70 1060 92 980 88
-              C880 83 820 108 720 102
-              C620 96 560 118 460 110
-              C360 102 300 122 210 112
-              C130 104 70 92 0 84
+            d="M0 0H1200V120
+              C1120 120 1060 145 980 140
+              C880 134 820 162 720 155
+              C620 148 560 172 460 163
+              C360 154 300 176 210 165
+              C130 156 70 142 0 134
               Z"
           />
         </svg>
@@ -2057,17 +2405,28 @@ watch(
       <div class="play-cloud-header__content pointer-events-auto">
         <div class="play-cloud-header__identity">
           <div class="play-cloud-header__identity-top">
-            <div
+            <button
+              type="button"
               class="play-cloud-header__avatar"
-              aria-hidden="true"
-              title="Avatar"
+              :class="{ 'play-cloud-header__avatar--interactive': true }"
+              :aria-label="`Changer d’avatar${pseudo ? ` (${pseudo})` : ''}`"
+              :title="pseudo ? `${pseudo} · changer d’avatar` : 'Changer d’avatar'"
+              :style="
+                profileAvatarUrl
+                  ? { backgroundImage: `url(${profileAvatarUrl})` }
+                  : undefined
+              "
+              @click="openAvatarPicker"
             />
             <div class="play-cloud-header__identity-text min-w-0">
               <p class="play-cloud-header__name truncate">
                 {{ pseudo ?? "…" }}
               </p>
-              <p class="play-cloud-header__world truncate">
-                {{ worldName }}
+              <p
+                class="play-cloud-header__world truncate"
+                :title="`Points de civilisation : ${civilizationPointsLabel}`"
+              >
+                {{ civilizationPointsLabel }}
               </p>
             </div>
           </div>
@@ -2215,6 +2574,23 @@ watch(
             </p>
             <p
               class="play-cloud-header__stat"
+              :class="scienceStockUi.paused ? null : `play-cloud-header__stat--${scienceStockUi.level}`"
+              :title="
+                scienceStockUi.paused
+                  ? `Science ${scienceStockUi.rate} · hôtel de ville · aucune recherche`
+                  : `Science ${formatStock(scienceStockUi.amount!)}/${formatStock(scienceStockUi.cap!)} · ${scienceStockUi.rate}`
+              "
+            >
+              <UIcon name="i-lucide-flask-conical" class="play-cloud-header__stat-icon" aria-hidden="true" />
+              <span class="sr-only">Science</span>
+              <span v-if="scienceStockUi.amount != null && scienceStockUi.cap != null" class="play-cloud-header__stock">
+                {{ formatStock(scienceStockUi.amount) }}<span class="play-cloud-header__cap">/{{ formatStock(scienceStockUi.cap) }}</span>
+              </span>
+              <span v-else class="play-cloud-header__stock play-cloud-header__stock--empty">—</span>
+              <span class="play-cloud-header__rate">· {{ scienceStockUi.rate }}</span>
+            </p>
+            <p
+              class="play-cloud-header__stat"
               :class="`play-cloud-header__stat--${woodStockUi.level}`"
               :title="`Bois ${formatStock(woodStockUi.amount)}/${formatStock(woodStockUi.cap)}`"
             >
@@ -2261,6 +2637,18 @@ watch(
               </span>
               <span class="play-cloud-header__rate">· {{ stoneStockUi.rate }}</span>
             </p>
+            <p
+              class="play-cloud-header__stat"
+              :class="`play-cloud-header__stat--${clayStockUi.level}`"
+              :title="`Argile ${formatStock(clayStockUi.amount)}/${formatStock(clayStockUi.cap)}`"
+            >
+              <UIcon name="i-lucide-brick-wall" class="play-cloud-header__stat-icon" aria-hidden="true" />
+              <span class="sr-only">Argile</span>
+              <span class="play-cloud-header__stock">
+                {{ formatStock(clayStockUi.amount) }}<span class="play-cloud-header__cap">/{{ formatStock(clayStockUi.cap) }}</span>
+              </span>
+              <span class="play-cloud-header__rate">· {{ clayStockUi.rate }}</span>
+            </p>
           </div>
         </div>
       </div>
@@ -2305,7 +2693,7 @@ watch(
       v-if="world && isDevClient && !debugChromeVisible"
       type="button"
       class="play-dev-chrome play-dev-chrome--toggle pointer-events-auto absolute left-3 z-30 flex size-11 items-center justify-center rounded-full border border-[#1c2b28]/12 bg-white/80 text-[#2d5248] shadow-[0_8px_24px_rgb(28_43_40_/_0.1)] backdrop-blur-md transition hover:border-[#4a7c6f]/45 hover:text-[#1c2b28] active:scale-95"
-      title="Afficher l’interface debug"
+      title="Afficher l’interface debug (accélère chantiers & recherches à 5 s)"
       aria-label="Afficher l’interface debug"
       @click="toggleDebugChrome"
     >
@@ -2319,7 +2707,7 @@ watch(
       <button
         type="button"
         class="flex h-11 items-center justify-center gap-1.5 rounded-full border border-[#1c2b28]/12 bg-white/75 px-3 text-xs font-semibold tracking-wide text-[#3d524c] shadow-[0_8px_24px_rgb(28_43_40_/_0.08)] backdrop-blur-md transition hover:border-[#4a7c6f]/45 hover:text-[#1c2b28] active:scale-95"
-        title="Masquer l’interface debug"
+        title="Masquer l’UI debug (remet les timers normaux)"
         aria-label="Masquer l’interface debug"
         @click="toggleDebugChrome"
       >
@@ -2479,35 +2867,45 @@ watch(
         <div class="building-sheet__sky" aria-hidden="true">
           <svg
             class="building-sheet__svg"
-            viewBox="0 0 1200 180"
+            viewBox="0 0 1200 160"
             preserveAspectRatio="none"
             xmlns="http://www.w3.org/2000/svg"
           >
             <defs>
               <linearGradient id="play-cloud-construction-fill" x1="50%" y1="100%" x2="50%" y2="0%">
-                <stop offset="0%" stop-color="#ffffff" stop-opacity="0.97" />
-                <stop offset="55%" stop-color="#f4f8f5" stop-opacity="0.94" />
-                <stop offset="100%" stop-color="#e4eee8" stop-opacity="0.78" />
+                <stop offset="0%" stop-color="#ffffff" stop-opacity="1" />
+                <stop offset="35%" stop-color="#ffffff" stop-opacity="1" />
+                <stop offset="55%" stop-color="#ffffff" stop-opacity="0.7" />
+                <stop offset="75%" stop-color="#ffffff" stop-opacity="0.28" />
+                <stop offset="90%" stop-color="#ffffff" stop-opacity="0.06" />
+                <stop offset="100%" stop-color="#ffffff" stop-opacity="0" />
               </linearGradient>
-              <filter id="play-cloud-construction-soft" x="-4%" y="-35%" width="108%" height="180%">
-                <feGaussianBlur in="SourceGraphic" stdDeviation="7" />
+              <filter id="play-cloud-construction-soft" x="-6%" y="-35%" width="112%" height="180%">
+                <feGaussianBlur in="SourceGraphic" stdDeviation="5.5" />
               </filter>
             </defs>
             <path
               fill="url(#play-cloud-construction-fill)"
               filter="url(#play-cloud-construction-soft)"
-              d="M0 180H1200V48
-                C1080 48 1000 28 880 34
-                C740 42 660 22 520 30
-                C380 38 300 20 180 32
-                C90 40 40 44 0 48
+              d="M0 160H1200V100
+                C1165 100 1135 82 1080 70
+                C1010 54 970 42 900 50
+                C850 56 820 68 760 58
+                C700 48 660 36 590 46
+                C530 54 500 66 440 50
+                C380 34 330 32 270 48
+                C210 62 170 74 100 80
+                C50 86 18 94 0 98
                 Z"
             />
+            <rect x="0" y="108" width="1200" height="52" fill="#ffffff" />
           </svg>
           <div class="building-sheet__puff building-sheet__puff--1" />
           <div class="building-sheet__puff building-sheet__puff--2" />
           <div class="building-sheet__puff building-sheet__puff--3" />
           <div class="building-sheet__puff building-sheet__puff--4" />
+          <div class="building-sheet__puff building-sheet__puff--5" />
+          <div class="building-sheet__puff building-sheet__puff--6" />
         </div>
 
         <div class="building-sheet__content pointer-events-auto">
@@ -2594,6 +2992,13 @@ watch(
       :selecting="selectingResearch"
       :unlock-notice="researchUnlockNotice"
       @select-tech="onSelectResearchTarget"
+    />
+
+    <AvatarPickerSheet
+      v-model:open="avatarPickerOpen"
+      :selected-id="avatarId"
+      :saving="avatarSaving"
+      @select="onSelectAvatar"
     />
 
     <Transition name="biome-wheel">
@@ -2701,35 +3106,45 @@ watch(
         <div class="building-sheet__sky" aria-hidden="true">
           <svg
             class="building-sheet__svg"
-            viewBox="0 0 1200 180"
+            viewBox="0 0 1200 160"
             preserveAspectRatio="none"
             xmlns="http://www.w3.org/2000/svg"
           >
             <defs>
               <linearGradient id="play-cloud-sheet-fill" x1="50%" y1="100%" x2="50%" y2="0%">
-                <stop offset="0%" stop-color="#ffffff" stop-opacity="0.97" />
-                <stop offset="55%" stop-color="#f4f8f5" stop-opacity="0.94" />
-                <stop offset="100%" stop-color="#e4eee8" stop-opacity="0.78" />
+                <stop offset="0%" stop-color="#ffffff" stop-opacity="1" />
+                <stop offset="35%" stop-color="#ffffff" stop-opacity="1" />
+                <stop offset="55%" stop-color="#ffffff" stop-opacity="0.7" />
+                <stop offset="75%" stop-color="#ffffff" stop-opacity="0.28" />
+                <stop offset="90%" stop-color="#ffffff" stop-opacity="0.06" />
+                <stop offset="100%" stop-color="#ffffff" stop-opacity="0" />
               </linearGradient>
-              <filter id="play-cloud-sheet-soft" x="-4%" y="-35%" width="108%" height="180%">
-                <feGaussianBlur in="SourceGraphic" stdDeviation="7" />
+              <filter id="play-cloud-sheet-soft" x="-6%" y="-35%" width="112%" height="180%">
+                <feGaussianBlur in="SourceGraphic" stdDeviation="5.5" />
               </filter>
             </defs>
             <path
               fill="url(#play-cloud-sheet-fill)"
               filter="url(#play-cloud-sheet-soft)"
-              d="M0 180H1200V48
-                C1080 48 1000 28 880 34
-                C740 42 660 22 520 30
-                C380 38 300 20 180 32
-                C90 40 40 44 0 48
+              d="M0 160H1200V100
+                C1165 100 1135 82 1080 70
+                C1010 54 970 42 900 50
+                C850 56 820 68 760 58
+                C700 48 660 36 590 46
+                C530 54 500 66 440 50
+                C380 34 330 32 270 48
+                C210 62 170 74 100 80
+                C50 86 18 94 0 98
                 Z"
             />
+            <rect x="0" y="108" width="1200" height="52" fill="#ffffff" />
           </svg>
           <div class="building-sheet__puff building-sheet__puff--1" />
           <div class="building-sheet__puff building-sheet__puff--2" />
           <div class="building-sheet__puff building-sheet__puff--3" />
           <div class="building-sheet__puff building-sheet__puff--4" />
+          <div class="building-sheet__puff building-sheet__puff--5" />
+          <div class="building-sheet__puff building-sheet__puff--6" />
         </div>
 
         <div class="building-sheet__content pointer-events-auto">
@@ -2737,6 +3152,12 @@ watch(
             <div class="min-w-0">
               <p class="building-sheet__title truncate">
                 {{ selectedBuildingTitle }}
+              </p>
+              <p
+                v-if="selectedOutsideInfluence && !destroyConfirm"
+                class="building-sheet__hint text-[#9a5b3c]"
+              >
+                Hors civilisation — inutilisable
               </p>
               <template v-if="showTileInfoSheet">
                 <p class="building-sheet__hint">
@@ -2871,9 +3292,6 @@ watch(
                   {{ selectedWorkerPanel.count }}/{{ selectedWorkerPanel.max }}
                 </span>
               </p>
-              <p class="building-sheet__hint mt-0.5">
-                {{ selectedWorkerPanel.rateLabel }} · {{ idlePop }} libre{{ idlePop === 1 ? "" : "s" }}
-              </p>
             </div>
             <div class="flex items-center gap-2">
               <button
@@ -2896,6 +3314,30 @@ watch(
               </button>
             </div>
           </div>
+
+          <div
+            v-if="selectedSawmillCraft && !destroyConfirm"
+            class="mt-3"
+          >
+            <p class="building-sheet__hint mb-1.5">
+              Sciage{{ selectedSawmillCraft.pendingPlanks > 0 ? ` · ${selectedSawmillCraft.pendingPlanks} planche${selectedSawmillCraft.pendingPlanks > 1 ? "s" : ""}` : "" }}
+              · {{ selectedSawmillCraft.label }}
+            </p>
+            <div class="h-1.5 overflow-hidden rounded-full bg-[#1c2b28]/10">
+              <div
+                class="h-full rounded-full bg-[#4a7c6f] transition-[width] duration-1000 linear"
+                :style="{ width: `${Math.round(selectedSawmillCraft.progress * 100)}%` }"
+              />
+            </div>
+          </div>
+
+          <p
+            v-if="selectedProductionLine && !destroyConfirm && !selectedConstruction"
+            class="building-sheet__metric mt-3"
+          >
+            Production :
+            <span class="font-mono">{{ selectedProductionLine }}</span>
+          </p>
         </div>
       </aside>
     </Transition>

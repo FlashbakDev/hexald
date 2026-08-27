@@ -45,6 +45,36 @@ export const pois: PoiDefinition[] = [
     biomes: ["mountain"],
     coastalWaterOnly: false,
     status: "mvp"
+  },
+  {
+    id: "clay_deposit",
+    label: "Gisement d’argile",
+    description:
+      "Bancs d’argile exposés. Une mine d’argile permet d’extraire l’argile — une ferme efface le gisement.",
+    kind: "natural",
+    biomes: ["plains"],
+    coastalWaterOnly: false,
+    status: "mvp"
+  },
+  {
+    id: "lake",
+    label: "Lac",
+    description:
+      "Plan d’eau intérieur — source d’un cours d’eau qui s’écoule vers les terres inexplorées ou la mer.",
+    kind: "natural",
+    biomes: ["forest", "plains", "mountain", "forest_plains", "plains_mountain", "forest_mountain"],
+    coastalWaterOnly: false,
+    status: "mvp"
+  },
+  {
+    id: "estuary",
+    label: "Estuaire",
+    description:
+      "Embouchure où le fleuve rejoint la mer.",
+    kind: "natural",
+    biomes: ["water"],
+    coastalWaterOnly: false,
+    status: "mvp"
   }
 ];
 
@@ -82,3 +112,9 @@ export const COW_HERD_SPAWN_CHANCE = 0.4;
  * reçoive un gisement de fer.
  */
 export const IRON_DEPOSIT_SPAWN_CHANCE = 0.4;
+
+/**
+ * Chance qu’une région avec au moins une plaine créée
+ * reçoive un gisement d’argile.
+ */
+export const CLAY_DEPOSIT_SPAWN_CHANCE = 0.4;

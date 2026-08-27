@@ -17,13 +17,18 @@ const props = withDefaults(
     research?: WorldResearchSnapshot | null;
     selecting?: boolean;
     unlockNotice?: string | null;
+    /** Inline (ex. admin catalogue) — pas de sheet overlay / fermeture. */
+    embedded?: boolean;
   }>(),
   {
     research: null,
     selecting: false,
-    unlockNotice: null
+    unlockNotice: null,
+    embedded: false
   }
 );
+
+const visible = computed(() => props.embedded || open.value);
 
 const emit = defineEmits<{
   "select-tech": [techId: TechId];
@@ -108,6 +113,7 @@ const edges = computed(() => {
 });
 
 function statusFor(id: TechId): TechPrototypeStatus {
+  if (props.embedded) return "available";
   const research = props.research;
   if (!research) {
     return id === "foundations" ? "unlocked" : "locked";
@@ -124,6 +130,11 @@ function statusFor(id: TechId): TechPrototypeStatus {
   return "locked";
 }
 
+function nodeStatusClass(id: TechId): string {
+  if (props.embedded) return "tech-frise__node--neutral";
+  return `tech-frise__node--${statusFor(id)}`;
+}
+
 function progressFor(id: TechId): { progress: number; cost: number; percent: number } {
   const entry = props.research?.techProgress.find((row) => row.techId === id);
   const cost = entry?.scienceCost ?? getTechNode(id).scienceCost;
@@ -137,6 +148,43 @@ function progressFor(id: TechId): { progress: number; cost: number; percent: num
   return { progress, cost, percent };
 }
 
+function formatResearchEta(minutes: number): string {
+  if (!Number.isFinite(minutes) || minutes <= 0) return "< 1 min";
+  if (minutes < 1) return "< 1 min";
+  if (minutes < 60) return `~${Math.ceil(minutes)} min`;
+  const hours = Math.floor(minutes / 60);
+  const mins = Math.round(minutes % 60);
+  if (mins <= 0) return `~${hours} h`;
+  return `~${hours} h ${mins} min`;
+}
+
+/** Science restante + ETA selon la prod HDV actuelle. */
+function scienceMetaFor(id: TechId): {
+  costLabel: string;
+  etaLabel: string | null;
+  line: string;
+} {
+  const status = statusFor(id);
+  const { progress, cost } = progressFor(id);
+  if (cost <= 0) {
+    return { costLabel: "—", etaLabel: null, line: "—" };
+  }
+  if (status === "unlocked") {
+    const costLabel = `${cost} science`;
+    return { costLabel, etaLabel: null, line: costLabel };
+  }
+
+  const remaining = Math.max(0, cost - progress);
+  const costLabel =
+    progress > 0 ? `${Math.floor(progress)}/${cost}` : `${cost} science`;
+  const rate = props.research?.scienceProductionPerMinute ?? 0;
+  if (rate <= 0) {
+    return { costLabel, etaLabel: null, line: costLabel };
+  }
+  const etaLabel = formatResearchEta(remaining / rate);
+  return { costLabel, etaLabel, line: `${costLabel} · ${etaLabel}` };
+}
+
 const prodLabel = computed(() => {
   const rate = props.research?.scienceProductionPerMinute ?? 0;
   if (rate <= 0) return "0 / min";
@@ -145,6 +193,7 @@ const prodLabel = computed(() => {
 });
 
 const pauseHint = computed(() => {
+  if (props.embedded) return null;
   if (props.research?.researchTargetTechId) return null;
   const hasAvailable = TECH_NODES.some((node) => statusFor(node.id) === "available");
   if (hasAvailable) {
@@ -154,26 +203,33 @@ const pauseHint = computed(() => {
 });
 
 function close() {
+  if (props.embedded) return;
   open.value = false;
 }
 
 function onSelectTech(id: TechId) {
+  if (props.embedded) return;
   if (statusFor(id) !== "available" || props.selecting) return;
   emit("select-tech", id);
 }
 
 function ctaTitle(id: TechId): string {
   const node = getTechNode(id);
+  if (props.embedded) {
+    const cost =
+      node.scienceCost > 0 ? `${node.scienceCost} science` : "départ";
+    return `${node.label} · ${cost} · ${node.unlocksLabel}`;
+  }
   const status = statusFor(id);
-  const { progress, cost } = progressFor(id);
-  if (status === "locked") return `${node.label} · prérequis manquants`;
+  const meta = scienceMetaFor(id);
+  if (status === "locked") return `${node.label} · prérequis manquants · ${meta.line}`;
   if (status === "unlocked") return `${node.label} · acquise · ${node.unlocksLabel}`;
-  if (status === "researching") return `${node.label} · en cours · ${progress}/${cost}`;
+  if (status === "researching") return `${node.label} · en cours · ${meta.line}`;
   const active = props.research?.researchTargetTechId;
   if (active && active !== id) {
-    return `${node.label} · changer de cible · ${progress}/${cost}`;
+    return `${node.label} · changer de cible · ${meta.line}`;
   }
-  return `${node.label} · ${node.scienceCost} science · ${node.unlocksLabel}`;
+  return `${node.label} · ${meta.line} · ${node.unlocksLabel}`;
 }
 
 const EDGE_RADIUS = 10;
@@ -277,7 +333,11 @@ function updateEdgePaths() {
     h: Math.max(1, Math.round(track.offsetHeight))
   };
 
-  const unlocked = new Set(props.research?.unlockedTechIds ?? ["foundations"]);
+  const unlocked = new Set(
+    props.embedded
+      ? TECH_NODES.map((n) => n.id)
+      : (props.research?.unlockedTechIds ?? ["foundations"])
+  );
   const next: EdgePath[] = [];
 
   for (const { from, to } of edges.value) {
@@ -301,6 +361,17 @@ function updateEdgePaths() {
 
 let resizeObserver: ResizeObserver | null = null;
 
+function onGraphWheel(event: WheelEvent) {
+  const graph = graphEl.value;
+  if (!graph) return;
+  if (graph.scrollWidth <= graph.clientWidth + 1) return;
+  // Molette verticale → scroll horizontal de la frise.
+  if (Math.abs(event.deltaY) < Math.abs(event.deltaX)) return;
+  if (event.deltaY === 0) return;
+  event.preventDefault();
+  graph.scrollLeft += event.deltaY;
+}
+
 function bindGraphObserver() {
   resizeObserver?.disconnect();
   resizeObserver = null;
@@ -308,6 +379,9 @@ function bindGraphObserver() {
   const graph = graphEl.value;
   const track = trackEl.value;
   if (!graph || !track) return;
+
+  graph.removeEventListener("wheel", onGraphWheel);
+  graph.addEventListener("wheel", onGraphWheel, { passive: false });
 
   resizeObserver = new ResizeObserver(() => updateEdgePaths());
   resizeObserver.observe(track);
@@ -318,8 +392,8 @@ function bindGraphObserver() {
   });
 }
 
-watch(open, async (isOpen) => {
-  if (!isOpen) return;
+watch(visible, async (isVisible) => {
+  if (!isVisible) return;
   await nextTick();
   bindGraphObserver();
 });
@@ -327,14 +401,21 @@ watch(open, async (isOpen) => {
 watch(
   () => [props.research, layoutColumns.value.length] as const,
   async () => {
-    if (!open.value) return;
+    if (!visible.value) return;
     await nextTick();
     updateEdgePaths();
   },
   { deep: true }
 );
 
+onMounted(async () => {
+  if (!visible.value) return;
+  await nextTick();
+  bindGraphObserver();
+});
+
 onBeforeUnmount(() => {
+  graphEl.value?.removeEventListener("wheel", onGraphWheel);
   resizeObserver?.disconnect();
 });
 </script>
@@ -342,55 +423,86 @@ onBeforeUnmount(() => {
 <template>
   <Transition name="building-sheet">
     <aside
-      v-if="open"
-      class="building-sheet tech-frise-sheet pointer-events-none absolute inset-x-0 z-40"
+      v-if="visible"
+      class="building-sheet tech-frise-sheet"
+      :class="
+        embedded
+          ? 'tech-frise-sheet--embedded pointer-events-auto relative'
+          : 'pointer-events-none absolute inset-x-0 z-40'
+      "
       role="region"
       aria-label="Arbre technologique"
     >
       <div class="building-sheet__sky" aria-hidden="true">
         <svg
           class="building-sheet__svg"
-          viewBox="0 0 1200 180"
+          viewBox="0 0 1200 160"
           preserveAspectRatio="none"
           xmlns="http://www.w3.org/2000/svg"
         >
           <defs>
-            <linearGradient id="play-cloud-tech-fill" x1="50%" y1="100%" x2="50%" y2="0%">
-              <stop offset="0%" stop-color="#ffffff" stop-opacity="0.97" />
-              <stop offset="55%" stop-color="#f4f8f5" stop-opacity="0.94" />
-              <stop offset="100%" stop-color="#e4eee8" stop-opacity="0.78" />
+            <linearGradient
+              :id="embedded ? 'admin-cloud-tech-fill' : 'play-cloud-tech-fill'"
+              x1="50%"
+              y1="100%"
+              x2="50%"
+              y2="0%"
+            >
+              <stop offset="0%" stop-color="#ffffff" stop-opacity="1" />
+              <stop offset="35%" stop-color="#ffffff" stop-opacity="1" />
+              <stop offset="55%" stop-color="#ffffff" stop-opacity="0.7" />
+              <stop offset="75%" stop-color="#ffffff" stop-opacity="0.28" />
+              <stop offset="90%" stop-color="#ffffff" stop-opacity="0.06" />
+              <stop offset="100%" stop-color="#ffffff" stop-opacity="0" />
             </linearGradient>
-            <filter id="play-cloud-tech-soft" x="-4%" y="-35%" width="108%" height="180%">
-              <feGaussianBlur in="SourceGraphic" stdDeviation="7" />
+            <filter
+              :id="embedded ? 'admin-cloud-tech-soft' : 'play-cloud-tech-soft'"
+              x="-6%"
+              y="-35%"
+              width="112%"
+              height="180%"
+            >
+              <feGaussianBlur in="SourceGraphic" stdDeviation="5.5" />
             </filter>
           </defs>
           <path
-            fill="url(#play-cloud-tech-fill)"
-            filter="url(#play-cloud-tech-soft)"
-            d="M0 180H1200V48
-              C1080 48 1000 28 880 34
-              C740 42 660 22 520 30
-              C380 38 300 20 180 32
-              C90 40 40 44 0 48
+            :fill="`url(#${embedded ? 'admin-cloud-tech-fill' : 'play-cloud-tech-fill'})`"
+            :filter="`url(#${embedded ? 'admin-cloud-tech-soft' : 'play-cloud-tech-soft'})`"
+            d="M0 160H1200V100
+              C1165 100 1135 82 1080 70
+              C1010 54 970 42 900 50
+              C850 56 820 68 760 58
+              C700 48 660 36 590 46
+              C530 54 500 66 440 50
+              C380 34 330 32 270 48
+              C210 62 170 74 100 80
+              C50 86 18 94 0 98
               Z"
           />
+          <rect x="0" y="108" width="1200" height="52" fill="#ffffff" />
         </svg>
         <div class="building-sheet__puff building-sheet__puff--1" />
         <div class="building-sheet__puff building-sheet__puff--2" />
         <div class="building-sheet__puff building-sheet__puff--3" />
         <div class="building-sheet__puff building-sheet__puff--4" />
+        <div class="building-sheet__puff building-sheet__puff--5" />
+        <div class="building-sheet__puff building-sheet__puff--6" />
       </div>
 
       <div class="building-sheet__content tech-frise-sheet__content pointer-events-auto">
         <div class="tech-frise-sheet__head">
           <div class="min-w-0">
             <p class="building-sheet__title">Technologies</p>
-            <p class="tech-frise-sheet__prod">
+            <p v-if="!embedded" class="tech-frise-sheet__prod">
               <UIcon name="i-lucide-flask-conical" class="size-3.5 shrink-0" aria-hidden="true" />
               HDV {{ prodLabel }}
             </p>
+            <p v-else class="tech-frise-sheet__prod">
+              Arbre live · {{ layoutColumns.reduce((n, c) => n + c.nodes.length, 0) }} techs
+            </p>
           </div>
           <button
+            v-if="!embedded"
             type="button"
             class="building-sheet__close"
             aria-label="Fermer les technologies"
@@ -436,10 +548,12 @@ onBeforeUnmount(() => {
                 :ref="(el) => setNodeRef(node.id, el)"
                 type="button"
                 class="tech-frise__node"
-                :class="`tech-frise__node--${statusFor(node.id)}`"
+                :class="nodeStatusClass(node.id)"
                 :title="ctaTitle(node.id)"
                 :aria-label="ctaTitle(node.id)"
-                :disabled="statusFor(node.id) !== 'available' || selecting"
+                :disabled="
+                  embedded || statusFor(node.id) !== 'available' || selecting
+                "
                 @click="onSelectTech(node.id)"
               >
                 <div class="tech-frise__node-main">
@@ -456,7 +570,7 @@ onBeforeUnmount(() => {
                         :r="RING_RADIUS"
                       />
                       <circle
-                        v-if="node.scienceCost > 0"
+                        v-if="!embedded && node.scienceCost > 0"
                         class="tech-frise__ring-fill"
                         :class="{
                           'tech-frise__ring-fill--active':
@@ -477,7 +591,7 @@ onBeforeUnmount(() => {
                       <UIcon :name="node.icon" class="size-5" />
                     </span>
                     <span
-                      v-if="statusFor(node.id) === 'unlocked'"
+                      v-if="!embedded && statusFor(node.id) === 'unlocked'"
                       class="tech-frise__node-check"
                       aria-hidden="true"
                     >
@@ -486,6 +600,19 @@ onBeforeUnmount(() => {
                   </div>
                   <div class="tech-frise__node-body">
                     <h3 class="tech-frise__node-title">{{ node.label }}</h3>
+                    <p
+                      v-if="
+                        node.scienceCost > 0 &&
+                        (embedded || statusFor(node.id) !== 'unlocked')
+                      "
+                      class="tech-frise__node-meta"
+                    >
+                      {{
+                        embedded
+                          ? `${node.scienceCost} science`
+                          : scienceMetaFor(node.id).line
+                      }}
+                    </p>
                     <div
                       v-if="node.unlocks.length > 0"
                       class="tech-frise__unlocks"
@@ -494,6 +621,7 @@ onBeforeUnmount(() => {
                         v-for="unlock in node.unlocks"
                         :key="`${node.id}-${unlock.refId}`"
                         class="tech-frise__unlock"
+                        :class="`tech-frise__unlock--${unlock.kind}`"
                         :title="unlock.label"
                       >
                         <UIcon :name="unlock.icon" class="size-3.5" />

@@ -41,6 +41,9 @@ function buildErrorMessage(err: unknown): string {
   if (code === "tech_not_unlocked") {
     return "Tech requise non débloquée — ouvre l’arbre technologique.";
   }
+  if (code === "outside_influence") {
+    return "Hors influence — construis plus près du village ou d’un bâtiment achevé.";
+  }
   return err instanceof Error ? err.message : "build_failed";
 }
 
@@ -56,14 +59,21 @@ function actionErrorMessage(action: GameAction, err: unknown): string {
 
 export function useWorld() {
   const config = useRuntimeConfig();
+  const { accelerateTimers } = useDebugMode();
   const worldId = useState<string | null>("world-id", () => null);
   const world = useState<WorldSnapshot | null>("world-snapshot", () => null);
   const error = useState<string | null>("world-error", () => null);
 
+  function apiHeaders(): Record<string, string> | undefined {
+    if (!accelerateTimers.value) return undefined;
+    return { "x-hexald-dev-accelerate": "1" };
+  }
+
   async function listWorlds(): Promise<WorldSummary[]> {
     return $fetch<WorldSummary[]>("/v1/worlds", {
       baseURL: config.public.apiBase,
-      credentials: "include"
+      credentials: "include",
+      headers: apiHeaders()
     });
   }
 
@@ -71,14 +81,16 @@ export function useWorld() {
     return $fetch<WorldSnapshot>("/v1/worlds", {
       baseURL: config.public.apiBase,
       method: "POST",
-      credentials: "include"
+      credentials: "include",
+      headers: apiHeaders()
     });
   }
 
   async function getWorld(id: string): Promise<WorldSnapshot> {
     return $fetch<WorldSnapshot>(`/v1/worlds/${id}`, {
       baseURL: config.public.apiBase,
-      credentials: "include"
+      credentials: "include",
+      headers: apiHeaders()
     });
   }
 
@@ -125,6 +137,7 @@ export function useWorld() {
           baseURL: config.public.apiBase,
           method: "POST",
           credentials: "include",
+          headers: apiHeaders(),
           body: action
         }
       );
@@ -170,6 +183,20 @@ export function useWorld() {
     return outcome.world;
   }
 
+  async function setProcessorInputRate(
+    id: string,
+    origin: HexCoord,
+    ratePerMinute: number
+  ): Promise<WorldSnapshot | null> {
+    const outcome = await applyAction(id, {
+      type: "set_processor_input_rate",
+      origin,
+      ratePerMinute
+    });
+    if (!outcome?.ok || outcome.type !== "set_processor_input_rate") return null;
+    return outcome.world;
+  }
+
   async function buildBuilding(
     id: string,
     buildingId: BuildRequest["buildingId"],
@@ -209,6 +236,7 @@ export function useWorld() {
           baseURL: config.public.apiBase,
           method: "POST",
           credentials: "include",
+          headers: apiHeaders(),
           body
         }
       );
@@ -226,7 +254,8 @@ export function useWorld() {
       const snapshot = await $fetch<WorldSnapshot>(`/v1/worlds/${id}/reset`, {
         baseURL: config.public.apiBase,
         method: "POST",
-        credentials: "include"
+        credentials: "include",
+        headers: apiHeaders()
       });
       worldId.value = snapshot.id;
       world.value = snapshot;
@@ -245,7 +274,8 @@ export function useWorld() {
         {
           baseURL: config.public.apiBase,
           method: "POST",
-          credentials: "include"
+          credentials: "include",
+          headers: apiHeaders()
         }
       );
       world.value = snapshot;
@@ -269,6 +299,7 @@ export function useWorld() {
           baseURL: config.public.apiBase,
           method: "POST",
           credentials: "include",
+          headers: apiHeaders(),
           body: { q: origin.q, r: origin.r, biome }
         }
       );
@@ -293,6 +324,7 @@ export function useWorld() {
     setResearchTarget,
     expandRegion,
     assignWorkers,
+    setProcessorInputRate,
     buildBuilding,
     destroyBuilding,
     resetWorld,

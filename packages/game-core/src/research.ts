@@ -1,5 +1,6 @@
 import type { TechId, WorldResearchSnapshot } from "@hexald/shared";
 import {
+  DEV_RESEARCH_DURATION_MS,
   getTechNode,
   isResearchableTechId,
   isTechId,
@@ -12,6 +13,11 @@ export type ResearchState = {
   unlockedTechIds: TechId[];
   progress: Partial<Record<TechId, number>>;
   scienceLastSettledAt: number;
+};
+
+export type ResearchSettleOptions = {
+  /** Mode debug : la tech cible se termine en DEV_RESEARCH_DURATION_MS. */
+  accelerate?: boolean;
 };
 
 export type SetResearchTargetResult =
@@ -59,11 +65,34 @@ export function techProgressFor(state: ResearchState, techId: TechId): number {
   return Math.max(0, Math.floor(state.progress[techId] ?? 0));
 }
 
+function unlockTarget(
+  state: ResearchState,
+  target: TechId,
+  now: number,
+  cost: number
+): ResearchState {
+  const unlocked = hasUnlocked(state, target)
+    ? state.unlockedTechIds
+    : [...state.unlockedTechIds, target];
+  return {
+    ...state,
+    unlockedTechIds: unlocked,
+    progress: { ...state.progress, [target]: cost },
+    researchTargetTechId: null,
+    scienceLastSettledAt: now
+  };
+}
+
 /**
  * Settle lazy : prod HDV → barre cible, ou perdue si pause.
  * Un unlock max par appel (offline inclus).
+ * `accelerate` : progression linéaire sur DEV_RESEARCH_DURATION_MS (debug).
  */
-export function settleResearch(state: ResearchState, now: number): ResearchState {
+export function settleResearch(
+  state: ResearchState,
+  now: number,
+  options: ResearchSettleOptions = {}
+): ResearchState {
   const target = state.researchTargetTechId;
 
   if (!target) {
@@ -72,8 +101,29 @@ export function settleResearch(state: ResearchState, now: number): ResearchState
 
   const cost = techScienceCost(target);
   const current = techProgressFor(state, target);
-  if (current >= cost || !isTechAvailable({ ...state, unlockedTechIds: state.unlockedTechIds }, target)) {
+  if (
+    current >= cost ||
+    !isTechAvailable({ ...state, unlockedTechIds: state.unlockedTechIds }, target)
+  ) {
     return { ...state, researchTargetTechId: null, scienceLastSettledAt: now };
+  }
+
+  if (options.accelerate) {
+    const started = state.scienceLastSettledAt;
+    const elapsed = Math.max(0, now - started);
+    if (DEV_RESEARCH_DURATION_MS <= 0 || elapsed >= DEV_RESEARCH_DURATION_MS) {
+      return unlockTarget(state, target, now, cost);
+    }
+    const progress =
+      cost <= 0
+        ? 0
+        : Math.min(cost, Math.floor((cost * elapsed) / DEV_RESEARCH_DURATION_MS));
+    return {
+      ...state,
+      progress: { ...state.progress, [target]: progress },
+      // Conserve l’ancre de début pour la projection 0→100 % sur 5 s.
+      scienceLastSettledAt: started
+    };
   }
 
   if (TOWN_HALL_SCIENCE_INTERVAL_MS <= 0) {
@@ -87,19 +137,11 @@ export function settleResearch(state: ResearchState, now: number): ResearchState
     return state;
   }
 
-  let progress = current + gained;
+  const progress = current + gained;
   last += gained * TOWN_HALL_SCIENCE_INTERVAL_MS;
 
   if (progress >= cost) {
-    const unlocked =
-      hasUnlocked(state, target) ? state.unlockedTechIds : [...state.unlockedTechIds, target];
-    return {
-      ...state,
-      unlockedTechIds: unlocked,
-      progress: { ...state.progress, [target]: cost },
-      researchTargetTechId: null,
-      scienceLastSettledAt: now
-    };
+    return unlockTarget(state, target, now, cost);
   }
 
   return {
@@ -169,7 +211,8 @@ function techProgressFromSnapshot(
 /** Projection client entre syncs serveur (unlock tranché côté API). */
 export function projectResearchSnapshot(
   research: WorldResearchSnapshot,
-  now: number
+  now: number,
+  options: ResearchSettleOptions = {}
 ): WorldResearchSnapshot {
   const target = research.researchTargetTechId;
   if (!target) return research;
@@ -179,13 +222,30 @@ export function projectResearchSnapshot(
 
   const cost = techScienceCost(target);
   const current = techProgressFromSnapshot(research, target);
-  if (current >= cost || TOWN_HALL_SCIENCE_INTERVAL_MS <= 0) return research;
+  if (current >= cost) return research;
 
-  const elapsed = Math.max(0, now - last);
-  const gained = Math.floor(elapsed / TOWN_HALL_SCIENCE_INTERVAL_MS);
-  if (gained <= 0) return research;
+  let progress = current;
 
-  const progress = Math.min(cost, current + gained);
+  if (options.accelerate) {
+    if (DEV_RESEARCH_DURATION_MS <= 0) {
+      progress = cost;
+    } else {
+      const elapsed = Math.max(0, now - last);
+      progress =
+        cost <= 0
+          ? 0
+          : Math.min(cost, Math.floor((cost * elapsed) / DEV_RESEARCH_DURATION_MS));
+    }
+  } else {
+    if (TOWN_HALL_SCIENCE_INTERVAL_MS <= 0) return research;
+    const elapsed = Math.max(0, now - last);
+    const gained = Math.floor(elapsed / TOWN_HALL_SCIENCE_INTERVAL_MS);
+    if (gained <= 0) return research;
+    progress = Math.min(cost, current + gained);
+  }
+
+  if (progress === current) return research;
+
   const techProgress = research.techProgress.map((row) =>
     row.techId === target ? { ...row, progress } : row
   );
