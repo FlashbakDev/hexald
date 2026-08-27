@@ -1,8 +1,14 @@
 import {
 
+  BRICKWORKS_CRAFT_DURATION_MS,
+
   DEV_CRAFT_DURATION_MS,
 
+  MILL_CRAFT_DURATION_MS,
+
   SAWMILL_CRAFT_DURATION_MS,
+
+  SMELTER_CRAFT_DURATION_MS,
 
   getProcessorStepForBuilding,
 
@@ -106,11 +112,10 @@ function craftDurationMs(
 ): number {
 
   if (accelerate) return DEV_CRAFT_DURATION_MS;
-
-  if (buildingId === "sawmill") return SAWMILL_CRAFT_DURATION_MS;
-
+  if (buildingId === "brickworks") return BRICKWORKS_CRAFT_DURATION_MS;
+  if (buildingId === "mill") return MILL_CRAFT_DURATION_MS;
+  if (buildingId === "smelter") return SMELTER_CRAFT_DURATION_MS;
   return SAWMILL_CRAFT_DURATION_MS;
-
 }
 
 

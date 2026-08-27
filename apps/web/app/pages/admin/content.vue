@@ -25,11 +25,15 @@ import {
 } from "~/utils/profileAvatars";
 
 definePageMeta({
-  layout: "blank"
+  layout: "blank",
+  robots: false
 });
 
-useHead({
-  title: "Contenu · Admin · Hexald"
+usePageSeo({
+  title: "Contenu · Admin · Hexald",
+  description: "Catalogue contenu admin Hexald.",
+  path: "/admin/content",
+  indexable: false
 });
 
 type CatalogTab =

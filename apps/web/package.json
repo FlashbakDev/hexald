@@ -8,13 +8,17 @@
     "dev": "nuxt dev --host -- --port 9089",
     "build": "nuxt build",
     "preview": "nuxt preview --host",
-    "prepare": "nuxt prepare"
+    "prepare": "nuxt prepare",
+    "optimize:images": "node scripts/optimize-images.mjs"
   },
   "dependencies": {
+    "@fontsource-variable/fraunces": "^5.3.0",
+    "@fontsource-variable/source-sans-3": "^5.3.0",
     "@hexald/content": "workspace:*",
     "@hexald/game-core": "workspace:*",
     "@hexald/shared": "workspace:*",
     "@nuxt/ui": "^4.11.0",
+    "@nuxtjs/seo": "^5.3.14",
     "firebase": "^12.18.0",
     "nuxt": "^4.5.2",
     "tailwindcss": "^4.3.3",
@@ -24,6 +28,7 @@
   "devDependencies": {
     "@types/three": "^0.185.4",
     "@vite-pwa/nuxt": "^1.1.1",
+    "sharp": "^0.35.4",
     "typescript": "^5.9.2"
   }
 }

@@ -59,20 +59,9 @@ export const pois: PoiDefinition[] = [
   {
     id: "lake",
     label: "Lac",
-    description:
-      "Plan d’eau intérieur — source d’un cours d’eau qui s’écoule vers les terres inexplorées ou la mer.",
+    description: "Plan d’eau intérieur au milieu des terres.",
     kind: "natural",
     biomes: ["forest", "plains", "mountain", "forest_plains", "plains_mountain", "forest_mountain"],
-    coastalWaterOnly: false,
-    status: "mvp"
-  },
-  {
-    id: "estuary",
-    label: "Estuaire",
-    description:
-      "Embouchure où le fleuve rejoint la mer.",
-    kind: "natural",
-    biomes: ["water"],
     coastalWaterOnly: false,
     status: "mvp"
   }

@@ -295,3 +295,48 @@ export async function updatePlayerAvatar(
   if (!updated) throw new Error("failed_to_update_avatar");
   return { ok: true, player: toPlayer(updated) };
 }
+
+export type RenamePseudoResult =
+  | { ok: true; player: PersistedPlayer }
+  | { ok: false; reason: "pseudo_taken" | "no_pseudo" };
+
+/** Change le pseudo d’un joueur qui en a déjà un (disponibilité unique). */
+export async function renamePlayerPseudo(
+  db: Database["db"],
+  playerId: string,
+  pseudo: string
+): Promise<RenamePseudoResult> {
+  const current = await fetchPlayer(db, playerId);
+  if (!current) throw new Error("player_not_found");
+  if (!current.pseudo) {
+    return { ok: false, reason: "no_pseudo" };
+  }
+
+  if (current.pseudo.toLowerCase() === pseudo.toLowerCase()) {
+    // Conserve la casse demandée si seule la casse change.
+    if (current.pseudo === pseudo) {
+      return { ok: true, player: current };
+    }
+  } else {
+    const available = await isPseudoAvailable(db, pseudo, playerId);
+    if (!available) {
+      return { ok: false, reason: "pseudo_taken" };
+    }
+  }
+
+  try {
+    const [updated] = await db
+      .update(players)
+      .set({ pseudo })
+      .where(eq(players.id, playerId))
+      .returning();
+    if (!updated) throw new Error("failed_to_rename_pseudo");
+    return { ok: true, player: toPlayer(updated) };
+  } catch (error) {
+    const availableAgain = await isPseudoAvailable(db, pseudo, playerId);
+    if (!availableAgain) {
+      return { ok: false, reason: "pseudo_taken" };
+    }
+    throw error;
+  }
+}

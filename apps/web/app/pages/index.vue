@@ -13,9 +13,14 @@ definePageMeta({
   layout: "default"
 });
 
-useHead({
-  title: "Hexald"
+usePageSeo({
+  title: "Hexald — jeu de stratégie hexagonale",
+  description:
+    "Pose ton village, conquiers des biomes et étends ton empire. Hexald est un jeu de gestion / stratégie persistant par navigateur, avec classement et progression de civilisation.",
+  path: "/"
 });
+
+useLandingGameSchema();
 
 const {
   pseudo,
@@ -307,7 +312,15 @@ const leaderboardScoreLabel = computed(
 <template>
   <div class="bg-[#dfe8e4]">
     <section class="relative isolate h-dvh overflow-hidden">
-      <LandingWorld />
+      <ClientOnly>
+        <LandingWorld />
+        <template #fallback>
+          <div
+            class="pointer-events-none absolute inset-0 bg-[#dfe8e4]"
+            aria-hidden="true"
+          />
+        </template>
+      </ClientOnly>
 
       <div
         class="pointer-events-none absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-[#dfe8e4]/35 lg:bg-gradient-to-r lg:from-[#dfe8e4]/70 lg:via-[#dfe8e4]/20 lg:to-transparent"
@@ -336,18 +349,7 @@ const leaderboardScoreLabel = computed(
 
       <div class="relative z-10 flex h-full flex-col">
         <div class="landing-col relative z-30 flex justify-end pt-[max(1rem,env(safe-area-inset-top))]">
-          <nav class="landing-topnav" aria-label="Navigation">
-            <NuxtLink
-              to="/"
-              class="landing-topnav__link is-active"
-              aria-current="page"
-            >
-              Accueil
-            </NuxtLink>
-            <NuxtLink to="/leaderboard" class="landing-topnav__link">
-              Classement
-            </NuxtLink>
-          </nav>
+          <SiteTopNav />
         </div>
 
         <div
@@ -356,11 +358,12 @@ const leaderboardScoreLabel = computed(
           <main class="w-full max-w-xl">
             <div class="landing-rise flex items-center gap-4 sm:gap-5">
               <img
-                src="/icon.png"
+                src="/icon-128.webp"
                 alt=""
                 width="72"
                 height="72"
                 class="size-14 shrink-0 rounded-2xl object-cover shadow-[0_8px_24px_rgb(28_43_40_/_0.18)] sm:size-[4.5rem]"
+                decoding="async"
                 aria-hidden="true"
               />
               <h1
@@ -374,6 +377,11 @@ const leaderboardScoreLabel = computed(
               class="landing-rise landing-rise-delay-1 mt-6 max-w-md text-lg leading-relaxed text-[#3d524c] sm:text-xl"
             >
               Pose ton village, conquiers des biomes, étends ton empire.
+            </p>
+            <p class="sr-only">
+              Hexald est un jeu de gestion et de stratégie persistant par
+              navigateur : construis ton monde hexagonal, développe ta
+              civilisation et compare ton score au classement.
             </p>
 
             <div class="landing-rise landing-rise-delay-2 relative z-20 mt-14">
@@ -603,6 +611,40 @@ const leaderboardScoreLabel = computed(
               </div>
             </li>
           </ol>
+        </div>
+      </section>
+
+      <section
+        class="landing-about"
+        aria-labelledby="landing-about-title"
+      >
+        <div class="landing-col">
+          <p class="landing-about__kicker">Le jeu</p>
+          <h2 id="landing-about-title" class="landing-about__title font-display">
+            Un diorama persistant, pas une carte partagée
+          </h2>
+          <div class="landing-about__prose">
+            <p>
+              Hexald n’est pas un MMO territorial classique. Chaque joueur possède
+              son propre monde hexagonal : tu poses des extracteurs, tu chaînes
+              la production, tu recherches des technologies et tu choisis le
+              biome de la prochaine région.
+            </p>
+            <p>
+              La population croît avec le surplus de nourriture, les ouvriers
+              font tourner les sites actifs, et les
+              <strong>points de civilisation</strong> (science, production,
+              population, militaire) alimentent le classement public.
+            </p>
+            <p>
+              Nouveau&nbsp;?
+              <NuxtLink to="/guide">Lis le guide</NuxtLink>
+              pour les premiers pas et les biomes, suis les
+              <NuxtLink to="/news">actualités</NuxtLink>,
+              ou compare les empires sur le
+              <NuxtLink to="/leaderboard">classement</NuxtLink>.
+            </p>
+          </div>
         </div>
       </section>
 

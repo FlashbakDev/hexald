@@ -1,5 +1,10 @@
 <script setup lang="ts">
-import type { ProfileAvatarId } from "@hexald/shared";
+import {
+  PSEUDO_MAX_LENGTH,
+  PSEUDO_MIN_LENGTH,
+  validatePseudo,
+  type ProfileAvatarId
+} from "@hexald/shared";
 import {
   PROFILE_AVATAR_OPTIONS,
   type ProfileAvatarOption
@@ -10,31 +15,75 @@ const open = defineModel<boolean>("open", { default: false });
 const props = withDefaults(
   defineProps<{
     selectedId?: string | null;
+    currentPseudo?: string | null;
     saving?: boolean;
+    renaming?: boolean;
+    renameError?: string | null;
   }>(),
   {
     selectedId: null,
-    saving: false
+    currentPseudo: null,
+    saving: false,
+    renaming: false,
+    renameError: null
   }
 );
 
 const emit = defineEmits<{
   select: [avatarId: ProfileAvatarId];
+  rename: [pseudo: string];
 }>();
 
 const options = PROFILE_AVATAR_OPTIONS;
+const draftPseudo = ref("");
+
+watch(
+  () => [open.value, props.currentPseudo] as const,
+  ([isOpen]) => {
+    if (isOpen) {
+      draftPseudo.value = props.currentPseudo ?? "";
+    }
+  }
+);
+
+const busy = computed(() => props.saving || props.renaming);
+
+const canSubmitRename = computed(() => {
+  const next = draftPseudo.value.trim();
+  if (!next || busy.value) return false;
+  if (next === (props.currentPseudo ?? "")) return false;
+  return validatePseudo(next).ok;
+});
+
+const localHint = computed(() => {
+  const next = draftPseudo.value.trim();
+  if (!next) return "3–20 caractères : lettres, chiffres, _";
+  const validation = validatePseudo(next);
+  if (!validation.ok) {
+    if (validation.reason === "too_short") return "Trop court (min. 3).";
+    if (validation.reason === "too_long") return "Trop long (max. 20).";
+    if (validation.reason === "invalid_chars") {
+      return "Lettres, chiffres et _ uniquement.";
+    }
+    return "Nom invalide.";
+  }
+  if (next === (props.currentPseudo ?? "")) return "C’est déjà ton nom.";
+  return null;
+});
 
 function close() {
   open.value = false;
 }
 
 function onPick(option: ProfileAvatarOption) {
-  if (props.saving) return;
-  if (option.id === props.selectedId) {
-    close();
-    return;
-  }
+  if (busy.value) return;
+  if (option.id === props.selectedId) return;
   emit("select", option.id);
+}
+
+function onSubmitRename() {
+  if (!canSubmitRename.value) return;
+  emit("rename", draftPseudo.value.trim());
 }
 </script>
 
@@ -44,7 +93,7 @@ function onPick(option: ProfileAvatarOption) {
       v-if="open"
       class="building-sheet avatar-picker-sheet pointer-events-none absolute inset-x-0 bottom-0 z-50"
       role="dialog"
-      aria-label="Choisir un avatar"
+      aria-label="Profil"
     >
       <div class="building-sheet__sky" aria-hidden="true">
         <svg
@@ -103,8 +152,8 @@ function onPick(option: ProfileAvatarOption) {
       <div class="building-sheet__content avatar-picker-sheet__content pointer-events-auto">
         <div class="avatar-picker-sheet__head">
           <div class="min-w-0">
-            <p class="building-sheet__title">Avatar</p>
-            <p class="building-sheet__hint">Choisis un personnage historique.</p>
+            <p class="building-sheet__title">Profil</p>
+            <p class="building-sheet__hint">Pseudo et avatar.</p>
           </div>
           <button
             type="button"
@@ -116,6 +165,41 @@ function onPick(option: ProfileAvatarOption) {
           </button>
         </div>
 
+        <form class="avatar-picker-sheet__rename" @submit.prevent="onSubmitRename">
+          <label class="avatar-picker-sheet__rename-label" for="play-rename-pseudo">
+            Pseudo
+          </label>
+          <div class="avatar-picker-sheet__rename-row">
+            <input
+              id="play-rename-pseudo"
+              v-model="draftPseudo"
+              class="avatar-picker-sheet__rename-input"
+              type="text"
+              autocomplete="username"
+              spellcheck="false"
+              :maxlength="PSEUDO_MAX_LENGTH"
+              :minlength="PSEUDO_MIN_LENGTH"
+              :disabled="busy"
+              placeholder="Ton nom"
+            />
+            <button
+              type="submit"
+              class="avatar-picker-sheet__rename-btn"
+              :disabled="!canSubmitRename"
+            >
+              {{ renaming ? "…" : "OK" }}
+            </button>
+          </div>
+          <p
+            v-if="renameError || localHint"
+            class="avatar-picker-sheet__rename-hint"
+            :class="{ 'avatar-picker-sheet__rename-hint--error': !!renameError }"
+          >
+            {{ renameError || localHint }}
+          </p>
+        </form>
+
+        <p class="avatar-picker-sheet__section-label">Avatar</p>
         <div class="avatar-picker-sheet__grid" role="listbox" aria-label="Avatars">
           <button
             v-for="option in options"
@@ -127,7 +211,7 @@ function onPick(option: ProfileAvatarOption) {
               'avatar-picker-sheet__item--selected': option.id === selectedId
             }"
             :aria-selected="option.id === selectedId"
-            :disabled="saving"
+            :disabled="busy"
             :title="option.label"
             @click="onPick(option)"
           >

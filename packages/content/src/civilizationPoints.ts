@@ -13,7 +13,7 @@ export const CIVILIZATION_POINTS_POP_MULTIPLIER = 10;
 
 /**
  * Points par bâtiment *actif* (achevé, ≥ 1 worker, pas orphelin).
- * Absents = 0 PC (maison, village, jardin/bonheur, marché…).
+ * Absents = 0 PC (maison, village, jardin/bonheur…).
  */
 export const CIVILIZATION_POINTS_BY_BUILDING: Readonly<
   Partial<
@@ -35,6 +35,7 @@ export const CIVILIZATION_POINTS_BY_BUILDING: Readonly<
   brickworks: { category: "production", points: 12 },
   smelter: { category: "production", points: 12 },
   forge: { category: "production", points: 12 },
+  market: { category: "production", points: 10 },
   library: { category: "science", points: 15 },
   barracks: { category: "military", points: 15 }
 };

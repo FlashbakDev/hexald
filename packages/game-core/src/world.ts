@@ -66,16 +66,70 @@ function mod(n: number, m: number) {
   return ((n % m) + m) % m;
 }
 
-export function createStartingWorld(): {
+function shuffleInPlace<T>(items: T[], random: () => number): T[] {
+  for (let i = items.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(random() * (i + 1));
+    const tmp = items[i]!;
+    items[i] = items[j]!;
+    items[j] = tmp;
+  }
+  return items;
+}
+
+/**
+ * Monde de départ (région 7 hex) — layout fixe avec aléatoire local :
+ * - centre (0,0) : forêt + village
+ * - 1 voisin random : lac (POI) sur plaine
+ * - 1 voisin du lac (dans la région) : montagne
+ * - 4 cases restantes : 2 forêts + 2 plaines
+ */
+export function createStartingWorld(random: () => number = Math.random): {
   tiles: Map<string, BiomeId>;
+  pois: Map<string, PoiId>;
   regions: Region[];
 } {
   const tiles = new Map<string, BiomeId>();
-  for (const cell of regionCells(START_REGION_CENTER)) {
-    tiles.set(hexKey(cell.q, cell.r), START_REGION_BIOME);
+  const pois = new Map<string, PoiId>();
+  const ring = hexNeighbors(START_REGION_CENTER);
+
+  const lake = ring[Math.floor(random() * ring.length)]!;
+  const mountainCandidates = hexNeighbors(lake).filter(
+    (cell) =>
+      !isStartVillageCoord(cell.q, cell.r) &&
+      !(cell.q === lake.q && cell.r === lake.r) &&
+      ring.some((entry) => entry.q === cell.q && entry.r === cell.r)
+  );
+  const mountain =
+    mountainCandidates[Math.floor(random() * mountainCandidates.length)] ??
+    ring.find((cell) => !(cell.q === lake.q && cell.r === lake.r))!;
+
+  const remaining = ring.filter(
+    (cell) =>
+      !(cell.q === lake.q && cell.r === lake.r) &&
+      !(cell.q === mountain.q && cell.r === mountain.r)
+  );
+  shuffleInPlace(remaining, random);
+
+  tiles.set(hexKey(START_REGION_CENTER.q, START_REGION_CENTER.r), "forest");
+  tiles.set(hexKey(lake.q, lake.r), "plains");
+  pois.set(hexKey(lake.q, lake.r), "lake");
+  tiles.set(hexKey(mountain.q, mountain.r), "mountain");
+
+  const landBiomes: PrimaryBiomeId[] = ["forest", "forest", "plains", "plains"];
+  for (let i = 0; i < remaining.length; i += 1) {
+    const cell = remaining[i]!;
+    tiles.set(hexKey(cell.q, cell.r), landBiomes[i] ?? "forest");
   }
+
+  // Sécurité : remplir toute la région si un candidat montagne a collé.
+  for (const cell of regionCells(START_REGION_CENTER)) {
+    const key = hexKey(cell.q, cell.r);
+    if (!tiles.has(key)) tiles.set(key, START_REGION_BIOME);
+  }
+
   return {
     tiles,
+    pois,
     regions: [{ center: START_REGION_CENTER, biome: START_REGION_BIOME }]
   };
 }

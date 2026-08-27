@@ -16,8 +16,6 @@ export type WorldTileSnapshot = {
   assignedWorkers?: number;
   /** POI naturel / landmark (ex. banc de poisson). */
   poiId?: PoiId | null;
-  /** Bits 0–5 : arêtes terre–terre avec rivière (HEX_DIRECTIONS). */
-  riverMask?: number;
   /** Valve d’entrée processor (unités input / min depuis le stock village). */
   processorInputRatePerMinute?: number;
   /** Buffer d’input local du processor. */
@@ -26,22 +24,6 @@ export type WorldTileSnapshot = {
   processorInputSettledAt?: string | null;
   /** Fin du craft en cours (ISO) ; null = idle. */
   craftCompletesAt?: string | null;
-};
-
-/** Pointe de rivière (écoulement sortant vers dir). */
-export type RiverTip = {
-  q: number;
-  r: number;
-  /**
-   * Index 0–5 : arête HEX_DIRECTIONS, ou sommet si `atVertex`.
-   * Sommet `v` = jonction des arêtes `v` et `(v+1)%6`.
-   */
-  dir: number;
-  /**
-   * Tip lac en attente : `dir` est un sommet ; à la prochaine région,
-   * une des deux arêtes incidentes poursuit le cours.
-   */
-  atVertex?: boolean;
 };
 
 export type WorldRegionSnapshot = {
@@ -54,7 +36,8 @@ export type ExtractorJob =
   | "farmer"
   | "quarrier"
   | "fisher"
-  | "miner";
+  | "miner"
+  | "merchant";
 
 /** Ligne d’inventaire générique (API / client). */
 export type InventoryStockSnapshot = {
@@ -74,18 +57,23 @@ export type WorldEconomySnapshot = {
   quarriers: number;
   fishers: number;
   miners: number;
+  merchants: number;
 
   lumberCampMaxWorkers: number;
   farmMaxWorkers: number;
   quarryMaxWorkers: number;
   fishingHutMaxWorkers: number;
   clayMineMaxWorkers: number;
+  mineMaxWorkers: number;
+  marketMaxWorkers: number;
 
   hasLumberCamp: boolean;
   hasFarm: boolean;
   hasQuarry: boolean;
   hasFishingHut: boolean;
   hasClayMine: boolean;
+  hasMine: boolean;
+  hasMarket: boolean;
 
   /** Inventaire générique — source de vérité pour craft / nouvelles ressources. */
   stocks: InventoryStockSnapshot[];
@@ -128,7 +116,7 @@ export type WorldResearchSnapshot = {
   researchTargetTechId: TechId | null;
   unlockedTechIds: TechId[];
   techProgress: TechProgressSnapshot[];
-  /** Prod HDV : +1 science / 15 s au MVP (≈ 5 min pour la 1re recherche). */
+  /** Prod science / min (HDV + bibliothèques avec ouvrier). */
   scienceProductionPerMinute: number;
   /** Horloge prod science (ISO) — projection client entre syncs. */
   scienceLastSettledAt: string;
@@ -152,8 +140,6 @@ export type WorldSnapshot = {
   regions: WorldRegionSnapshot[];
   economy: WorldEconomySnapshot;
   research: WorldResearchSnapshot;
-  /** Pointes de rivières à prolonger (serveur + reprise client). */
-  riverTips?: RiverTip[];
   /** Points de civilisation (DEC-027). */
   civilizationPoints: CivilizationPointsSnapshot;
 };
@@ -222,7 +208,14 @@ export type PlaceableBuildingId =
   | "fishing_hut"
   | "house"
   | "sawmill"
-  | "clay_mine";
+  | "clay_mine"
+  | "mine"
+  | "brickworks"
+  | "mill"
+  | "smelter"
+  | "library"
+  | "barracks"
+  | "market";
 
 export type BuildRequest = {
   buildingId: PlaceableBuildingId;

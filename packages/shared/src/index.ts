@@ -48,7 +48,6 @@ export type {
   DestroyBuildingResult,
   PlaceableBuildingId,
   ExtractorJob,
-  RiverTip,
   CivilizationPointsSnapshot,
   LeaderboardEntrySnapshot,
   LeaderboardSnapshot

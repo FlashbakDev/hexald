@@ -2,7 +2,7 @@ import {
   BoxGeometry,
   Group,
   Mesh,
-  MeshBasicMaterial,
+  MeshStandardMaterial,
   type BufferGeometry,
   type Material
 } from "three";
@@ -23,6 +23,13 @@ function unitToward(dirIndex: number) {
 
 /** Apothem — milieu d’arête pour hex rayon 1 pointy-top. */
 const EDGE_RADIAL = Math.cos(Math.PI / 6);
+/** Longueur d’arête (rayon centre→sommet = 1). */
+const EDGE_LEN = 1;
+/** Tiret court + grand écart = lecture « pointillé ». */
+const DASH_LEN = 0.09;
+const DASH_GAP = 0.1;
+const DASH_THICK = 0.042;
+const DASH_H = 0.012;
 
 function axialToWorld(q: number, r: number) {
   const x = Math.sqrt(3) * (q + r / 2);
@@ -31,33 +38,33 @@ function axialToWorld(q: number, r: number) {
 }
 
 /**
- * Contour blanc d’emprise (style Civ) — rubans sur les arêtes
- * où une tuile influencée touche une tuile hors emprise.
+ * Contour d’emprise — pointillés blancs à plat sur les arêtes délimitantes
+ * (tuile influencée ↔ hors emprise). Pas de muret.
+ *
+ * `heightForTile` = cote du **plateau** (dessus du hex).
  */
 export function createInfluenceBorderKit() {
   const geometries: BufferGeometry[] = [];
   const materials: Material[] = [];
 
-  const band = new MeshBasicMaterial({
+  const dashMat = new MeshStandardMaterial({
     color: 0xffffff,
-    transparent: true,
-    opacity: 0.92,
-    depthWrite: false
+    emissive: 0xffffff,
+    emissiveIntensity: 0.85,
+    roughness: 0.45,
+    metalness: 0,
+    polygonOffset: true,
+    polygonOffsetFactor: -4,
+    polygonOffsetUnits: -4
   });
-  const glow = new MeshBasicMaterial({
-    color: 0xffffff,
-    transparent: true,
-    opacity: 0.35,
-    depthWrite: false
-  });
-  materials.push(band, glow);
+  materials.push(dashMat);
 
-  const coreGeo = new BoxGeometry(1.04, 0.018, 0.055);
-  const glowGeo = new BoxGeometry(1.08, 0.01, 0.12);
-  geometries.push(coreGeo, glowGeo);
+  const dashGeo = new BoxGeometry(DASH_LEN, DASH_H, DASH_THICK);
+  geometries.push(dashGeo);
 
   const root = new Group();
   root.name = "influence-border";
+  root.renderOrder = 10;
 
   const rebuild = (
     coords: readonly HexCoord[],
@@ -70,11 +77,16 @@ export function createInfluenceBorderKit() {
     if (coords.length === 0) return;
 
     const influenced = new Set(coords.map((cell) => hexKey(cell.q, cell.r)));
-    const defaultY = 0.16;
+    const defaultTop = 0.3;
+    const step = DASH_LEN + DASH_GAP;
+    const inset = DASH_LEN * 0.55;
+    const usable = Math.max(DASH_LEN, EDGE_LEN - inset * 2);
+    const count = Math.max(2, Math.floor((usable + DASH_GAP) / step));
+    const span = (count - 1) * step;
 
     for (const cell of coords) {
       const { x: cx, z: cz } = axialToWorld(cell.q, cell.r);
-      const baseY = heightForTile?.(cell.q, cell.r) ?? defaultY;
+      const topY = heightForTile?.(cell.q, cell.r) ?? defaultTop;
 
       for (let dir = 0; dir < 6; dir += 1) {
         const n = HEX_DIRECTIONS[dir]!;
@@ -82,25 +94,19 @@ export function createInfluenceBorderKit() {
         if (influenced.has(nKey)) continue;
 
         const { x: ux, z: uz, yaw } = unitToward(dir);
-        const segment = new Group();
-        segment.position.set(
-          cx + ux * EDGE_RADIAL,
-          baseY,
-          cz + uz * EDGE_RADIAL
-        );
-        segment.rotation.y = yaw;
+        const midX = cx + ux * EDGE_RADIAL;
+        const midZ = cz + uz * EDGE_RADIAL;
 
-        const outer = new Mesh(glowGeo, glow);
-        disableRaycast(outer);
-        outer.position.y = 0.002;
-        segment.add(outer);
-
-        const inner = new Mesh(coreGeo, band);
-        disableRaycast(inner);
-        inner.position.y = 0.008;
-        segment.add(inner);
-
-        root.add(segment);
+        for (let i = 0; i < count; i += 1) {
+          const t = count === 1 ? 0 : -span / 2 + i * step;
+          const dash = new Mesh(dashGeo, dashMat);
+          disableRaycast(dash);
+          dash.renderOrder = 10;
+          dash.position.set(midX, topY + DASH_H / 2 + 0.01, midZ);
+          dash.rotation.y = yaw;
+          dash.translateX(t);
+          root.add(dash);
+        }
       }
     }
   };

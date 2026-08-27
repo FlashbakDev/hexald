@@ -29,9 +29,11 @@ export function maxWorkersForBuilding(buildingId: BuildingId): number {
 
 /** Bâtiment qui accepte une affectation permanente de workers. */
 export function acceptsPermanentWorkers(buildingId: BuildingId): boolean {
+  if (maxWorkersForBuilding(buildingId) <= 0) return false;
   return (
     isPlaceableExtractor(buildingId) ||
-    (isPlaceableProcessor(buildingId) && maxWorkersForBuilding(buildingId) > 0)
+    isPlaceableProcessor(buildingId) ||
+    buildingId === "library"
   );
 }
 
@@ -44,12 +46,14 @@ export function workerTotalsFromTiles(
   quarriers: number;
   fishers: number;
   miners: number;
+  merchants: number;
 } {
   let woodcutters = 0;
   let farmers = 0;
   let quarriers = 0;
   let fishers = 0;
   let miners = 0;
+  let merchants = 0;
   const influenced = computeInfluencedTiles(tiles, now);
 
   for (const tile of tiles) {
@@ -60,11 +64,13 @@ export function workerTotalsFromTiles(
     if (tile.buildingId === "lumber_camp") woodcutters += workers;
     else if (tile.buildingId === "farm") farmers += workers;
     else if (tile.buildingId === "fishing_hut") fishers += workers;
-    else if (tile.buildingId === "clay_mine") miners += workers;
+    else if (tile.buildingId === "clay_mine" || tile.buildingId === "mine")
+      miners += workers;
+    else if (tile.buildingId === "market") merchants += workers;
     else quarriers += workers;
   }
 
-  return { woodcutters, farmers, quarriers, fishers, miners };
+  return { woodcutters, farmers, quarriers, fishers, miners, merchants };
 }
 
 /** Workers engagés sur un site (chantier ou bâtiment achevé) — hors pool HDV. */
@@ -131,6 +137,22 @@ export type AssignTileWorkersResult =
         | "outside_influence";
     };
 
+/** Compte les ouvriers productifs en bibliothèque (science). */
+export function countLibraryScienceWorkers(
+  tiles: readonly TileWorkerState[],
+  now: number
+): number {
+  const influenced = computeInfluencedTiles(tiles, now);
+  let total = 0;
+  for (const tile of tiles) {
+    if (tile.buildingId !== "library") continue;
+    if (!isBuildingComplete(tile.constructionCompletesAt, now)) continue;
+    if (!influenced.has(hexKey(tile.q, tile.r))) continue;
+    total += clampTileWorkers(tile.assignedWorkers ?? 0, "library");
+  }
+  return total;
+}
+
 /** Assigne 0 ou 1 worker sur un extracteur / processor (chantier ou achevé). */
 export function assignWorkersAtTile(
   tiles: readonly TileWorkerState[],
@@ -173,11 +195,12 @@ export function assignWorkersAtTile(
 
 export function extractorJobForBuildingId(
   buildingId: PlaceableExtractorId
-): "woodcutter" | "farmer" | "quarrier" | "fisher" | "miner" {
+): "woodcutter" | "farmer" | "quarrier" | "fisher" | "miner" | "merchant" {
   if (buildingId === "lumber_camp") return "woodcutter";
   if (buildingId === "farm") return "farmer";
   if (buildingId === "fishing_hut") return "fisher";
-  if (buildingId === "clay_mine") return "miner";
+  if (buildingId === "clay_mine" || buildingId === "mine") return "miner";
+  if (buildingId === "market") return "merchant";
   return "quarrier";
 }
 

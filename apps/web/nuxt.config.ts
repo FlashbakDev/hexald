@@ -5,39 +5,79 @@ const firebaseAuthDomain = (
   process.env.NUXT_PUBLIC_FIREBASE_AUTH_DOMAIN ?? ""
 ).trim();
 
+const siteUrl = (
+  process.env.NUXT_PUBLIC_SITE_URL ?? "https://hexald.com"
+).replace(/\/$/, "");
+
 export default defineNuxtConfig({
   compatibilityDate: "2025-07-15",
-  modules: ["@nuxt/ui", "@vite-pwa/nuxt"],
+  modules: ["@nuxt/ui", "@nuxtjs/seo", "@vite-pwa/nuxt"],
   css: ["~/assets/css/main.css"],
+  site: {
+    url: siteUrl,
+    name: "Hexald",
+    description:
+      "Hexald est un jeu de gestion / stratégie persistant par navigateur : construis ton monde hexagonal, développe ta civilisation et grimpe au classement.",
+    defaultLocale: "fr"
+  },
   app: {
     head: {
-      title: "Hexald",
       htmlAttrs: { lang: "fr" },
-      meta: [
-        { name: "theme-color", content: "#2d5248" },
-        { name: "description", content: "Gestion / stratégie hexagonale persistante." },
-        { property: "og:title", content: "Hexald" },
-        {
-          property: "og:description",
-          content: "Gestion / stratégie hexagonale persistante."
-        },
-        { property: "og:image", content: "/icon.png" },
-        { name: "twitter:card", content: "summary" },
-        { name: "twitter:image", content: "/icon.png" }
-      ],
+      meta: [{ name: "theme-color", content: "#2d5248" }],
       link: [
         { rel: "icon", type: "image/x-icon", href: "/favicon.ico" },
-        { rel: "icon", type: "image/png", sizes: "32x32", href: "/favicon-32x32.png" },
-        { rel: "icon", type: "image/png", sizes: "16x16", href: "/favicon-16x16.png" },
-        { rel: "apple-touch-icon", sizes: "180x180", href: "/apple-touch-icon.png" },
+        {
+          rel: "icon",
+          type: "image/png",
+          sizes: "32x32",
+          href: "/favicon-32x32.png"
+        },
+        {
+          rel: "icon",
+          type: "image/png",
+          sizes: "16x16",
+          href: "/favicon-16x16.png"
+        },
+        {
+          rel: "apple-touch-icon",
+          sizes: "180x180",
+          href: "/apple-touch-icon.png"
+        },
         { rel: "mask-icon", href: "/icon.png", color: "#2d5248" }
       ]
     }
   },
+  robots: {
+    disallow: ["/play", "/admin", "/backend", "/poc", "/offline", "/__/auth"]
+  },
+  sitemap: {
+    exclude: ["/play", "/admin/**", "/poc", "/offline", "/backend/**"]
+  },
+  ogImage: {
+    enabled: false
+  },
+  schemaOrg: {
+    identity: {
+      type: "Organization",
+      name: "Hexald",
+      url: siteUrl,
+      logo: "/icon.png",
+      description:
+        "Jeu de gestion / stratégie hexagonal persistant par navigateur."
+    }
+  },
   fonts: {
+    // Self-hosted via @fontsource-variable imports in main.css — no Google runtime.
+    defaults: {
+      weights: [400, 500, 600],
+      styles: ["normal"],
+      subsets: ["latin", "latin-ext"]
+    },
     families: [
-      { name: "Fraunces", provider: "google", weights: [400, 500, 600] },
-      { name: "Source Sans 3", provider: "google", weights: [400, 500, 600] }
+      { name: "Fraunces", provider: "none" },
+      { name: "Fraunces Variable", provider: "none" },
+      { name: "Source Sans 3", provider: "none" },
+      { name: "Source Sans 3 Variable", provider: "none" }
     ]
   },
   devServer: {
@@ -51,6 +91,7 @@ export default defineNuxtConfig({
   runtimeConfig: {
     public: {
       apiBase: "/backend",
+      siteUrl,
       /** AdSense publisher client — NUXT_PUBLIC_ADSENSE_CLIENT_ID (never load via head; plugin gates it) */
       adsenseClientId: "",
       /** Firebase web config — NUXT_PUBLIC_FIREBASE_* (explicit pour mobile / LAN) */
@@ -61,14 +102,29 @@ export default defineNuxtConfig({
     }
   },
   routeRules: {
+    "/": { prerender: true },
+    "/news": { prerender: true },
+    "/news/**": { prerender: true },
+    "/guide": { prerender: true },
+    "/leaderboard": { swr: 60 },
+    "/legals": { prerender: true },
+    "/privacy": { prerender: true },
+    "/terms": { prerender: true },
+    "/cookies": { prerender: true },
+    "/offline": { prerender: true, robots: false },
+    "/play": { ssr: false, robots: false },
+    "/admin/**": { robots: false },
+    "/poc": { robots: false },
     "/backend/**": {
-      proxy: `${apiProxyTarget}/**`
+      proxy: `${apiProxyTarget}/**`,
+      robots: false
     },
     // Proxy auth helper same-origin (Option 3 Firebase) — utile pour redirect mobile.
     ...(firebaseAuthDomain
       ? {
           "/__/auth/**": {
-            proxy: `https://${firebaseAuthDomain}/__/auth/**`
+            proxy: `https://${firebaseAuthDomain}/__/auth/**`,
+            robots: false
           }
         }
       : {})
@@ -127,11 +183,25 @@ export default defineNuxtConfig({
       ]
     },
     workbox: {
-      // Shell précaché pour afficher le message offline ; API jamais en cache.
-      navigateFallback: "/",
-      navigateFallbackDenylist: [/^\/backend/, /^\/__\/auth/],
+      // Fallback dédié offline — pas la homepage (évite shell marketing pour bots / routes manquantes).
+      navigateFallback: "/offline",
+      navigateFallbackDenylist: [
+        /^\/backend/,
+        /^\/__\/auth/,
+        /^\/api/,
+        /^\/sitemap/,
+        /^\/robots\.txt/,
+        /\/[^/?]+\.[^/]+$/
+      ],
       // icon.png / favicon restent hors SW : servis en réseau (évite plafond 2 MiB).
-      globPatterns: ["**/*.{js,css,html,svg,webp,woff2}", "pwa/*.png", "favicon-*.png", "apple-touch-icon.png"],
+      globPatterns: [
+        "**/*.{js,css,html,svg,webp,woff2,jpg}",
+        "pwa/*.png",
+        "favicon-*.png",
+        "apple-touch-icon.png",
+        "og.jpg",
+        "icon-*.webp"
+      ],
       maximumFileSizeToCacheInBytes: 2 * 1024 * 1024,
       runtimeCaching: [
         {

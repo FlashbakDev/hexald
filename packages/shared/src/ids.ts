@@ -38,6 +38,7 @@ export type ResourceId =
   | "iron_ore"
   | "iron_ingot"
   | "tools"
+  | "gold"
   /** Éclat de monde — ancrage / révélation de région. */
   | "worldshard";
 
@@ -47,8 +48,7 @@ export type PoiId =
   | "cow_herd"
   | "iron_deposit"
   | "clay_deposit"
-  | "lake"
-  | "estuary";
+  | "lake";
 
 export type BuildingId =
   | "village"
@@ -81,4 +81,5 @@ export type WorkerJob =
   | "fisher"
   | "laborer"
   | "artisan"
-  | "builder";
+  | "builder"
+  | "merchant";

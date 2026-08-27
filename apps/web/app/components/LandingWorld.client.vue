@@ -26,8 +26,8 @@ const isNarrow = ref(
 );
 const viewSize = computed(() => (isNarrow.value ? 8.2 : 6.8));
 const frameBiasY = computed(() => (isNarrow.value ? 0.42 : 0.06));
-/** Desktop : décale le village vers la droite pour laisser la place au texte. */
-const frameBiasX = computed(() => (isNarrow.value ? 0 : 0.28));
+/** Desktop : centre la carte (village) sur la moitié droite de l’écran. */
+const frameBiasX = computed(() => (isNarrow.value ? 0 : 0.32));
 
 function syncViewport() {
   isNarrow.value = window.matchMedia("(max-width: 1023px)").matches;

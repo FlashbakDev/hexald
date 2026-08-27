@@ -27,6 +27,7 @@ import {
   buildingRateFromCatalog,
   lumberCampTechBonusPerMinute as lumberCampTechBonusFromUnlocks,
   quarryMasonryBonusPerMinute as quarryMasonryBonusFromUnlocks,
+  mineMasonryBonusPerMinute as mineMasonryBonusFromUnlocks,
   pastureFoodBonusPerMinute,
   plantationFoodBonusPerMinute,
   getBuildingDefinition,
@@ -77,6 +78,7 @@ export type EconomyState = {
   quarriers: number;
   fishers: number;
   miners: number;
+  merchants: number;
   /** Inventaire générique (resource_id → stock). */
   stocks: Partial<Record<ResourceId, StockEntry>>;
   unlockedTechIds: readonly TechId[];
@@ -88,12 +90,16 @@ export type EconomyState = {
   quarrySites: number;
   fishingHutSites: number;
   clayMineSites: number;
+  mineSites: number;
+  marketSites: number;
   /** Au moins un site achevé — requis pour produire. */
   hasLumberCamp: boolean;
   hasFarm: boolean;
   hasQuarry: boolean;
   hasFishingHut: boolean;
   hasClayMine: boolean;
+  hasMine: boolean;
+  hasMarket: boolean;
   /** DEC-017 — surplus food cumulé vers le prochain habitant. */
   foodSurplusAccumulated: number;
   /** Sites extracteurs (biome + workers) pour bonus fusion. */
@@ -239,6 +245,8 @@ function completedSiteCount(
   if (buildingId === "farm") return state.hasFarm ? 1 : 0;
   if (buildingId === "fishing_hut") return state.hasFishingHut ? 1 : 0;
   if (buildingId === "clay_mine") return state.hasClayMine ? 1 : 0;
+  if (buildingId === "mine") return state.hasMine ? 1 : 0;
+  if (buildingId === "market") return state.hasMarket ? 1 : 0;
   return state.hasQuarry ? 1 : 0;
 }
 
@@ -253,6 +261,13 @@ function quarryMasonryBonusForState(state: EconomyState): number {
   return quarryMasonryBonusFromUnlocks(
     state.unlockedTechIds,
     completedSiteCount(state, "quarry")
+  );
+}
+
+function mineMasonryBonusForState(state: EconomyState): number {
+  return mineMasonryBonusFromUnlocks(
+    state.unlockedTechIds,
+    completedSiteCount(state, "mine")
   );
 }
 
@@ -271,6 +286,7 @@ function rateFromSites(
     let rate = Math.max(0, workers) * base;
     if (buildingId === "lumber_camp") rate += lumberCampTechBonusForState(state);
     if (buildingId === "quarry") rate += quarryMasonryBonusForState(state);
+    if (buildingId === "mine") rate += mineMasonryBonusForState(state);
     return rate;
   }
   let total = 0;
@@ -279,6 +295,7 @@ function rateFromSites(
   }
   if (buildingId === "lumber_camp") total += lumberCampTechBonusForState(state);
   if (buildingId === "quarry") total += quarryMasonryBonusForState(state);
+  if (buildingId === "mine") total += mineMasonryBonusForState(state);
   return total;
 }
 
@@ -305,6 +322,12 @@ function workersAndActiveForBuilding(
   if (buildingId === "clay_mine") {
     return { workers: state.miners, active: state.hasClayMine };
   }
+  if (buildingId === "mine") {
+    return { workers: state.miners, active: state.hasMine };
+  }
+  if (buildingId === "market") {
+    return { workers: state.merchants, active: state.hasMarket };
+  }
   return { workers: state.quarriers, active: state.hasQuarry };
 }
 
@@ -314,7 +337,9 @@ function buildExtractorProducers(): ExtractorProducer[] {
     "farm",
     "quarry",
     "fishing_hut",
-    "clay_mine"
+    "clay_mine",
+    "mine",
+    "market"
   ];
   const producers: ExtractorProducer[] = [];
   for (const buildingId of ids) {
@@ -389,6 +414,7 @@ export function createInitialEconomy(now = Date.now()): EconomyState {
     quarriers: 0,
     fishers: 0,
     miners: 0,
+    merchants: 0,
     stocks: {
       wood: { amount: STARTING_WOOD, lastCalculatedAt: now },
       wheat: { amount: STARTING_WHEAT, lastCalculatedAt: now },
@@ -401,11 +427,15 @@ export function createInitialEconomy(now = Date.now()): EconomyState {
     quarrySites: 0,
     fishingHutSites: 0,
     clayMineSites: 0,
+    mineSites: 0,
+    marketSites: 0,
     hasLumberCamp: false,
     hasFarm: false,
     hasQuarry: false,
     hasFishingHut: false,
     hasClayMine: false,
+    hasMine: false,
+    hasMarket: false,
     foodSurplusAccumulated: 0,
     extractorSites: [],
     processorSites: [],
@@ -457,6 +487,14 @@ export function fishingFoodRateFromState(state: EconomyState): number {
 
 export function clayRateFromState(state: EconomyState): number {
   return rateFromSites(state, "clay_mine");
+}
+
+export function ironOreRateFromState(state: EconomyState): number {
+  return rateFromSites(state, "mine");
+}
+
+export function goldRateFromState(state: EconomyState): number {
+  return rateFromSites(state, "market");
 }
 
 export function wheatFoodEquivalentPerMinute(state: EconomyState): number {
@@ -755,7 +793,8 @@ function siteCountForJob(job: ExtractorJob, state: EconomyState): number {
   if (job === "woodcutter") return state.lumberCampSites;
   if (job === "farmer") return state.farmSites;
   if (job === "fisher") return state.fishingHutSites;
-  if (job === "miner") return state.clayMineSites;
+  if (job === "miner") return state.clayMineSites + state.mineSites;
+  if (job === "merchant") return state.marketSites;
   return state.quarrySites;
 }
 
@@ -764,6 +803,7 @@ function currentWorkersForJob(state: EconomyState, job: ExtractorJob): number {
   if (job === "farmer") return state.farmers;
   if (job === "fisher") return state.fishers;
   if (job === "miner") return state.miners;
+  if (job === "merchant") return state.merchants;
   return state.quarriers;
 }
 
@@ -789,12 +829,20 @@ function jobConfig(job: ExtractorJob, state: EconomyState) {
           ? "fishers"
           : job === "miner"
             ? "miners"
-            : "quarriers";
+            : job === "merchant"
+              ? "merchants"
+              : "quarriers";
   return {
     hasBuilding: sites > 0,
     maxWorkers: maxAssignableWorkersForJob(job, state),
     current: currentWorkersForJob(state, job),
-    key: key as "woodcutters" | "farmers" | "quarriers" | "fishers" | "miners"
+    key: key as
+      | "woodcutters"
+      | "farmers"
+      | "quarriers"
+      | "fishers"
+      | "miners"
+      | "merchants"
   };
 }
 
@@ -804,7 +852,8 @@ export function assignedWorkers(state: EconomyState): number {
     state.farmers +
     state.quarriers +
     state.fishers +
-    state.miners
+    state.miners +
+    state.merchants
   );
 }
 
@@ -821,7 +870,8 @@ export function extractorJobForBuilding(
     definition?.workerJob === "farmer" ||
     definition?.workerJob === "quarrier" ||
     definition?.workerJob === "fisher" ||
-    definition?.workerJob === "miner"
+    definition?.workerJob === "miner" ||
+    definition?.workerJob === "merchant"
   ) {
     return definition.workerJob;
   }
@@ -829,7 +879,8 @@ export function extractorJobForBuilding(
   if (output === "wood") return "woodcutter";
   if (output === "wheat") return "farmer";
   if (output === "food") return "fisher";
-  if (output === "clay") return "miner";
+  if (output === "clay" || output === "iron_ore") return "miner";
+  if (output === "gold") return "merchant";
   return "quarrier";
 }
 

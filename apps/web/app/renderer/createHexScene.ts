@@ -37,7 +37,6 @@ import {
   canPlaceRegion,
   createStartingWorld,
   generateRegionTiles,
-  lakeOutflowVertexFromMask,
   regionLatticeNeighbors,
   startingTileBuildingId
 } from "@hexald/game-core";
@@ -47,8 +46,14 @@ import { createFogCloudKit, FOG_CLOUD_LIFT } from "./createFogCloudKit";
 import { createFarmMesh } from "./createFarmMesh";
 import { createFishingHutMesh } from "./createFishingHutMesh";
 import { createHouseMesh } from "./createHouseMesh";
+import { createLibraryMesh } from "./createLibraryMesh";
+import { createBarracksMesh } from "./createBarracksMesh";
+import { createMarketMesh } from "./createMarketMesh";
 import { createLumberCampMesh } from "./createLumberCampMesh";
 import { createSawmillMesh } from "./createSawmillMesh";
+import { createMillMesh } from "./createMillMesh";
+import { createSmelterMesh } from "./createSmelterMesh";
+import { createBrickworksMesh } from "./createBrickworksMesh";
 import { createQuarryMesh } from "./createQuarryMesh";
 import {
   createMountainDecorKit,
@@ -66,13 +71,9 @@ import { createCowHerdDecorKit } from "./createCowHerdDecor";
 import { createIronDepositDecorKit } from "./createIronDepositDecor";
 import { createClayDepositDecorKit } from "./createClayDepositDecor";
 import { createLakeDecorKit } from "./createLakeDecor";
-import { createEstuaryDecorKit } from "./createEstuaryDecor";
 import { createVillageMesh } from "./createVillageMesh";
 import { createClayMineMesh } from "./createClayMineMesh";
-import {
-  createRiverEdgeDecorKit,
-  ownedRiverDirsFromMask
-} from "./createRiverEdgeDecor";
+import { createMineMesh } from "./createMineMesh";
 import { createInfluenceBorderKit } from "./createInfluenceBorderKit";
 import type { PoiId } from "@hexald/shared";
 import { poiAllowedOnBiome } from "@hexald/content";
@@ -81,6 +82,8 @@ const HEX_SIZE = 1;
 const HEX_HEIGHT = 0.28;
 /** Mer pure : plus basse que la terre / les côtes (lisibilité). */
 const WATER_HEIGHT = 0.12;
+/** Lac intérieur : légère dépression sous le plateau terrestre. */
+const LAKE_HEIGHT = HEX_HEIGHT * 0.78;
 const EMPTY_HEIGHT = 0.2;
 const HOVER_LIFT = 0.22;
 const SELECT_LIFT = 0.14;
@@ -143,8 +146,6 @@ type HexTile = {
   hasVillage: boolean;
   buildingId: BuildingId | null;
   poiId: PoiId | null;
-  /** Bits 0–5 : arêtes rivière. */
-  riverMask: number;
   isRegionCenter: boolean;
   decor: Group | null;
   buildingMesh: Group | null;
@@ -160,7 +161,6 @@ type TileState = {
   biome: BiomeId;
   buildingId: BuildingId | null;
   poiId: PoiId | null;
-  riverMask: number;
   isRegionCenter: boolean;
   hasVillage: boolean;
 };
@@ -243,7 +243,8 @@ function tileMeshHeight(biome: BiomeId, poiId: PoiId | null = null) {
   if (biome === "water") return WATER_HEIGHT;
   // Gisement = sol plat + tas de cailloux (pas le relief montagne).
   if (biome === "mountain" && poiId === "iron_deposit") return HEX_HEIGHT;
-  if (poiId === "lake" && biome !== "water") return HEX_HEIGHT;
+  // Lac = cuvette légèrement plus basse que les tuiles voisines.
+  if (poiId === "lake" && biome !== "water") return LAKE_HEIGHT;
   if (biome === "mountain") return HEX_HEIGHT * 1.38;
   if (biome === "forest_mountain") return HEX_HEIGHT * 1.18;
   if (biome === "plains" || biome === "forest_plains") return HEX_HEIGHT * 0.94;
@@ -294,14 +295,7 @@ export type HexSceneApi = {
   /** Retire le bâtiment et restaure le décor de biome. */
   removeBuilding: (q: number, r: number) => boolean;
   /** Dev — change le biome et retire le bâtiment affiché. */
-  applyTileBiome: (
-    q: number,
-    r: number,
-    biome: BiomeId,
-    riverMask?: number
-  ) => boolean;
-  /** Resync des masques rivière depuis un snapshot monde. */
-  syncRiverMasks: (tiles: readonly WorldTileSnapshot[]) => void;
+  applyTileBiome: (q: number, r: number, biome: BiomeId) => boolean;
   /** Projette le centre d’une tuile (au-dessus du bâtiment) en coords canvas. */
   projectTile: (q: number, r: number) => HexScreenPoint | null;
   /** Surbrillance tutoriel (tuiles cliquables) — emissive pulsante. */
@@ -325,8 +319,8 @@ export type HexSceneFraming = {
   frameBiasY?: number;
   /**
    * 0 = look target centered.
-   * Positive shifts the look target toward the left of the screen (0–0.7),
-   * so more of the map sits on the right (landing desktop).
+   * Positive shifts the look target toward the right of the screen (0–0.7),
+   * so the map center sits on the right half (landing desktop).
    */
   frameBiasX?: number;
 };
@@ -751,10 +745,24 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
   fishingHutKit.group.position.y = HEX_HEIGHT / 2;
   const houseKit = createHouseMesh();
   houseKit.group.position.y = HEX_HEIGHT / 2;
+  const libraryKit = createLibraryMesh();
+  libraryKit.group.position.y = HEX_HEIGHT / 2;
+  const barracksKit = createBarracksMesh();
+  barracksKit.group.position.y = HEX_HEIGHT / 2;
+  const marketKit = createMarketMesh();
+  marketKit.group.position.y = HEX_HEIGHT / 2;
   const sawmillKit = createSawmillMesh();
   sawmillKit.group.position.y = HEX_HEIGHT / 2;
+  const millKit = createMillMesh();
+  millKit.group.position.y = HEX_HEIGHT / 2;
+  const smelterKit = createSmelterMesh();
+  smelterKit.group.position.y = HEX_HEIGHT / 2;
+  const brickworksKit = createBrickworksMesh();
+  brickworksKit.group.position.y = HEX_HEIGHT / 2;
   const clayMineKit = createClayMineMesh();
   clayMineKit.group.position.y = HEX_HEIGHT / 2;
+  const mineKit = createMineMesh();
+  mineKit.group.position.y = HEX_HEIGHT / 2;
   const forestDecor = createForestDecorKit();
   const plainsDecor = createPlainsDecorKit();
   const mountainDecor = createMountainDecorKit();
@@ -767,8 +775,6 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
   const ironDepositDecor = createIronDepositDecorKit();
   const clayDepositDecor = createClayDepositDecorKit();
   const lakeDecor = createLakeDecorKit();
-  const estuaryDecor = createEstuaryDecorKit();
-  const riverEdges = createRiverEdgeDecorKit();
   const influenceBorder = createInfluenceBorderKit();
   scene.add(influenceBorder.root);
   const deepWaterTexture = createDeepWaterSurfaceTexture();
@@ -783,8 +789,7 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
     biome: BiomeId,
     isRegionCenter: boolean,
     buildingId: BuildingId | null = null,
-    poiId: PoiId | null = null,
-    riverMask = 0
+    poiId: PoiId | null = null
   ): TileState => {
     const key = hexKey(q, r);
     const hasVillage = buildingId === "village";
@@ -794,7 +799,6 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
       biome,
       buildingId,
       poiId,
-      riverMask,
       isRegionCenter,
       hasVillage
     };
@@ -898,18 +902,6 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
       return;
     }
 
-    if (tile.poiId === "estuary") {
-      const group = new Group();
-      const landDirs = neighborDirsWhere(tile.q, tile.r, isLandBiome);
-      if (landDirs.length > 0) {
-        group.add(shoreEdges.createWaterEdges(landDirs));
-      }
-      group.add(estuaryDecor.createForTile(tile.q, tile.r));
-      group.userData.isEstuary = true;
-      attachDecor(tile, group);
-      return;
-    }
-
     if (depth >= 1) {
       attachDecor(tile, waterDecor.createDeepSurface(tile.q, tile.r, "deep"));
       return;
@@ -960,29 +952,7 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
     let hasContent = false;
 
     const addLake = () => {
-      const vertex = lakeOutflowVertexFromMask(tile.riverMask);
-      let joined = false;
-      if (vertex != null) {
-        for (const e of [vertex, (vertex + 1) % 6]) {
-          const d = HEX_DIRECTIONS[e]!;
-          const nKey = hexKey(tile.q + d.q, tile.r + d.r);
-          const nBiome = biomesByKey.get(nKey);
-          if (!nBiome || nBiome === "water") continue;
-          const nMask =
-            tileStatesByKey.get(nKey)?.riverMask ??
-            tilesByKey.get(nKey)?.riverMask ??
-            0;
-          if (nMask & (1 << ((e + 3) % 6))) {
-            joined = true;
-            break;
-          }
-        }
-      }
-      group.add(
-        lakeDecor.createForTile(tile.q, tile.r, vertex, {
-          halfRiver: vertex != null && !joined
-        })
-      );
+      group.add(lakeDecor.createForTile(tile.q, tile.r));
     };
 
     if (isForestDecorBiome(tile.biome)) {
@@ -1041,27 +1011,6 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
       }
     }
 
-    // Rubans complets seulement si l’arête est jointive (voisin land + bit opposé).
-    // Demi-fleuve lac : déjà dans createLakeDecor.
-    if (tile.biome !== "water" && tile.riverMask) {
-      const dirs: number[] = [];
-      for (const dir of ownedRiverDirsFromMask(tile.riverMask)) {
-        const d = HEX_DIRECTIONS[dir]!;
-        const nKey = hexKey(tile.q + d.q, tile.r + d.r);
-        const nBiome = biomesByKey.get(nKey);
-        if (!nBiome || nBiome === "water") continue;
-        const nMask =
-          tileStatesByKey.get(nKey)?.riverMask ??
-          tilesByKey.get(nKey)?.riverMask ??
-          0;
-        if (nMask & (1 << ((dir + 3) % 6))) dirs.push(dir);
-      }
-      if (dirs.length > 0) {
-        group.add(riverEdges.createRiverEdges(dirs));
-        hasContent = true;
-      }
-    }
-
     if (hasContent) attachDecor(tile, group);
   };
 
@@ -1108,11 +1057,25 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
               ? fishingHutKit
               : buildingId === "house"
                 ? houseKit
+                : buildingId === "library"
+                  ? libraryKit
+                  : buildingId === "barracks"
+                    ? barracksKit
+                    : buildingId === "market"
+                      ? marketKit
                 : buildingId === "sawmill"
                   ? sawmillKit
+                  : buildingId === "mill"
+                    ? millKit
+                  : buildingId === "smelter"
+                    ? smelterKit
+                  : buildingId === "brickworks"
+                    ? brickworksKit
                   : buildingId === "clay_mine"
                     ? clayMineKit
-                    : null;
+                    : buildingId === "mine"
+                      ? mineKit
+                      : null;
     if (!kit) return;
     const instance = kit.group.clone(true);
     instance.position.y = tile.biome === "water" ? WATER_HEIGHT / 2 : HEX_HEIGHT / 2;
@@ -1127,8 +1090,7 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
     isRegionCenter: boolean,
     spawn: HexSpawnAnim | null = null,
     buildingId: BuildingId | null = null,
-    poiId: PoiId | null = null,
-    riverMask = 0
+    poiId: PoiId | null = null
   ) => {
     const key = hexKey(q, r);
     const existingEmpty = emptyByKey.get(key);
@@ -1179,7 +1141,6 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
       hasVillage,
       buildingId,
       poiId,
-      riverMask,
       isRegionCenter,
       decor: null,
       buildingMesh: null,
@@ -1189,7 +1150,7 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
     biomeTiles.push(tile);
     tilesByMesh.set(mesh, tile);
     tilesByKey.set(key, tile);
-    registerTileState(q, r, biome, isRegionCenter, buildingId, poiId, riverMask);
+    registerTileState(q, r, biome, isRegionCenter, buildingId, poiId);
 
     if (tile.hasVillage) {
       clearBiomeDecor(tile);
@@ -1216,8 +1177,7 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
             {
               biome: tile.biome,
               buildingId: (tile.buildingId ?? null) as BuildingId | null,
-              poiId: (tile.poiId ?? null) as PoiId | null,
-              riverMask: tile.riverMask ?? 0
+              poiId: (tile.poiId ?? null) as PoiId | null
             }
           ] as const)
         ),
@@ -1235,8 +1195,7 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
               {
                 biome,
                 buildingId: startingTileBuildingId(q!, r!),
-                poiId: null as PoiId | null,
-                riverMask: 0
+                poiId: (startingLocal.pois.get(key) ?? null) as PoiId | null
               }
             ] as const;
           })
@@ -1257,8 +1216,7 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
       entry.biome,
       regionCenterKeys.has(key),
       entry.buildingId,
-      entry.poiId,
-      entry.riverMask
+      entry.poiId
     );
   }
   // GPU streamé au premier `syncBiomeTiles` (viewDirty) — pas tout le monde d’un coup.
@@ -1454,9 +1412,9 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
     const biasY = frameBiasY;
     const biasX = frameBiasX;
     const halfW = viewSize * aspect;
-    // Asymmetric frustum: look target sits left/higher when bias > 0.
-    camera.left = -halfW * (1 - biasX);
-    camera.right = halfW * (1 + biasX);
+    // Asymmetric frustum: look target sits right/higher when bias > 0.
+    camera.left = -halfW * (1 + biasX);
+    camera.right = halfW * (1 - biasX);
     camera.top = viewSize * (1 - biasY);
     camera.bottom = -viewSize * (1 + biasY);
     camera.updateProjectionMatrix();
@@ -1618,8 +1576,7 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
       state.isRegionCenter,
       spawn,
       state.buildingId,
-      state.poiId,
-      state.riverMask
+      state.poiId
     );
     refreshDecorAround(state.q, state.r);
     return tile;
@@ -2062,15 +2019,13 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
 
     for (const { cell, delayMs } of timed) {
       const poiId = (cell.poiId ?? null) as PoiId | null;
-      const riverMask = cell.riverMask ?? 0;
       registerTileState(
         cell.q,
         cell.r,
         cell.biome,
         cell.q === center.q && cell.r === center.r,
         (cell.buildingId ?? null) as BuildingId | null,
-        poiId,
-        riverMask
+        poiId
       );
       // Expansion sous les yeux : toujours spawner le GPU (anim vague).
       spawnBiomeTile(
@@ -2080,8 +2035,7 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
         cell.q === center.q && cell.r === center.r,
         { t0, delayMs },
         (cell.buildingId ?? null) as BuildingId | null,
-        poiId,
-        riverMask
+        poiId
       );
     }
     for (const cell of tiles) {
@@ -2102,11 +2056,10 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
     if (!state || state.hasVillage || state.buildingId) return false;
     if (buildingId === "village") return false;
     state.buildingId = buildingId;
-    // Ferme / carrière : POI « temporaire » effacés.
-    // Gisement argile : conservé pour la mine d’argile.
+    // Ferme : troupeau effacé. Gisements argile / fer : conservés pour leurs mines.
     if (
       state.poiId === "cow_herd" ||
-      state.poiId === "iron_deposit" ||
+      (state.poiId === "iron_deposit" && buildingId !== "mine") ||
       (state.poiId === "clay_deposit" && buildingId !== "clay_mine")
     ) {
       state.poiId = null;
@@ -2116,7 +2069,7 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
     tile.buildingId = buildingId;
     if (
       tile.poiId === "cow_herd" ||
-      tile.poiId === "iron_deposit" ||
+      (tile.poiId === "iron_deposit" && buildingId !== "mine") ||
       (tile.poiId === "clay_deposit" && buildingId !== "clay_mine")
     ) {
       tile.poiId = null;
@@ -2158,12 +2111,7 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
   };
 
   /** Remplace biome + mesh (ex. terre↔eau) et retire le bâtiment. */
-    const applyTileBiome = (
-    q: number,
-    r: number,
-    biome: BiomeId,
-    riverMask = 0
-  ) => {
+  const applyTileBiome = (q: number, r: number, biome: BiomeId) => {
     const key = hexKey(q, r);
     const state = tileStatesByKey.get(key);
     if (!state) return false;
@@ -2173,7 +2121,6 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
     const wasCenter = state.isRegionCenter;
     state.biome = biome;
     state.buildingId = null;
-    state.riverMask = riverMask;
     if (!poiAllowedOnBiome(state.poiId, biome)) state.poiId = null;
     biomesByKey.set(key, biome);
 
@@ -2202,8 +2149,7 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
       wasCenter,
       null,
       null,
-      state.poiId,
-      riverMask
+      state.poiId
     );
     refreshDecorAround(q, r);
     refreshAllWaterLooks();
@@ -2211,30 +2157,6 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
     hoverDirty = true;
     emitSelection(tile.mesh, biomePayload(tile, { clientX: lastClientX, clientY: lastClientY }));
     return true;
-  };
-
-  /** Resync riverMask + poiId depuis un snapshot (expand / reload / debug biome). */
-  const syncRiverMasks = (tiles: readonly WorldTileSnapshot[]) => {
-    for (const cell of tiles) {
-      const key = hexKey(cell.q, cell.r);
-      const state = tileStatesByKey.get(key);
-      if (!state) continue;
-      const nextMask = cell.riverMask ?? 0;
-      const nextPoi = (cell.poiId ?? null) as PoiId | null;
-      const maskChanged = state.riverMask !== nextMask;
-      const poiChanged = state.poiId !== nextPoi;
-      if (!maskChanged && !poiChanged) continue;
-      state.riverMask = nextMask;
-      state.poiId = nextPoi;
-      const tile = tilesByKey.get(key);
-      if (tile) {
-        tile.riverMask = nextMask;
-        tile.poiId = nextPoi;
-        if (tile.biome === "water") refreshWaterLook(tile);
-        else refreshBiomeDecor(tile);
-      }
-    }
-    viewDirty = true;
   };
 
   const projectScratch = new Vector3();
@@ -2348,9 +2270,7 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
                   ? SELECT_LIFT * 0.3
                   : tutorialHere
                     ? SELECT_LIFT * 0.55
-                    : influenceHere
-                      ? SELECT_LIFT * 0.12
-                      : 0);
+                    : 0);
         tile.mesh.position.y += (targetY - tile.mesh.position.y) * 0.18;
       }
 
@@ -2368,8 +2288,9 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
         const e = 0.14 + tutorialPulse * 0.2;
         setEmissive(tile.materials, e * 0.95, e, e * 0.82);
       } else if (influenceHere) {
-        const e = 0.04 + tutorialPulse * 0.03;
-        setEmissive(tile.materials, e * 0.15, e * 0.35, e * 0.45);
+        // Teinte très légère — la délimitation = pointillés d’arête.
+        const e = 0.035 + tutorialPulse * 0.02;
+        setEmissive(tile.materials, e * 0.7, e * 0.75, e);
       } else if (inPreview && previewOk) {
         setEmissive(tile.materials, 0.08, 0.14, 0.06);
       } else if (inPreview) {
@@ -2528,12 +2449,13 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
 
   const setInfluenceHighlights = (coords: readonly HexCoord[]) => {
     influenceHighlightKeys = new Set(coords.map((cell) => hexKey(cell.q, cell.r)));
+    // Plateau = dessus du cylindre (mesh centré à restY = height/2 → top = 2*restY).
     influenceBorder.rebuild(coords, (q, r) => {
       const tile = tilesByKey.get(hexKey(q, r));
-      if (tile) return tile.restY + 0.02;
+      if (tile) return 2 * tile.restY + 0.02;
       const biome = biomesByKey.get(hexKey(q, r));
-      if (biome === "water") return WATER_HEIGHT / 2 + 0.02;
-      return HEX_HEIGHT / 2 + 0.02;
+      if (biome === "water") return WATER_HEIGHT + 0.02;
+      return HEX_HEIGHT + 0.02;
     });
   };
 
@@ -2546,7 +2468,6 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
     applyBuilding,
     removeBuilding,
     applyTileBiome,
-    syncRiverMasks,
     projectTile,
     setTutorialHighlights,
     setBuildHighlights,
@@ -2567,15 +2488,21 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
       quarryKit.dispose();
       fishingHutKit.dispose();
       houseKit.dispose();
+      libraryKit.dispose();
+      barracksKit.dispose();
+      marketKit.dispose();
       sawmillKit.dispose();
+      millKit.dispose();
+      smelterKit.dispose();
+      brickworksKit.dispose();
       clayMineKit.dispose();
+      mineKit.dispose();
       forestDecor.dispose();
       plainsDecor.dispose();
       mountainDecor.dispose();
       mountainClouds.dispose();
       fusionDecor.dispose();
       shoreEdges.dispose();
-      riverEdges.dispose();
       influenceBorder.dispose();
       waterDecor.dispose();
       fishBankDecor.dispose();
@@ -2583,7 +2510,6 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
       ironDepositDecor.dispose();
       clayDepositDecor.dispose();
       lakeDecor.dispose();
-      estuaryDecor.dispose();
       deepWaterTexture.dispose();
       plainsGrassTexture.dispose();
       biomeGeometry.dispose();

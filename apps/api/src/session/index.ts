@@ -5,6 +5,7 @@ import {
   ensurePlayerAvatar,
   isPseudoAvailable,
   linkOrCreateFirebasePlayer,
+  renamePlayerPseudo,
   updatePlayerAvatar,
   type PersistedPlayer
 } from "@hexald/db";
@@ -171,6 +172,29 @@ export async function sessionRoutes(app: FastifyInstance) {
     const result = await updatePlayerAvatar(app.db, player.id, avatarId);
     if (!result.ok) {
       return reply.code(400).send({ error: result.reason });
+    }
+
+    return toSession(app.db, result.player);
+  });
+
+  app.post("/session/pseudo/rename", async (request, reply) => {
+    const player = await requirePlayer(app, request, reply);
+    if (!player) return;
+
+    const body = request.body as { pseudo?: unknown } | null;
+    const validation = validatePseudo(body?.pseudo);
+    if (!validation.ok) {
+      return reply.code(400).send({ error: validation.reason });
+    }
+
+    const result = await renamePlayerPseudo(
+      app.db,
+      player.id,
+      validation.pseudo
+    );
+    if (!result.ok) {
+      const status = result.reason === "pseudo_taken" ? 409 : 400;
+      return reply.code(status).send({ error: result.reason });
     }
 
     return toSession(app.db, result.player);

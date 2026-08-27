@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { LEGAL_LINKS } from "~/utils/legal";
+import { SITE_NAV_LINKS } from "~/utils/siteNav";
 
 withDefaults(
   defineProps<{
@@ -49,19 +50,34 @@ const year = new Date().getFullYear();
         <div
           class="flex flex-col gap-8 sm:flex-row sm:items-end sm:justify-between"
         >
-          <nav
-            class="flex flex-wrap items-center gap-x-5 gap-y-3 text-sm"
-            aria-label="Informations légales"
-          >
-            <NuxtLink
-              v-for="link in LEGAL_LINKS"
-              :key="link.to"
-              :to="link.to"
-              class="transition hover:text-[#1c2b28]"
+          <div class="flex flex-col gap-4 sm:gap-5">
+            <nav
+              class="flex flex-wrap items-center gap-x-5 gap-y-3 text-sm font-semibold"
+              aria-label="Navigation"
             >
-              {{ link.label }}
-            </NuxtLink>
-          </nav>
+              <NuxtLink
+                v-for="link in SITE_NAV_LINKS"
+                :key="link.to"
+                :to="link.to"
+                class="text-[#2d5248] transition hover:text-[#1c2b28]"
+              >
+                {{ link.label }}
+              </NuxtLink>
+            </nav>
+            <nav
+              class="flex flex-wrap items-center gap-x-5 gap-y-3 text-sm"
+              aria-label="Informations légales"
+            >
+              <NuxtLink
+                v-for="link in LEGAL_LINKS"
+                :key="link.to"
+                :to="link.to"
+                class="transition hover:text-[#1c2b28]"
+              >
+                {{ link.label }}
+              </NuxtLink>
+            </nav>
+          </div>
           <p class="text-sm text-[#6b7c76]">© {{ year }} Hexald</p>
         </div>
       </template>

@@ -96,15 +96,14 @@ export const buildings: BuildingDefinition[] = [
   },
   {
     id: "mine",
-    label: "Mine",
+    label: "Mine de fer",
     terrain: "mountain",
     input: "workers",
     output: "iron_ore",
     hexSize: 1,
     status: "mvp",
     role: "extractor",
-    // Pas encore branché runtime (job miner + mesh + prod fer).
-    placeable: false,
+    placeable: true,
     woodCost: 30,
     buildDurationMs: 60_000,
     maxWorkers: 1,
@@ -154,9 +153,15 @@ export const buildings: BuildingDefinition[] = [
     input: "wheat",
     output: "flour",
     hexSize: 1,
-    status: "planned",
+    status: "mvp",
     role: "processor",
-    placeable: false,
+    placeable: true,
+    woodCost: 25,
+    buildDurationMs: 60_000,
+    maxWorkers: 1,
+    /** Legacy ; craft = durée fixe, output = ouvriers. */
+    ratePerWorkerPerMinute: 1,
+    workerJob: "artisan",
     requiredTechId: "pottery",
   },
   {
@@ -209,12 +214,18 @@ export const buildings: BuildingDefinition[] = [
     id: "brickworks",
     label: "Briqueterie",
     terrain: "any",
-    input: null,
+    input: "clay",
     output: "stone_blocks",
     hexSize: 1,
-    status: "planned",
+    status: "mvp",
     role: "processor",
-    placeable: false,
+    placeable: true,
+    woodCost: 30,
+    buildDurationMs: 60_000,
+    maxWorkers: 1,
+    /** Legacy ; craft = durée fixe, output = ouvriers. */
+    ratePerWorkerPerMinute: 1,
+    workerJob: "artisan",
     requiredTechId: "pottery",
   },
   {
@@ -237,10 +248,16 @@ export const buildings: BuildingDefinition[] = [
     terrain: "any",
     input: "iron_ore",
     output: "iron_ingot",
-    hexSize: "multi",
+    hexSize: 1,
     status: "mvp",
     role: "processor",
-    placeable: false,
+    placeable: true,
+    woodCost: 40,
+    buildDurationMs: 60_000,
+    maxWorkers: 1,
+    /** Legacy ; craft = durée fixe, output = ouvriers. */
+    ratePerWorkerPerMinute: 1,
+    workerJob: "artisan",
     requiredTechId: "metallurgy",
   },
   {
@@ -259,12 +276,17 @@ export const buildings: BuildingDefinition[] = [
     id: "library",
     label: "Bibliothèque",
     terrain: "any",
-    input: null,
+    input: "workers",
     output: "prestige",
     hexSize: 1,
-    status: "planned",
+    status: "mvp",
     role: "special",
-    placeable: false,
+    placeable: true,
+    woodCost: 35,
+    buildDurationMs: 60_000,
+    maxWorkers: 1,
+    ratePerWorkerPerMinute: 4,
+    workerJob: "artisan",
     requiredTechId: "writing",
   },
   {
@@ -291,21 +313,29 @@ export const buildings: BuildingDefinition[] = [
     input: null,
     output: null,
     hexSize: 1,
-    status: "planned",
+    status: "mvp",
     role: "special",
-    placeable: false,
+    placeable: true,
+    woodCost: 40,
+    buildDurationMs: 60_000,
     requiredTechId: "bronze_working",
   },
   {
     id: "market",
     label: "Marché",
     terrain: "any",
-    input: null,
-    output: null,
+    input: "workers",
+    output: "gold",
     hexSize: 1,
-    status: "planned",
-    role: "special",
-    placeable: false,
+    status: "mvp",
+    role: "extractor",
+    placeable: true,
+    woodCost: 35,
+    buildDurationMs: 60_000,
+    maxWorkers: 1,
+    /** MVP : 1 or / 5 min, sans consommer de ressources. */
+    ratePerWorkerPerMinute: 0.2,
+    workerJob: "merchant",
     requiredTechId: "currency",
   },
   {
@@ -357,16 +387,32 @@ export type PlaceableBuildingId =
   | "fishing_hut"
   | "house"
   | "sawmill"
-  | "clay_mine";
+  | "clay_mine"
+  | "mine"
+  | "brickworks"
+  | "mill"
+  | "smelter"
+  | "library"
+  | "barracks"
+  | "market";
 
 export type PlaceableExtractorId =
   | "lumber_camp"
   | "farm"
   | "quarry"
   | "fishing_hut"
-  | "clay_mine";
+  | "clay_mine"
+  | "mine"
+  | "market";
 
-export type PlaceableProcessorId = "sawmill";
+export type PlaceableProcessorId =
+  | "sawmill"
+  | "brickworks"
+  | "mill"
+  | "smelter";
+
+/** Bâtiments spéciaux posables (hors extracteur / processor). */
+export type PlaceableSpecialId = "library" | "barracks";
 
 /** Dérivé du catalogue (`placeable: true`). */
 export const PLACEABLE_BUILDINGS: readonly PlaceableBuildingId[] =
@@ -392,6 +438,13 @@ const EXPECTED_PLACEABLES: readonly PlaceableBuildingId[] = [
   "house",
   "sawmill",
   "clay_mine",
+  "mine",
+  "brickworks",
+  "mill",
+  "smelter",
+  "library",
+  "barracks",
+  "market",
 ];
 
 for (const id of EXPECTED_PLACEABLES) {

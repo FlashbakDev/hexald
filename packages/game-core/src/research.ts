@@ -4,6 +4,7 @@ import {
   getTechNode,
   isResearchableTechId,
   isTechId,
+  LIBRARY_SCIENCE_PER_WORKER_PER_MINUTE,
   techScienceCost,
   TOWN_HALL_SCIENCE_INTERVAL_MS
 } from "@hexald/content";
@@ -18,6 +19,8 @@ export type ResearchState = {
 export type ResearchSettleOptions = {
   /** Mode debug : la tech cible se termine en DEV_RESEARCH_DURATION_MS. */
   accelerate?: boolean;
+  /** Ouvriers actifs en bibliothèque (achevé + influencé). */
+  libraryWorkers?: number;
 };
 
 export type SetResearchTargetResult =
@@ -40,10 +43,26 @@ export function createInitialResearchState(now = Date.now()): ResearchState {
   };
 }
 
-/** Prod HDV au MVP : entiers / intervalle → fraction / minute. */
-export function scienceProductionPerMinute(): number {
+/** Prod HDV de base (sans bibliothèque). */
+export function townHallScienceProductionPerMinute(): number {
   if (TOWN_HALL_SCIENCE_INTERVAL_MS <= 0) return 0;
   return 60_000 / TOWN_HALL_SCIENCE_INTERVAL_MS;
+}
+
+/** Prod science totale : HDV + ouvriers bibliothèque. */
+export function scienceProductionPerMinute(libraryWorkers = 0): number {
+  const workers = Math.max(0, Math.floor(libraryWorkers));
+  return (
+    townHallScienceProductionPerMinute() +
+    workers * LIBRARY_SCIENCE_PER_WORKER_PER_MINUTE
+  );
+}
+
+/** ms pour gagner 1 point de science au rythme courant. */
+export function scienceTickIntervalMs(libraryWorkers = 0): number {
+  const rate = scienceProductionPerMinute(libraryWorkers);
+  if (rate <= 0) return Number.POSITIVE_INFINITY;
+  return 60_000 / rate;
 }
 
 function hasUnlocked(state: ResearchState, techId: TechId): boolean {
@@ -84,7 +103,7 @@ function unlockTarget(
 }
 
 /**
- * Settle lazy : prod HDV → barre cible, ou perdue si pause.
+ * Settle lazy : prod HDV (+ bibliothèques) → barre cible, ou perdue si pause.
  * Un unlock max par appel (offline inclus).
  * `accelerate` : progression linéaire sur DEV_RESEARCH_DURATION_MS (debug).
  */
@@ -126,19 +145,20 @@ export function settleResearch(
     };
   }
 
-  if (TOWN_HALL_SCIENCE_INTERVAL_MS <= 0) {
+  const intervalMs = scienceTickIntervalMs(options.libraryWorkers ?? 0);
+  if (!Number.isFinite(intervalMs) || intervalMs <= 0) {
     return state;
   }
 
   let last = state.scienceLastSettledAt;
   const elapsed = Math.max(0, now - last);
-  const gained = Math.floor(elapsed / TOWN_HALL_SCIENCE_INTERVAL_MS);
+  const gained = Math.floor(elapsed / intervalMs);
   if (gained <= 0) {
     return state;
   }
 
   const progress = current + gained;
-  last += gained * TOWN_HALL_SCIENCE_INTERVAL_MS;
+  last += gained * intervalMs;
 
   if (progress >= cost) {
     return unlockTarget(state, target, now, cost);
@@ -237,9 +257,14 @@ export function projectResearchSnapshot(
           : Math.min(cost, Math.floor((cost * elapsed) / DEV_RESEARCH_DURATION_MS));
     }
   } else {
-    if (TOWN_HALL_SCIENCE_INTERVAL_MS <= 0) return research;
+    const rate =
+      options.libraryWorkers != null
+        ? scienceProductionPerMinute(options.libraryWorkers)
+        : research.scienceProductionPerMinute;
+    if (rate <= 0) return research;
+    const intervalMs = 60_000 / rate;
     const elapsed = Math.max(0, now - last);
-    const gained = Math.floor(elapsed / TOWN_HALL_SCIENCE_INTERVAL_MS);
+    const gained = Math.floor(elapsed / intervalMs);
     if (gained <= 0) return research;
     progress = Math.min(cost, current + gained);
   }

@@ -1,6 +1,5 @@
 import { and, desc, eq, isNotNull, sql } from "drizzle-orm";
 import type { BiomeId, BuildingId, PoiId, ResourceId, TechId } from "@hexald/shared";
-import type { RiverTip } from "@hexald/shared";
 import type { Database, WorldDb } from "./client.ts";
 import {
   players,
@@ -21,7 +20,6 @@ export type WorldTileRow = {
   assignedWorkers: number;
   defaultWorkerSeeded: boolean;
   poiId: PoiId | null;
-  riverMask: number;
   processorInputRate: number;
   processorInputBuffer: number;
   processorInputSettledAt: Date | null;
@@ -71,7 +69,6 @@ export type PersistedWorld = {
   research: WorldResearchRow;
   tiles: WorldTileRow[];
   regions: WorldRegionRow[];
-  riverTips: RiverTip[];
 };
 
 export type PersistedWorldSummary = {
@@ -338,7 +335,6 @@ export async function insertWorldWithTerrain(
           assignedWorkers: tile.assignedWorkers ?? 0,
           defaultWorkerSeeded: tile.defaultWorkerSeeded ?? false,
           poiId: tile.poiId ?? null,
-          riverMask: tile.riverMask ?? 0,
           processorInputRate: tile.processorInputRate ?? 0,
           processorInputBuffer: tile.processorInputBuffer ?? 0,
           processorInputSettledAt: tile.processorInputSettledAt ?? null,
@@ -373,14 +369,12 @@ export async function insertWorldWithTerrain(
       research,
       tiles: input.tiles.map((tile) => ({
         ...tile,
-        riverMask: tile.riverMask ?? 0,
         processorInputRate: tile.processorInputRate ?? 0,
         processorInputBuffer: tile.processorInputBuffer ?? 0,
         processorInputSettledAt: tile.processorInputSettledAt ?? null,
         craftCompletesAt: tile.craftCompletesAt ?? null
       })),
-      regions: input.regions,
-      riverTips: []
+      regions: input.regions
     };
   });
 }
@@ -403,7 +397,6 @@ export async function fetchWorld(
         assignedWorkers: worldTiles.assignedWorkers,
         defaultWorkerSeeded: worldTiles.defaultWorkerSeeded,
         poiId: worldTiles.poiId,
-        riverMask: worldTiles.riverMask,
         processorInputRate: worldTiles.processorInputRate,
         processorInputBuffer: worldTiles.processorInputBuffer,
         processorInputSettledAt: worldTiles.processorInputSettledAt,
@@ -439,7 +432,6 @@ export async function fetchWorld(
       assignedWorkers: tile.assignedWorkers ?? 0,
       defaultWorkerSeeded: tile.defaultWorkerSeeded ?? false,
       poiId: (tile.poiId as PoiId | null) ?? null,
-      riverMask: tile.riverMask ?? 0,
       processorInputRate: tile.processorInputRate ?? 0,
       processorInputBuffer: tile.processorInputBuffer ?? 0,
       processorInputSettledAt: tile.processorInputSettledAt ?? null,
@@ -449,8 +441,7 @@ export async function fetchWorld(
       centerQ: region.centerQ,
       centerR: region.centerR,
       biome: region.biome as BiomeId
-    })),
-    riverTips: normalizeRiverTips(world.riverTips)
+    }))
   };
 }
 
@@ -714,7 +705,6 @@ export async function setTileBiomeDev(
     r: number;
     biome: BiomeId;
     poiId?: PoiId | null;
-    riverMask?: number;
   }
 ): Promise<void> {
   await db
@@ -729,8 +719,7 @@ export async function setTileBiomeDev(
       processorInputBuffer: 0,
       processorInputSettledAt: null,
       craftCompletesAt: null,
-      poiId: tile.poiId ?? null,
-      ...(tile.riverMask !== undefined ? { riverMask: tile.riverMask } : {})
+      poiId: tile.poiId ?? null
     })
     .where(
       and(
@@ -774,7 +763,6 @@ export async function appendRegion(
         assignedWorkers: tile.assignedWorkers ?? 0,
         defaultWorkerSeeded: tile.defaultWorkerSeeded ?? false,
         poiId: tile.poiId ?? null,
-        riverMask: tile.riverMask ?? 0,
         processorInputRate: tile.processorInputRate ?? 0,
         processorInputBuffer: tile.processorInputBuffer ?? 0,
         processorInputSettledAt: tile.processorInputSettledAt ?? null,
@@ -789,27 +777,7 @@ export async function appendRegion(
     .where(eq(worlds.id, worldId));
 }
 
-/** Met à jour les river_mask de tuiles existantes (arêtes partagées). */
-export async function setTileRiverMasks(
-  db: WorldDb,
-  worldId: string,
-  updates: readonly { q: number; r: number; riverMask: number }[]
-): Promise<void> {
-  for (const tile of updates) {
-    await db
-      .update(worldTiles)
-      .set({ riverMask: tile.riverMask })
-      .where(
-        and(
-          eq(worldTiles.worldId, worldId),
-          eq(worldTiles.q, tile.q),
-          eq(worldTiles.r, tile.r)
-        )
-      );
-  }
-}
-
-/** Met à jour le POI d’une tuile (ex. estuaire sur mer déjà révélée). */
+/** Met à jour le POI d’une tuile. */
 export async function setTilePoiId(
   db: WorldDb,
   worldId: string,
@@ -825,41 +793,6 @@ export async function setTilePoiId(
         eq(worldTiles.r, tile.r)
       )
     );
-}
-
-export async function updateWorldRiverTips(
-  db: WorldDb,
-  worldId: string,
-  riverTips: RiverTip[]
-): Promise<void> {
-  await db
-    .update(worlds)
-    .set({ riverTips, updatedAt: new Date() })
-    .where(eq(worlds.id, worldId));
-}
-
-function normalizeRiverTips(value: unknown): RiverTip[] {
-  if (!Array.isArray(value)) return [];
-  const tips: RiverTip[] = [];
-  for (const entry of value) {
-    if (!entry || typeof entry !== "object") continue;
-    const q = (entry as { q?: unknown }).q;
-    const r = (entry as { r?: unknown }).r;
-    const dir = (entry as { dir?: unknown }).dir;
-    if (
-      typeof q !== "number" ||
-      typeof r !== "number" ||
-      typeof dir !== "number" ||
-      !Number.isInteger(dir) ||
-      dir < 0 ||
-      dir > 5
-    ) {
-      continue;
-    }
-    const atVertex = (entry as { atVertex?: unknown }).atVertex === true;
-    tips.push(atVertex ? { q, r, dir, atVertex: true } : { q, r, dir });
-  }
-  return tips;
 }
 
 /** Utilitaire tests / debug — compte les lignes inventaire. */

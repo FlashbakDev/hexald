@@ -3,6 +3,7 @@ export { validateAction, type ActionResult } from "./actions.ts";
 export {
   assignWorkersAtTile,
   committedWorkersFromTiles,
+  countLibraryScienceWorkers,
   extractorJobForBuildingId,
   maxWorkersForBuilding,
   totalAssignedWorkers,
@@ -41,6 +42,8 @@ export {
   foodProductionPerMinute,
   fishingFoodRateFromState,
   clayRateFromState,
+  ironOreRateFromState,
+  goldRateFromState,
   wheatFoodEquivalentPerMinute,
   foodConsumptionPerMinute,
   foodNetRatePerMinute,
@@ -155,18 +158,6 @@ export {
   type GeneratedTile
 } from "./world.ts";
 export {
-  assignRivers,
-  clearRiverEdgesAt,
-  filterTipsAwayFromTile,
-  lakeOutflowVertexFromMask,
-  lakeSpawnChance,
-  riverEdgeBits,
-  terrainHeight,
-  withLakeOutflowVertex,
-  type AssignRiversInput,
-  type AssignRiversResult
-} from "./rivers.ts";
-export {
   computeRegionExpansionCost,
   listDevelopmentSites,
   regionHopFromOrigin,
@@ -179,9 +170,11 @@ export {
   projectResearchSnapshot,
   researchStateChanged,
   scienceProductionPerMinute,
+  scienceTickIntervalMs,
   setResearchTarget,
   settleResearch,
   techProgressFor,
+  townHallScienceProductionPerMinute,
   type ResearchSettleOptions,
   type ResearchState,
   type SetResearchTargetResult

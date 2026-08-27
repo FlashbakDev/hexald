@@ -1,10 +1,14 @@
 <script setup lang="ts">
 definePageMeta({
-  layout: "blank"
+  layout: "blank",
+  robots: false
 });
 
-useHead({
-  title: "Admin · Hexald"
+usePageSeo({
+  title: "Admin · Hexald",
+  description: "Espace d’administration Hexald.",
+  path: "/admin",
+  indexable: false
 });
 
 type AdminGate = "loading" | "login" | "forbidden" | "ready";

@@ -14,10 +14,11 @@ const online = useNetworkStatus();
     <div class="offline-blocker__card">
       <img
         class="offline-blocker__icon"
-        src="/icon.png"
+        src="/icon-64.webp"
         width="64"
         height="64"
         alt=""
+        decoding="async"
         aria-hidden="true"
       />
       <p class="offline-blocker__brand font-display">Hexald</p>

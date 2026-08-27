@@ -10,9 +10,17 @@ definePageMeta({
   layout: "default"
 });
 
-useHead({
-  title: "Classement · Hexald"
+usePageSeo({
+  title: "Classement Hexald — points de civilisation",
+  description:
+    "Découvre les plus grands empires Hexald classés par points de civilisation (PC) : Science, Production, Population et Militaire. Comptes inscrits uniquement.",
+  path: "/leaderboard"
 });
+
+useBreadcrumbSchema([
+  { name: "Accueil", item: "/" },
+  { name: "Classement", item: "/leaderboard" }
+]);
 
 const route = useRoute();
 const router = useRouter();
@@ -73,16 +81,7 @@ function goToPage(next: number) {
         >
           Hexald
         </NuxtLink>
-        <nav class="lb-header__nav" aria-label="Navigation">
-          <NuxtLink to="/" class="lb-header__link">Accueil</NuxtLink>
-          <NuxtLink
-            to="/leaderboard"
-            class="lb-header__link is-active"
-            aria-current="page"
-          >
-            Classement
-          </NuxtLink>
-        </nav>
+        <SiteTopNav />
       </div>
     </header>
 
@@ -93,10 +92,23 @@ function goToPage(next: number) {
       <h1 class="font-display text-4xl font-medium tracking-tight sm:text-5xl">
         Les plus grands empires
       </h1>
-      <p class="mt-3 max-w-xl text-[#3d524c]">
-        Classés par points de civilisation (PC) :
-        Science + Production + Population + Militaire.
-        Comptes inscrits uniquement.
+      <p class="mt-3 max-w-2xl text-[#3d524c]">
+        Classement live des comptes inscrits Hexald, triés par
+        <strong>points de civilisation (PC)</strong> :
+        Science + Production + Population + Militaire. La population compte
+        ×&nbsp;10 ; les technologies débloquées et les bâtiments actifs
+        (ouvriers assignés) alimentent le reste du score.
+      </p>
+      <p class="mt-2 max-w-2xl text-sm text-[#3d524c]">
+        Nouveau sur Hexald&nbsp;?
+        <NuxtLink to="/guide" class="font-semibold text-[#2d5248] underline">
+          Lis le guide
+        </NuxtLink>
+        ou retourne à
+        <NuxtLink to="/" class="font-semibold text-[#2d5248] underline">
+          l’accueil
+        </NuxtLink>
+        pour commencer à jouer.
       </p>
 
       <p v-if="pending" class="mt-10 text-sm text-[#3d524c]">
@@ -191,7 +203,7 @@ function goToPage(next: number) {
       </template>
     </main>
 
-    <SiteFooter />
+    <SiteFooter variant="section" />
   </div>
 </template>
 

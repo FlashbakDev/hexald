@@ -93,6 +93,17 @@ export function useSession() {
     return session;
   }
 
+  async function renamePseudo(nextPseudo: string): Promise<SessionSnapshot> {
+    const session = await $fetch<SessionSnapshot>("/v1/session/pseudo/rename", {
+      baseURL: config.public.apiBase,
+      method: "POST",
+      credentials: "include",
+      body: { pseudo: nextPseudo }
+    });
+    applySession(session);
+    return session;
+  }
+
   async function checkPseudoAvailable(nextPseudo: string): Promise<{
     available: boolean;
     reason?: string;
@@ -136,6 +147,7 @@ export function useSession() {
     ensureSession,
     claimPseudo,
     setAvatar,
+    renamePseudo,
     checkPseudoAvailable,
     clearSessionCookie
   };

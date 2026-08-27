@@ -3,8 +3,11 @@ definePageMeta({
   layout: "legal"
 });
 
-useHead({
-  title: "Mentions légales · Hexald"
+usePageSeo({
+  title: "Mentions légales · Hexald",
+  description:
+    "Mentions légales Hexald : éditeur, hébergeur et informations légales relatives au service de jeu en ligne.",
+  path: "/legals"
 });
 </script>
 

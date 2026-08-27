@@ -58,6 +58,7 @@ export const FARM_MAX_WORKERS = buildingMaxWorkersFromCatalog("farm") || 1;
 export const QUARRY_MAX_WORKERS = buildingMaxWorkersFromCatalog("quarry") || 1;
 export const FISHING_HUT_MAX_WORKERS = buildingMaxWorkersFromCatalog("fishing_hut") || 1;
 export const CLAY_MINE_MAX_WORKERS = buildingMaxWorkersFromCatalog("clay_mine") || 1;
+export const MINE_MAX_WORKERS = buildingMaxWorkersFromCatalog("mine") || 1;
 
 export const WOOD_RATE_PER_WORKER_PER_MINUTE =
   buildingRateFromCatalog("lumber_camp") || 5;
@@ -69,6 +70,10 @@ export const FISHING_HUT_FOOD_RATE_PER_WORKER_PER_MINUTE =
   buildingRateFromCatalog("fishing_hut") || 2;
 export const CLAY_RATE_PER_WORKER_PER_MINUTE =
   buildingRateFromCatalog("clay_mine") || 5;
+export const IRON_ORE_RATE_PER_WORKER_PER_MINUTE =
+  buildingRateFromCatalog("mine") || 5;
+export const GOLD_RATE_PER_WORKER_PER_MINUTE =
+  buildingRateFromCatalog("market") || 0.2;
 
 
 /** @deprecated Préférer TOWN_HALL_BASE_STORAGE (+ bonus bâtiments). Placeholders v0. */
@@ -79,6 +84,15 @@ export const FOOD_STOCK_CAP = TOWN_HALL_BASE_STORAGE;
 
 /** Intervalle de prod science HDV — 15 s → Agriculture (20) ≈ 5 min. */
 export const TOWN_HALL_SCIENCE_INTERVAL_MS = 15_000;
+
+/**
+ * Science / min / ouvrier en bibliothèque (achevé + influencé).
+ * Aligné sur le rythme HDV (1 science / 15 s).
+ */
+export const LIBRARY_SCIENCE_PER_WORKER_PER_MINUTE =
+  TOWN_HALL_SCIENCE_INTERVAL_MS > 0
+    ? 60_000 / TOWN_HALL_SCIENCE_INTERVAL_MS
+    : 0;
 
 /**
  * Éclats de monde — révélation de région.
@@ -102,7 +116,8 @@ export const STOCK_CAP_BY_RESOURCE: Record<string, number> = {
   clay: TOWN_HALL_BASE_STORAGE,
   iron_ore: TOWN_HALL_BASE_STORAGE,
   iron_ingot: TOWN_HALL_BASE_STORAGE,
-  tools: TOWN_HALL_BASE_STORAGE
+  tools: TOWN_HALL_BASE_STORAGE,
+  gold: TOWN_HALL_BASE_STORAGE
 };
 
 export function stockCapFor(resourceId: string): number {
@@ -134,6 +149,15 @@ export const DEV_RESEARCH_DURATION_MS = 5_000;
 
 /** Durée d’un cycle craft scierie L1 (ouvriers × planches). */
 export const SAWMILL_CRAFT_DURATION_MS = 120_000;
+
+/** Durée d’un cycle craft briqueterie L1 (ouvriers × briques). */
+export const BRICKWORKS_CRAFT_DURATION_MS = 120_000;
+
+/** Durée d’un cycle craft moulin L1 (ouvriers × farine). */
+export const MILL_CRAFT_DURATION_MS = 120_000;
+
+/** Durée d’un cycle craft fonderie L1 (ouvriers × lingots). */
+export const SMELTER_CRAFT_DURATION_MS = 120_000;
 
 /** En mode debug client (dev), craft accéléré à 5 s. */
 export const DEV_CRAFT_DURATION_MS = 5_000;

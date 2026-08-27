@@ -19,10 +19,12 @@ export {
   claimPlayerPseudo,
   ensurePlayerAvatar,
   updatePlayerAvatar,
+  renamePlayerPseudo,
   type PersistedPlayer,
   type ClaimPseudoResult,
   type LinkFirebaseResult,
-  type UpdateAvatarResult
+  type UpdateAvatarResult,
+  type RenamePseudoResult
 } from "./players.ts";
 export {
   insertWorldWithTerrain,
@@ -39,9 +41,7 @@ export {
   setTileWorkerState,
   setTileProcessorState,
   setTileAssignedWorkers,
-  setTileRiverMasks,
   setTilePoiId,
-  updateWorldRiverTips,
   deleteWorldForOwner,
   withWorldLock,
   WORLD_LOCK_TIMEOUT_MS,

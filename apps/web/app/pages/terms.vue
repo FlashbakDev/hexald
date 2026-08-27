@@ -3,8 +3,11 @@ definePageMeta({
   layout: "legal"
 });
 
-useHead({
-  title: "Conditions générales d’utilisation · Hexald"
+usePageSeo({
+  title: "Conditions générales d’utilisation · Hexald",
+  description:
+    "Conditions générales d’utilisation du jeu Hexald : accès au service, comptes, règles et responsabilités.",
+  path: "/terms"
 });
 </script>
 
@@ -32,7 +35,8 @@ useHead({
     <h2>3. Compte et pseudo</h2>
     <p>
       Un identifiant de session est créé automatiquement. Vous pouvez revendiquer un
-      pseudo unique. Vous êtes responsable de l’usage associé à votre session et de
+      pseudo unique et le modifier ultérieurement, sous réserve de disponibilité.
+      Vous êtes responsable de l’usage associé à votre session et de
       la confidentialité de votre appareil.
     </p>
 

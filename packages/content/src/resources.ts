@@ -12,10 +12,11 @@ export const resources: ResourceDefinition[] = [
   { id: "flour", label: "Farine" },
   { id: "food", label: "Nourriture" },
   { id: "stone", label: "Pierre" },
-  { id: "stone_blocks", label: "Blocs" },
+  { id: "stone_blocks", label: "Briques" },
   { id: "clay", label: "Argile" },
   { id: "iron_ore", label: "Minerai de fer" },
   { id: "iron_ingot", label: "Lingot de fer" },
   { id: "tools", label: "Outils" },
+  { id: "gold", label: "Or" },
   { id: "worldshard", label: "Éclat de monde" }
 ];

@@ -23,7 +23,14 @@ export const BUILDINGS_WITH_MESH = new Set<BuildingId>([
   "fishing_hut",
   "house",
   "sawmill",
-  "clay_mine"
+  "mill",
+  "smelter",
+  "clay_mine",
+  "mine",
+  "brickworks",
+  "library",
+  "barracks",
+  "market"
 ]);
 
 export type AdminPreviewWorld = {

@@ -116,6 +116,9 @@ if (import.meta.hot) {
   import.meta.hot.accept("../renderer/createShoreEdgeDecor", () => {
     mountScene();
   });
+  import.meta.hot.accept("../renderer/createInfluenceBorderKit", () => {
+    mountScene();
+  });
   import.meta.hot.accept("../renderer/createFishBankDecor", () => {
     mountScene();
   });
@@ -135,10 +138,8 @@ defineExpose({
   applyBuilding: (q: number, r: number, buildingId: BuildingId) =>
     api?.applyBuilding(q, r, buildingId) ?? false,
   removeBuilding: (q: number, r: number) => api?.removeBuilding(q, r) ?? false,
-  applyTileBiome: (q: number, r: number, biome: BiomeId, riverMask?: number) =>
-    api?.applyTileBiome(q, r, biome, riverMask) ?? false,
-  syncRiverMasks: (tiles: readonly WorldTileSnapshot[]) =>
-    api?.syncRiverMasks(tiles),
+  applyTileBiome: (q: number, r: number, biome: BiomeId) =>
+    api?.applyTileBiome(q, r, biome) ?? false,
   projectTile: (q: number, r: number) => api?.projectTile(q, r) ?? null,
   setTutorialHighlights: (coords: readonly HexCoord[]) =>
     api?.setTutorialHighlights(coords),

@@ -228,10 +228,10 @@ export const TECH_NODES: readonly TechNodeDefinition[] = [
     ageId: "craft",
     label: "Poterie",
     description:
-      "+1 nourriture / plantation, briqueterie, mine d’argile.",
+      "+1 nourriture / plantation, briqueterie, mine d’argile, moulin.",
     scienceCost: 40,
     prerequisites: ["agriculture"],
-    unlocksLabel: "Plantation · Briques · Argile",
+    unlocksLabel: "Plantation · Briques · Argile · Moulin",
     icon: "i-lucide-amphora",
     unlocks: [
       {
@@ -251,6 +251,12 @@ export const TECH_NODES: readonly TechNodeDefinition[] = [
         refId: "clay_mine",
         label: "Mine d’argile",
         icon: "i-lucide-mountain",
+      },
+      {
+        kind: "building",
+        refId: "mill",
+        label: "Moulin",
+        icon: "i-lucide-wind",
       },
     ],
   },
@@ -394,13 +400,13 @@ export const TECH_NODES: readonly TechNodeDefinition[] = [
     description: "Exploitation structurée du fer et des minerais.",
     scienceCost: 80,
     prerequisites: ["pottery"],
-    unlocksLabel: "Mine",
+    unlocksLabel: "Mine de fer",
     icon: "i-lucide-pickaxe",
     unlocks: [
       {
         kind: "building",
         refId: "mine",
-        label: "Mine",
+        label: "Mine de fer",
         icon: "i-lucide-pickaxe",
       },
     ],

@@ -3,12 +3,16 @@ import type { BiomeId, PrimaryBiomeId } from "@hexald/shared";
 import { biomes, primaryBiomes } from "@hexald/content";
 import type { SelectedTile } from "~/renderer/createHexScene";
 
-useHead({
-  title: "POC visuel — Hexald"
+usePageSeo({
+  title: "POC visuel · Hexald",
+  description: "Prototype visuel Hexald — non indexé.",
+  path: "/poc",
+  indexable: false
 });
 
 definePageMeta({
-  layout: false
+  layout: false,
+  robots: false
 });
 
 const preview = useTemplateRef<{

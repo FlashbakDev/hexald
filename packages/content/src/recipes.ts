@@ -23,7 +23,13 @@ export const chains: ProductionChain[] = [
     label: "Fer",
     steps: [
       { buildingId: "mine", input: null, output: "iron_ore" },
-      { buildingId: "smelter", input: "iron_ore", output: "iron_ingot" },
+      {
+        buildingId: "smelter",
+        input: "iron_ore",
+        output: "iron_ingot",
+        inputCount: 5,
+        outputCount: 1
+      },
       { buildingId: "forge", input: "iron_ingot", output: "tools" }
     ]
   },
@@ -46,7 +52,13 @@ export const chains: ProductionChain[] = [
     label: "Nourriture",
     steps: [
       { buildingId: "farm", input: null, output: "wheat" },
-      { buildingId: "mill", input: "wheat", output: "flour" },
+      {
+        buildingId: "mill",
+        input: "wheat",
+        output: "flour",
+        inputCount: 5,
+        outputCount: 1
+      },
       { buildingId: "bakery", input: "flour", output: "food" },
       { buildingId: "fishing_hut", input: null, output: "food" }
     ]
@@ -62,7 +74,21 @@ export const chains: ProductionChain[] = [
     id: "clay",
     label: "Argile",
     steps: [
-      { buildingId: "clay_mine", input: null, output: "clay" }
+      { buildingId: "clay_mine", input: null, output: "clay" },
+      {
+        buildingId: "brickworks",
+        input: "clay",
+        output: "stone_blocks",
+        inputCount: 5,
+        outputCount: 1
+      }
+    ]
+  },
+  {
+    id: "commerce",
+    label: "Commerce",
+    steps: [
+      { buildingId: "market", input: null, output: "gold" }
     ]
   }
 ];

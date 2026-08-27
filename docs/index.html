@@ -71,7 +71,7 @@
       </nav>
 
       <div class="sidebar-foot">
-        <div>Phase actuelle : <strong id="sidebar-phase">Phase 4 · Science live</strong></div>
+        <div>Phase actuelle : <strong id="sidebar-phase">Phase 4 · Industry live</strong></div>
         <div>Statut : <strong>Pre-production · Prod live</strong></div>
       </div>
     </aside>
@@ -106,12 +106,12 @@
             <article class="card stat-card">
               <div class="label">Phase</div>
               <div class="value">POC</div>
-              <div class="hint">Phase 4 — mine · processors · adjacence</div>
+              <div class="hint">Processors live · boulangerie / forge · adjacence</div>
             </article>
             <article class="card stat-card">
               <div class="label">Priority</div>
               <div class="value">Industry</div>
-              <div class="hint">Mine · chaînes · adjacence Civ</div>
+              <div class="hint">Boulangerie · forge · adjacence Civ</div>
             </article>
             <article class="card stat-card">
               <div class="label">Status</div>
@@ -138,6 +138,9 @@
                 <span class="badge badge-accent">Docker</span>
                 <span class="badge badge-accent">PWA</span>
                 <span class="badge badge-accent">Science</span>
+                <span class="badge badge-accent">Industry</span>
+                <span class="badge badge-accent">PC · leaderboard</span>
+                <span class="badge badge-accent">Influence</span>
                 <span class="badge badge-neutral">ads.txt</span>
                 <span class="badge badge-neutral">Wiki contenu</span>
                 <span class="badge badge-neutral">UI nuages</span>
@@ -160,10 +163,13 @@
                 <li><span>04</span> Tutoriel play + parallax gyro + pages légales — fait</li>
                 <li><span>05</span> Arbre technologique + prod science HDV (DEC-022) — fait</li>
                 <li><span>06</span> Sécuriser <code>/admin</code> (Firebase + <code>ADMIN_EMAILS</code>) — fait</li>
-                <li><span>07</span> PC / leaderboard réel (DEC-027)</li>
-                <li><span>08</span> Mine (fer) — extracteur runtime + mesh</li>
-                <li><span>09</span> Processors (scierie, moulin, fonderie, forge)</li>
-                <li><span>10</span> Bonus d’adjacence Civ (voisins → rate)</li>
+                <li><span>07</span> PC / leaderboard réel (DEC-027) — fait</li>
+                <li><span>08</span> Influence de civilisation (DEC-026) — fait</li>
+                <li><span>09</span> Mine fer / argile · processors (scierie, moulin, briqueterie, fonderie) — fait</li>
+                <li><span>10</span> Marché · bibliothèque · caserne (pose) — fait</li>
+                <li><span>11</span> Boulangerie · forge (outils)</li>
+                <li><span>12</span> Bonus d’adjacence Civ (voisins → rate)</li>
+                <li><span>13</span> Fleuves (retirés v0 — lac de départ conservé)</li>
               </ol>
             </article>
             <article class="card notes-card">
@@ -435,7 +441,8 @@
                 <h4 style="margin:0 0 8px">Chaîne</h4>
                 <ul class="tech-list">
                   <li><strong>Cible</strong> — ferme → blé → moulin → farine → boulangerie → food</li>
-                  <li><strong>Live</strong> — cabane de pêcheur sur <code>fish_bank</code> → food directe (DEC-023)</li>
+                  <li><strong>Live</strong> — moulin (farine) ; cabane de pêcheur sur <code>fish_bank</code> → food directe (DEC-023)</li>
+                  <li><strong>Reste</strong> — boulangerie (food depuis farine)</li>
                   <li><strong>Secours</strong> — 5 blé ≈ 1 food si pas encore de boulangerie</li>
                   <li>Le pain reste la voie efficace ; le blé brut = filet de sécurité, pas la meta</li>
                   <li>Balance : le worker mange aussi — une ferme qui nourrit juste son fermier = 0 surplus</li>
@@ -498,13 +505,14 @@
           </article>
 
           <article class="card" style="margin-top:14px">
-            <h3>Science &amp; arbre technologique <span class="status status-planned">Planned</span> <span class="badge badge-neutral">DEC-022</span></h3>
+            <h3>Science &amp; arbre technologique <span class="status status-done">Live</span> <span class="badge badge-neutral">DEC-022</span></h3>
             <p>Progression Civ-light : la prod science de l’<strong>hôtel de ville</strong> alimente directement la tech <strong>cible</strong> choisie par le joueur. Pas de stock tampon — sans cible, la prod est perdue. Séparé des éclats (expansion) et du bois (construction).</p>
             <div class="grid grid-2" style="margin-top:12px">
               <div>
                 <h4 style="margin:0 0 8px">Production &amp; recherche</h4>
                 <ul class="tech-list">
-                  <li>HDV : filet passif <strong>+1 science / 10&nbsp;min</strong> (lazy settle)</li>
+                  <li>HDV : filet passif <strong>+1 science / 15&nbsp;s</strong> (lazy settle — Agriculture ≈ 5&nbsp;min)</li>
+                  <li><strong>Bibliothèque</strong> : <strong>+4 science / min / worker</strong> (même rythme que HDV)</li>
                   <li><strong>Pas de stock</strong> — prod → barre de la cible active, ou perdue si pause</li>
                   <li>Cible obligatoire : tech <strong>available</strong> uniquement (pas de prérequis auto)</li>
                   <li>Après unlock (online ou offline) : <strong>pause forcée</strong> — re-sélection manuelle</li>
@@ -562,13 +570,13 @@
         <section id="production">
           <p class="section-kicker">Chaînes</p>
           <h2>Production Chains</h2>
-          <p>Le système devra à terme permettre des chaînes beaucoup plus complexes. Le MVP en valide quatre.</p>
+          <p>Chaînes MVP validées en jeu. Les processors partagent un modèle commun : <strong>ouvriers = unités d’output</strong>, cycle ~2&nbsp;min, <strong>5 unités d’input</strong> consommées par unité produite (réserve globale du village).</p>
 
           <div class="grid grid-2">
             <article class="resource-chain">
-              <h3>Iron <span class="status status-mvp">MVP</span></h3>
+              <h3>Iron <span class="status status-done">Live</span></h3>
               <div class="chain">
-                <span class="chain-node">Montagne</span><span class="chain-arrow">→</span>
+                <span class="chain-node">Gisement <code>iron_deposit</code></span><span class="chain-arrow">→</span>
                 <span class="chain-node">Mine</span><span class="chain-arrow">→</span>
                 <span class="chain-node resource">Minerai de fer</span><span class="chain-arrow">→</span>
                 <span class="chain-node">Fonderie</span><span class="chain-arrow">→</span>
@@ -576,9 +584,10 @@
                 <span class="chain-node">Forge</span><span class="chain-arrow">→</span>
                 <span class="chain-node resource">Outils</span>
               </div>
+              <p class="wiki-meta" style="margin-top:8px">Forge — catalogue + gate tech OK, runtime craft <span class="status status-planned">Planned</span></p>
             </article>
             <article class="resource-chain">
-              <h3>Wood <span class="status status-mvp">MVP</span></h3>
+              <h3>Wood <span class="status status-done">Live</span></h3>
               <div class="chain">
                 <span class="chain-node">Forêt</span><span class="chain-arrow">→</span>
                 <span class="chain-node">Camp de bûcherons</span><span class="chain-arrow">→</span>
@@ -599,17 +608,30 @@
                 <span class="chain-node">Boulangerie</span><span class="chain-arrow">→</span>
                 <span class="chain-node resource">Nourriture</span>
               </div>
+              <p class="wiki-meta" style="margin-top:8px">Moulin live · boulangerie à brancher</p>
             </article>
             <article class="resource-chain">
-              <h3>Stone <span class="status status-mvp">MVP</span></h3>
+              <h3>Stone &amp; clay <span class="status status-done">Live</span></h3>
               <div class="chain">
-                <span class="chain-node">Montagne / colline</span><span class="chain-arrow">→</span>
+                <span class="chain-node">Montagne</span><span class="chain-arrow">→</span>
                 <span class="chain-node">Carrière</span><span class="chain-arrow">→</span>
-                <span class="chain-node resource">Pierre</span><span class="chain-arrow">→</span>
-                <span class="chain-node">Taille</span><span class="chain-arrow">→</span>
-                <span class="chain-node resource">Blocs</span><span class="chain-arrow">→</span>
-                <span class="chain-node resource">Construction / routes</span>
+                <span class="chain-node resource">Pierre</span>
               </div>
+              <div class="chain" style="margin-top:10px">
+                <span class="chain-node">Gisement <code>clay_deposit</code></span><span class="chain-arrow">→</span>
+                <span class="chain-node">Mine d’argile</span><span class="chain-arrow">→</span>
+                <span class="chain-node resource">Argile</span><span class="chain-arrow">→</span>
+                <span class="chain-node">Briqueterie</span><span class="chain-arrow">→</span>
+                <span class="chain-node resource">Blocs</span>
+              </div>
+            </article>
+            <article class="resource-chain">
+              <h3>Or <span class="status status-done">Live</span></h3>
+              <div class="chain">
+                <span class="chain-node">Marché</span><span class="chain-arrow">→</span>
+                <span class="chain-node resource">Or</span>
+              </div>
+              <p class="wiki-meta" style="margin-top:8px">1 or / 5&nbsp;min / worker · sans consommation de ressources · gate <code>currency</code></p>
             </article>
           </div>
         </section>
@@ -653,15 +675,23 @@
                   <td>Wood</td>
                   <td>Planks</td>
                   <td>1 hex</td>
-                  <td><span class="status status-mvp">MVP</span></td>
+                  <td><span class="status status-done">Live</span></td>
                 </tr>
                 <tr>
-                  <td>Mine</td>
-                  <td>Mountain</td>
+                  <td>Iron mine</td>
+                  <td>Mountain + iron_deposit</td>
                   <td>Workers</td>
-                  <td>Ore</td>
+                  <td>Iron ore</td>
                   <td>1 hex</td>
-                  <td><span class="status status-mvp">MVP</span></td>
+                  <td><span class="status status-done">Live</span></td>
+                </tr>
+                <tr>
+                  <td>Clay mine</td>
+                  <td>Plains + clay_deposit</td>
+                  <td>Workers</td>
+                  <td>Clay</td>
+                  <td>1 hex</td>
+                  <td><span class="status status-done">Live</span></td>
                 </tr>
                 <tr>
                   <td>Farm</td>
@@ -677,7 +707,7 @@
                   <td>Wheat</td>
                   <td>Flour</td>
                   <td>1 hex</td>
-                  <td><span class="status status-planned">Planned</span></td>
+                  <td><span class="status status-done">Live</span></td>
                 </tr>
                 <tr>
                   <td>Bakery</td>
@@ -686,6 +716,14 @@
                   <td>Processed food</td>
                   <td>1 hex</td>
                   <td><span class="status status-planned">Planned</span></td>
+                </tr>
+                <tr>
+                  <td>Brickworks</td>
+                  <td>Any</td>
+                  <td>Clay</td>
+                  <td>Stone blocks</td>
+                  <td>1 hex</td>
+                  <td><span class="status status-done">Live</span></td>
                 </tr>
                 <tr>
                   <td>Quarry</td>
@@ -700,8 +738,8 @@
                   <td>Any</td>
                   <td>Ore</td>
                   <td>Ingots</td>
-                  <td>1+ hex</td>
-                  <td><span class="status status-mvp">MVP</span></td>
+                  <td>1 hex</td>
+                  <td><span class="status status-done">Live</span></td>
                 </tr>
                 <tr>
                   <td>Forge</td>
@@ -709,7 +747,23 @@
                   <td>Ingots</td>
                   <td>Tools</td>
                   <td>1 hex</td>
-                  <td><span class="status status-mvp">MVP</span></td>
+                  <td><span class="status status-planned">Planned</span></td>
+                </tr>
+                <tr>
+                  <td>Library</td>
+                  <td>Any</td>
+                  <td>Workers</td>
+                  <td>Science (+4/min)</td>
+                  <td>1 hex</td>
+                  <td><span class="status status-done">Live</span></td>
+                </tr>
+                <tr>
+                  <td>Market</td>
+                  <td>Any</td>
+                  <td>Workers</td>
+                  <td>Gold</td>
+                  <td>1 hex</td>
+                  <td><span class="status status-done">Live</span></td>
                 </tr>
                 <tr>
                   <td>Monument</td>
@@ -720,12 +774,12 @@
                   <td><span class="status status-planned">Later</span></td>
                 </tr>
                 <tr>
-                  <td>Caserne</td>
+                  <td>Barracks</td>
                   <td>Any</td>
                   <td>Workers + tools?</td>
                   <td>Soldiers (PvM)</td>
                   <td>1 hex</td>
-                  <td><span class="status status-planned">Later</span></td>
+                  <td><span class="status status-mvp">Live</span> pose · combat <span class="status status-planned">Later</span></td>
                 </tr>
               </tbody>
             </table>
@@ -923,7 +977,7 @@
                     <li><strong>Actif</strong> = bâtiment achevé + au moins 1 worker assigné.
                       Chantier / 0 worker / hors influence (orphelins DEC-026) → 0 PC bâtiment.</li>
                     <li><strong>Hors score v0</strong> : territoire / régions révélées, influence, monuments / merveilles,
-                      bonheur (jardin, thermes…), culture / commerce (marché). Les merveilles pourront alimenter Culture / Prestige plus tard.</li>
+                      bonheur (jardin, thermes…), culture (sink or / commerce futur). Le <strong>marché</strong> compte en Production PC mais l’<strong>or</strong> n’est pas une ressource de score. Les merveilles pourront alimenter Culture / Prestige plus tard.</li>
                     <li><strong>PC</strong> = score dérivé recalculable (settle / snapshot), <strong>pas</strong> une ressource inventaire ni un sink.</li>
                     <li>Constantes points/bâtiment et <code>N</code> pop : catalogue content (calibrage itératif).</li>
                   </ul>
@@ -1237,7 +1291,7 @@
                   </ul>
                 </dt>
                 <dt>Raison</dt><dd>Valide la boucle poser → attendre → assigner → produire → dépenser (build / expand) avant les chaînes craft.</dd>
-                <dt>Conséquences</dt><dd>Mine / scierie / forge restent catalogue jusqu’à Phase 4. Plus de limite « 1 camp par monde ». Expansion : DEC-020 (éclats). Bonus fusion : DEC-019.</dd>
+                <dt>Conséquences</dt><dd>Historique DEC-018 : poser la boucle extracteurs avant craft. Phase 4 livrée ensuite (mine, processors, POI gisements). Plus de limite « 1 camp par monde ». Expansion : DEC-020 (éclats). Bonus fusion : DEC-019.</dd>
               </dl>
             </article>
 
@@ -1340,7 +1394,7 @@
                 <dt>Décision</dt><dd>
                   <ul style="margin:0;padding-left:1.1em">
                     <li><strong>Pas de stock science</strong> — la production n’est pas une ressource d’inventaire. Elle alimente directement la barre de progression de la tech <strong>cible</strong> ; sans cible (pause), la prod est <strong>perdue</strong>. Distinct de <code>worldshard</code> (expansion) et <code>wood</code> (construction).</li>
-                    <li><strong>Prod MVP</strong> : hôtel de ville <strong>+1 science / 10&nbsp;min</strong> (settle lazy). Bâtiment <code>research_center</code> (« Centre de recherche ») : <strong>hors MVP</strong> — prévu plus tard pour accélérer la prod (2 / worker / min).</li>
+                    <li><strong>Prod MVP</strong> : hôtel de ville <strong>+1 science / 15&nbsp;s</strong> (settle lazy) ; bibliothèque <strong>+4 science / min / worker</strong>. Bâtiment <code>research_center</code> (« Centre de recherche ») : <strong>hors MVP</strong> — prévu plus tard pour accélérer la prod.</li>
                     <li><strong>Recherche monde-wide</strong> : le joueur choisit une tech <strong>available</strong> (prérequis OK, pas encore unlocked) via l’UI ou l’action <code>set_research_target</code> sur <code>POST /v1/worlds/:id/actions</code> (lock monde). Impossible de cibler une tech locked (prérequis manquants) — pas de chemin auto vers une cible lointaine ; une tech à la fois, sélection manuelle à chaque étape.</li>
                     <li><strong>Pause obligatoire</strong> : après chaque unlock (online ou offline), <code>research_target</code> repasse à <code>null</code> — le joueur doit re-sélectionner. Offline : la prod rattrapée peut terminer la tech en cours, puis stop ; le surplus éventuel est perdu.</li>
                     <li><strong>Progression partielle</strong> : conservée par tech (<code>world_tech_progress</code>) ; changer de cible ne réinitialise pas les autres branches.</li>
@@ -1754,10 +1808,12 @@
                 <tr><td><code>flour</code></td><td>Farine</td><td>Transformé du blé (moulin)</td></tr>
                 <tr><td><code>food</code></td><td>Nourriture</td><td>Pain (boulangerie) + subsistance hôtel de ville ; conso / pop (DEC-016)</td></tr>
                 <tr><td><code>stone</code></td><td>Pierre</td><td>Récolte montagne (carrière)</td></tr>
-                <tr><td><code>stone_blocks</code></td><td>Blocs</td><td>Pierre travaillée (prévu)</td></tr>
-                <tr><td><code>iron_ore</code></td><td>Minerai de fer</td><td>Récolte montagne (mine)</td></tr>
-                <tr><td><code>iron_ingot</code></td><td>Lingot de fer</td><td>Fonderie</td></tr>
-                <tr><td><code>tools</code></td><td>Outils</td><td>Forge — bout de chaîne fer</td></tr>
+                <tr><td><code>stone_blocks</code></td><td>Blocs</td><td>Briqueterie (argile) — live</td></tr>
+                <tr><td><code>clay</code></td><td>Argile</td><td>Mine d’argile sur <code>clay_deposit</code> → briqueterie</td></tr>
+                <tr><td><code>iron_ore</code></td><td>Minerai de fer</td><td>Gisement <code>iron_deposit</code> + mine</td></tr>
+                <tr><td><code>iron_ingot</code></td><td>Lingot de fer</td><td>Fonderie — live</td></tr>
+                <tr><td><code>tools</code></td><td>Outils</td><td>Forge — catalogue, runtime à brancher</td></tr>
+                <tr><td><code>gold</code></td><td>Or</td><td>Marché (1 / 5&nbsp;min / worker) · gate <code>currency</code></td></tr>
                 <tr><td><code>worldshard</code></td><td>Éclat de monde</td><td>Ancrage / révélation de région (DEC-020) ; prod HDV 1/15&nbsp;min, cap 5</td></tr>
               </tbody>
             </table>
@@ -1802,19 +1858,23 @@
                 </tr>
                 <tr data-wiki-kind="mvp">
                   <td>Scierie</td><td><code>sawmill</code></td><td>any</td><td>wood</td><td>planks</td><td>1</td>
-                  <td><span class="status status-mvp">MVP</span></td>
+                  <td><span class="status status-done">Live</span></td>
                 </tr>
                 <tr data-wiki-kind="mvp">
-                  <td>Mine</td><td><code>mine</code></td><td>mountain</td><td>workers</td><td>iron_ore</td><td>1</td>
-                  <td><span class="status status-mvp">MVP</span></td>
+                  <td>Mine de fer</td><td><code>mine</code></td><td>mountain + iron_deposit</td><td>workers</td><td>iron_ore</td><td>1</td>
+                  <td><span class="status status-done">Live</span></td>
+                </tr>
+                <tr data-wiki-kind="mvp">
+                  <td>Mine d’argile</td><td><code>clay_mine</code></td><td>plains + clay_deposit</td><td>workers</td><td>clay</td><td>1</td>
+                  <td><span class="status status-done">Live</span></td>
                 </tr>
                 <tr data-wiki-kind="mvp">
                   <td>Ferme</td><td><code>farm</code></td><td>plains</td><td>workers</td><td>wheat</td><td>1</td>
                   <td><span class="status status-done">Live</span></td>
                 </tr>
-                <tr data-wiki-kind="planned">
+                <tr data-wiki-kind="mvp">
                   <td>Moulin</td><td><code>mill</code></td><td>any</td><td>wheat</td><td>flour</td><td>1</td>
-                  <td><span class="status status-planned">Planned</span></td>
+                  <td><span class="status status-done">Live</span></td>
                 </tr>
                 <tr data-wiki-kind="planned">
                   <td>Boulangerie</td><td><code>bakery</code></td><td>any</td><td>flour</td><td>food</td><td>1</td>
@@ -1829,12 +1889,24 @@
                   <td><span class="status status-done">Live</span> <span class="badge badge-neutral">DEC-023</span> · gate <code>fishing</code> (DEC-022)</td>
                 </tr>
                 <tr data-wiki-kind="mvp">
-                  <td>Fonderie</td><td><code>smelter</code></td><td>any</td><td>iron_ore</td><td>iron_ingot</td><td>multi</td>
-                  <td><span class="status status-mvp">MVP</span></td>
+                  <td>Briqueterie</td><td><code>brickworks</code></td><td>any</td><td>clay</td><td>stone_blocks</td><td>1</td>
+                  <td><span class="status status-done">Live</span></td>
+                </tr>
+                <tr data-wiki-kind="mvp">
+                  <td>Fonderie</td><td><code>smelter</code></td><td>any</td><td>iron_ore</td><td>iron_ingot</td><td>1</td>
+                  <td><span class="status status-done">Live</span></td>
                 </tr>
                 <tr data-wiki-kind="mvp">
                   <td>Forge</td><td><code>forge</code></td><td>any</td><td>iron_ingot</td><td>tools</td><td>1</td>
-                  <td><span class="status status-mvp">MVP</span></td>
+                  <td><span class="status status-planned">Planned</span></td>
+                </tr>
+                <tr data-wiki-kind="mvp">
+                  <td>Bibliothèque</td><td><code>library</code></td><td>any</td><td>workers</td><td>science (+4/min)</td><td>1</td>
+                  <td><span class="status status-done">Live</span></td>
+                </tr>
+                <tr data-wiki-kind="mvp">
+                  <td>Marché</td><td><code>market</code></td><td>any</td><td>workers</td><td>gold (1/5&nbsp;min)</td><td>1</td>
+                  <td><span class="status status-done">Live</span></td>
                 </tr>
                 <tr data-wiki-kind="later">
                   <td>Centre de recherche</td><td><code>research_center</code></td><td>any</td><td>workers</td><td>science (accélération prod.)</td><td>1</td>
@@ -1845,8 +1917,8 @@
                   <td><span class="status status-planned">Later</span></td>
                 </tr>
                 <tr data-wiki-kind="later">
-                  <td>Caserne</td><td><code>barracks</code></td><td>any</td><td>workers (+ outils ?)</td><td>soldiers (PvM)</td><td>1</td>
-                  <td><span class="status status-planned">Later</span></td>
+                  <td>Caserne</td><td><code>barracks</code></td><td>any</td><td>—</td><td>— (PvM futur)</td><td>1</td>
+                  <td><span class="status status-done">Live</span> pose · soldats <span class="status status-planned">Later</span></td>
                 </tr>
               </tbody>
             </table>
@@ -1862,9 +1934,9 @@
             <article class="card wiki-entry">
               <h3>Fer <code class="wiki-id">iron</code></h3>
               <div class="wiki-chain">
-                <span>Mine → <code>iron_ore</code></span>
+                <span>Gisement <code>iron_deposit</code> → Mine → <code>iron_ore</code></span>
                 <span>Fonderie → <code>iron_ingot</code></span>
-                <span>Forge → <code>tools</code></span>
+                <span>Forge → <code>tools</code> (catalogue — runtime à brancher)</span>
               </div>
             </article>
             <article class="card wiki-entry">
@@ -1880,8 +1952,8 @@
                 <span>Hôtel de ville → food (subsistance)</span>
                 <span>Cabane de pêcheur → <code>food</code> (sur <code>fish_bank</code>)</span>
                 <span>Ferme → <code>wheat</code> (récolte, pas food)</span>
-                <span>Moulin → <code>flour</code></span>
-                <span>Boulangerie → <code>food</code></span>
+                <span>Moulin → <code>flour</code> <span class="status status-done">Live</span></span>
+                <span>Boulangerie → <code>food</code> (planned)</span>
               </div>
               <p class="wiki-meta">DEC-016 / DEC-017 · Conso 1 food/pop/min · Hôtel de ville 4 food/min · Croissance si surplus (barre 60) · Blé secours 5→1 · settle + UI header live</p>
             </article>
@@ -1894,21 +1966,36 @@
               <p class="wiki-meta">DEC-020 · Cap 5 · Départ 1 · Futurs bâtiments prod. dédiés</p>
             </article>
             <article class="card wiki-entry">
+              <h3>Argile &amp; blocs <code class="wiki-id">clay</code></h3>
+              <div class="wiki-chain">
+                <span>Gisement <code>clay_deposit</code> → Mine d’argile → <code>clay</code></span>
+                <span>Briqueterie → <code>stone_blocks</code></span>
+              </div>
+            </article>
+            <article class="card wiki-entry">
+              <h3>Or <code class="wiki-id">gold</code></h3>
+              <div class="wiki-chain">
+                <span>Marché → <code>gold</code> (1 / 5&nbsp;min / worker, sans input)</span>
+              </div>
+              <p class="wiki-meta">Gate <code>currency</code> · visible header quand marché actif · compte en PC Production</p>
+            </article>
+            <article class="card wiki-entry">
               <h3>Science (recherche) <span class="badge badge-neutral">DEC-022</span></h3>
               <div class="wiki-chain">
-                <span>Hôtel de ville → prod science (1 / 10&nbsp;min)</span>
+                <span>Hôtel de ville → prod science (1 / 15&nbsp;s)</span>
+                <span>Bibliothèque → +4 science / min / worker</span>
                 <span>Si cible active → barre <code>progress / scienceCost</code></span>
                 <span>Sinon → prod perdue</span>
                 <span>Unlock → pause · re-sélection manuelle</span>
               </div>
-              <p class="wiki-meta">Pas de stock · Pas de ressource inventaire · HDV seul au MVP · Centre de recherche plus tard</p>
+              <p class="wiki-meta">Pas de stock · Pas de ressource inventaire · Centre de recherche plus tard</p>
             </article>
             <article class="card wiki-entry">
               <h3>Pierre <code class="wiki-id">stone</code></h3>
               <div class="wiki-chain">
                 <span>Carrière → <code>stone</code></span>
               </div>
-              <p class="wiki-meta">Chaîne courte MVP ; blocs (<code>stone_blocks</code>) plus tard.</p>
+              <p class="wiki-meta">Chaîne courte ; blocs via briqueterie (argile).</p>
             </article>
           </div>
         </section>
@@ -1916,7 +2003,7 @@
         <section id="wiki-tech">
           <p class="section-kicker">Wiki · Technologies</p>
           <h2>Arbre technologique</h2>
-          <p>Catalogue <code>packages/content/src/technologies.ts</code> — <strong>16 techs</strong>, 3 âges (Origines → Artisanat → Métallurgie). Règles runtime : <span class="badge badge-neutral">DEC-022</span> — prod HDV +1 / 10&nbsp;min vers cible, pause post-unlock, pas de stock science. Frise <code>TechTimelinePanel</code> live.</p>
+          <p>Catalogue <code>packages/content/src/technologies.ts</code> — <strong>16 techs</strong>, 3 âges (Origines → Artisanat → Métallurgie). Règles runtime : <span class="badge badge-neutral">DEC-022</span> — prod HDV +1 / 15&nbsp;s vers cible, bibliothèque +4/min, pause post-unlock, pas de stock science. Frise <code>TechTimelinePanel</code> live.</p>
 
           <div class="table-wrap">
             <table>
@@ -1960,15 +2047,15 @@
                   <td><code>mining</code></td>
                   <td>40</td>
                   <td><code>pottery</code></td>
-                  <td><code>mine</code> (catalogue ; runtime extracteur à brancher)</td>
-                  <td><span class="status status-mvp">Live</span></td>
+                  <td><code>mine</code>, <code>clay_mine</code> (extracteurs POI)</td>
+                  <td><span class="status status-done">Live</span></td>
                 </tr>
                 <tr>
                   <td>Métallurgie</td>
                   <td><code>metallurgy</code></td>
                   <td>50</td>
                   <td><code>mining</code></td>
-                  <td><code>smelter</code>, <code>forge</code></td>
+                  <td><code>smelter</code> live · <code>forge</code> catalogue</td>
                   <td><span class="status status-mvp">Live</span></td>
                 </tr>
               </tbody>
@@ -1980,7 +2067,7 @@
             <h3>Gate build (DEC-022)</h3>
             <ul class="tech-list">
               <li><strong>Hors gate</strong> : <code>lumber_camp</code>, <code>farm</code>, <code>quarry</code>, <code>house</code>, expansion région</li>
-              <li><strong>Gated</strong> : <code>fishing_hut</code> (<code>sailing</code>), processors (<code>sawmill</code>, <code>mill</code>, <code>bakery</code>), <code>mine</code>, <code>smelter</code>, <code>forge</code></li>
+              <li><strong>Gated</strong> : <code>fishing_hut</code> (<code>sailing</code>), processors (<code>sawmill</code>, <code>mill</code>, <code>brickworks</code>, <code>smelter</code>, <code>bakery</code> planned, <code>forge</code> planned), <code>mine</code>, <code>clay_mine</code>, <code>library</code>, <code>market</code>, <code>barracks</code></li>
               <li>Mondes existants : bâtiments déjà posés conservés ; gate sur nouvelles poses seulement</li>
             </ul>
           </article>
@@ -2003,12 +2090,21 @@
               </ul>
             </article>
             <article class="card wiki-entry">
-              <h3>Influence de civilisation <span class="badge badge-neutral">DEC-026</span></h3>
+              <h3>Influence de civilisation <span class="badge badge-neutral">DEC-026</span> <span class="status status-done">Live</span></h3>
               <ul class="tech-list">
                 <li>Composante connectée depuis le village (pas union naïve)</li>
                 <li>Rayons : standard / route <code>R=1</code> · avant-poste <code>R=2</code></li>
                 <li>Chantier : pas d’emprise ; démo → recalcul immédiat</li>
                 <li>Build uniquement dans l’emprise ; hors emprise → bâtiment inutilisable, ouvriers rentrent</li>
+                <li>UI play : overlay blanc en mode construction</li>
+              </ul>
+            </article>
+            <article class="card wiki-entry">
+              <h3>Lac de départ &amp; fleuves</h3>
+              <ul class="tech-list">
+                <li><strong>Lac</strong> (<code>lake</code>) — POI décor au centre du monde initial (forêt/plaine autour)</li>
+                <li><strong>Fleuves</strong> — génération retirée pour cette version (stabilité) ; à refaire plus tard</li>
+                <li>L’expand de région ne pose plus de réseau fluvial</li>
               </ul>
             </article>
             <article class="card wiki-entry">
@@ -2085,7 +2181,7 @@
                 <li>Bonus thématique lié au biome (pas de « +tout » générique)</li>
                 <li>Ne remplacent pas les chaînes économiques de base</li>
                 <li>Pas pay-to-win : skins de POI OK, stats exclusives payantes non</li>
-                <li>IDs prévus dans <code>packages/content</code> (ex. <code>pois.ts</code>) — pas encore implémentés en POC</li>
+                <li>IDs dans <code>packages/content/src/pois.ts</code> — live : <code>fish_bank</code>, <code>cow_herd</code>, <code>iron_deposit</code>, <code>clay_deposit</code>, <code>lake</code></li>
               </ul>
             </article>
           </div>
@@ -2144,6 +2240,54 @@
               </header>
               <p>École de poissons sur une <strong>eau côtière</strong> (touche une terre). Apparaît aléatoirement à la génération d’une région (≤1 / région, chance 40&nbsp;%). Pas de prod passive — pose une <strong>cabane de pêcheur</strong> dessus.</p>
               <p class="wiki-meta">Biome · <strong>water</strong> (côte) · Bonus · extracteur <code>fishing_hut</code> · Emprise · 1 hex · DEC-021 / DEC-023</p>
+            </article>
+            <article class="card wiki-entry" data-wiki-kind="natural">
+              <header class="wiki-entry-head">
+                <span class="wiki-swatch" style="background:#4a8a9a"></span>
+                <div>
+                  <h3>Lac</h3>
+                  <code class="wiki-id">lake</code>
+                </div>
+                <span class="status status-done">Live</span>
+              </header>
+              <p>Plan d’eau intérieur (décor). Posé au centre du monde de départ — pas de gameplay extracteur pour l’instant.</p>
+              <p class="wiki-meta">Biome · terre (centre monde) · Bonus · décor · Emprise · 1 hex</p>
+            </article>
+            <article class="card wiki-entry" data-wiki-kind="natural">
+              <header class="wiki-entry-head">
+                <span class="wiki-swatch" style="background:#c4a574"></span>
+                <div>
+                  <h3>Troupeau de vaches</h3>
+                  <code class="wiki-id">cow_herd</code>
+                </div>
+                <span class="status status-done">Live</span>
+              </header>
+              <p>Bétail en pâture sur plaine. Décor + hint élevage futur — une ferme posée sur la tuile efface le troupeau.</p>
+              <p class="wiki-meta">Biome · <strong>plains</strong> · Bonus · lore / futur étable · Emprise · 1 hex</p>
+            </article>
+            <article class="card wiki-entry" data-wiki-kind="natural">
+              <header class="wiki-entry-head">
+                <span class="wiki-swatch" style="background:#8a949f"></span>
+                <div>
+                  <h3>Gisement de fer</h3>
+                  <code class="wiki-id">iron_deposit</code>
+                </div>
+                <span class="status status-done">Live</span>
+              </header>
+              <p>Veines exposées en montagne. Requis pour poser une <strong>mine de fer</strong> — une carrière efface le gisement.</p>
+              <p class="wiki-meta">Biome · <strong>mountain</strong> · Bonus · gate <code>mine</code> · Emprise · 1 hex</p>
+            </article>
+            <article class="card wiki-entry" data-wiki-kind="natural">
+              <header class="wiki-entry-head">
+                <span class="wiki-swatch" style="background:#b8956a"></span>
+                <div>
+                  <h3>Gisement d’argile</h3>
+                  <code class="wiki-id">clay_deposit</code>
+                </div>
+                <span class="status status-done">Live</span>
+              </header>
+              <p>Bancs d’argile en plaine. Requis pour la <strong>mine d’argile</strong> — une ferme efface le gisement.</p>
+              <p class="wiki-meta">Biome · <strong>plains</strong> · Bonus · gate <code>clay_mine</code> · Emprise · 1 hex</p>
             </article>
             <article class="card wiki-entry" data-wiki-kind="natural">
               <header class="wiki-entry-head">
@@ -2321,10 +2465,15 @@
               <ul>
                 <li>Arbre technologique + prod science HDV (DEC-022) — fait</li>
                 <li>Frise <code>TechTimelinePanel</code> + action <code>set_research_target</code> — fait</li>
-                <li>Gate build processors / pêche / mine via techs — fait (catalogue)</li>
+                <li>Gate build processors / pêche / mine via techs — fait</li>
+                <li>Influence de civilisation (DEC-026) — fait</li>
+                <li>Points de civilisation + leaderboard (DEC-027) — fait (v0, pas de breakdown UI)</li>
+                <li>Mine fer / argile + POI gisements — fait</li>
+                <li>Processors : scierie, moulin, briqueterie, fonderie — fait</li>
+                <li>Marché · bibliothèque · caserne (pose) — fait</li>
+                <li>Lac de départ — fait · fleuves — retirés (refaire plus tard)</li>
+                <li>Boulangerie · forge (outils)</li>
                 <li>Bonus d’adjacence Civ (voisins → rate)</li>
-                <li>Mine (fer) — extracteur runtime + mesh + workers</li>
-                <li>Chaînes de production (scierie, moulin / boulangerie, fonderie, forge)</li>
                 <li>Centre de recherche <code>research_center</code> (accélération prod science) — planned</li>
                 <li>Bâtiments producteurs d’éclats (post-MVP)</li>
               </ul>
@@ -2332,8 +2481,8 @@
             <article class="roadmap-item">
               <div class="roadmap-head"><h3>Phase 5 — Civilization</h3><span class="status status-planned">Planned</span></div>
               <ul>
-                <li>Influence de civilisation (DEC-026) — emprise build, orphelins inutilisables</li>
-                <li>Points de civilisation PC (DEC-027) — score dérivé + leaderboard réel</li>
+                <li>Influence de civilisation (DEC-026) — fait (Phase 4)</li>
+                <li>Points de civilisation PC (DEC-027) — fait v0 (Phase 4)</li>
                 <li>Villages</li>
                 <li>Routes (+ avant-poste, rayons d’emprise)</li>
                 <li>Bâtiments multi-hexagones</li>
@@ -2346,7 +2495,8 @@
               <ul>
                 <li>Comptes Firebase (lien invité Google / email) — fait (DEC-024)</li>
                 <li>Persistance multi-appareil via compte — fait (même monde lié)</li>
-                <li><strong>Points de civilisation (PC)</strong> (DEC-027) + <strong>leaderboard</strong> / classements par catégorie</li>
+                <li><strong>Points de civilisation (PC)</strong> (DEC-027) + <strong>leaderboard</strong> — fait v0 (comptes Firebase, pagination 20)</li>
+                <li>Breakdown PC par catégorie · classements amis / hebdo</li>
                 <li>Interaction entre joueurs</li>
                 <li>Commerce</li>
               </ul>
@@ -2396,16 +2546,20 @@
                 <li>Comptes Firebase (lien invité) — validé</li>
                 <li>Arbre technologique + science HDV (DEC-022) — validé</li>
                 <li>Admin protégé (DEC-025) — validé</li>
+                <li>Influence DEC-026 + overlay play — validé</li>
+                <li>PC + leaderboard DEC-027 — validé</li>
+                <li>Mine fer / argile + processors (scierie, moulin, briqueterie, fonderie) — validé</li>
               </ul>
             </article>
             <article class="card priority-col">
               <h3><span class="priority priority-p1">P1</span> Important</h3>
               <ul>
-                <li>Mine (fer) + chaînes industrielles</li>
+                <li>Boulangerie · forge (outils)</li>
                 <li>Bonus d’adjacence (Civ-like)</li>
-                <li>Processors posables (scierie, moulin, fonderie, forge)</li>
+                <li>Stocks secondaires dans le bandeau (planches, lingots…)</li>
                 <li>Centre de recherche (accélération science)</li>
                 <li>Bâtiments prod. d’éclats</li>
+                <li>Fleuves (regénération stable)</li>
                 <li>Routes</li>
                 <li>Villages additionnels</li>
               </ul>
@@ -2441,10 +2595,6 @@
           <div class="kanban" id="kanban">
             <div class="kanban-col" data-column="ideas">
               <h3>Ideas</h3>
-              <article class="task" draggable="true" data-id="task-civ-influence">
-                <strong>Influence de civilisation</strong>
-                <p>DEC-026 — gate build sur emprise achevée ; expand hors scope ; démo recalcule ; orphelins inutilisables + workers rentrent.</p>
-              </article>
               <article class="task" draggable="true" data-id="task-research-center">
                 <strong>Centre de recherche</strong>
                 <p>Bâtiment <code>research_center</code> — accélère la prod science (2 / worker / min). DEC-022 post-MVP.</p>
@@ -2469,20 +2619,12 @@
                 <strong>Nouveaux biomes</strong>
                 <p>Désert, jungle, glace, neige, marais (+ volcanique ?). Roue, fusions, rivages, raison économique. Wiki · Biomes.</p>
               </article>
-              <article class="task" draggable="true" data-id="task-world-score-leaderboard">
-                <strong>PC + leaderboard</strong>
-                <p>DEC-027 : PC = Science + Production + Population + Militaire. Runtime + classements réels (remplace mock). Voir Ideas &amp; PvP V1.</p>
-              </article>
             </div>
             <div class="kanban-col" data-column="todo">
               <h3>Todo</h3>
-              <article class="task" draggable="true" data-id="task-economy-resources">
-                <strong>Mine (fer)</strong>
-                <p>Même pattern extracteur + workers ; catalogue + gate tech OK, runtime à brancher.</p>
-              </article>
-              <article class="task" draggable="true" data-id="task-processors">
-                <strong>Processors posables</strong>
-                <p>Scierie, moulin, boulangerie, fonderie, forge — craft runtime + meshes.</p>
+              <article class="task" draggable="true" data-id="task-bakery-forge">
+                <strong>Boulangerie + forge</strong>
+                <p>Processors restants : food depuis farine, outils depuis lingots — craft runtime + meshes.</p>
               </article>
               <article class="task" draggable="true" data-id="task-adjacency-after-extractors">
                 <strong>Adjacence après extracteurs</strong>
@@ -2500,7 +2642,19 @@
               </article>
               <article class="task" draggable="true" data-id="task-ages">
                 <strong>Arbre technologique (DEC-022)</strong>
-                <p>Prod HDV +1 / 10&nbsp;min · cible manuelle · frise · gate build · <code>set_research_target</code>.</p>
+                <p>Prod HDV +1 / 15&nbsp;s · bibliothèque +4/min · cible manuelle · frise · gate build · <code>set_research_target</code>.</p>
+              </article>
+              <article class="task" draggable="true" data-id="task-civ-influence">
+                <strong>Influence de civilisation</strong>
+                <p>DEC-026 — emprise build, overlay play, orphelins inutilisables + workers rentrent.</p>
+              </article>
+              <article class="task" draggable="true" data-id="task-world-score-leaderboard">
+                <strong>PC + leaderboard</strong>
+                <p>DEC-027 : snapshot PC, <code>GET /v1/leaderboard</code>, UI play + <code>/leaderboard</code> (Firebase).</p>
+              </article>
+              <article class="task" draggable="true" data-id="task-mine-processors">
+                <strong>Mine + processors industry</strong>
+                <p>Mine fer/argile, scierie, moulin, briqueterie, fonderie, marché, bibliothèque — runtime + meshes.</p>
               </article>
               <article class="task" draggable="true" data-id="task-admin-auth">
                 <strong>Sécuriser /admin</strong>
@@ -2666,7 +2820,7 @@
               <article class="card idea" data-status="confirmed">
                 <span class="status status-confirmed">Confirmed</span>
                 <h3>Points de civilisation (PC) + leaderboard</h3>
-                <p><span class="badge badge-neutral">DEC-027</span> Score dérivé <code>PC = Science + Production + Population + Militaire</code> (pas de ressource spendable). Pop ×&nbsp;10 ; techs = Σ&nbsp;<code>scienceCost</code> ; bâtiments actifs (≥&nbsp;1 worker). Hors v0 : territoire, influence, bonheur, culture, merveilles. Classements (global, hebdo, amis…). Socle du PvP indirect (V1). Phase 5–6.</p>
+                <p><span class="badge badge-neutral">DEC-027</span> <span class="status status-done">Live v0</span> Score dérivé <code>PC = Science + Production + Population + Militaire</code>. Pop ×&nbsp;10 ; techs = Σ&nbsp;<code>scienceCost</code> ; bâtiments actifs (≥&nbsp;1 worker). Classement global comptes Firebase · breakdown catégories plus tard.</p>
               </article>
               <article class="card idea" data-status="confirmed">
                 <span class="status status-confirmed">Confirmed</span>
@@ -2705,8 +2859,8 @@
             </article>
             <article class="card idea" data-status="confirmed">
               <span class="status status-confirmed">Confirmed</span>
-              <h3>Arbre technologique (science)</h3>
-              <p>Validé DEC-022 (révisé) : prod HDV directe vers cible, pause obligatoire, tech <code>fishing</code> ; centre de recherche et âges nommés hors MVP.</p>
+                <h3>Arbre technologique (science)</h3>
+                <p>Validé DEC-022 (live) : prod HDV +1 / 15&nbsp;s, bibliothèque +4/min, cible obligatoire, pause post-unlock ; centre de recherche hors MVP.</p>
             </article>
             <article class="card idea" data-status="confirmed">
               <span class="status status-confirmed">Confirmed</span>
@@ -2875,8 +3029,9 @@
             <div class="check-item is-done"><span class="check-box"></span>Bonus fusion +20&nbsp;% extracteurs</div>
             <div class="check-item is-done"><span class="check-box"></span>Comptes Firebase (lien invité)</div>
             <div class="check-item is-done"><span class="check-box"></span>Arbre technologique + prod science HDV (DEC-022)</div>
-            <div class="check-item"><span class="check-box"></span>Mine + minerai</div>
-            <div class="check-item"><span class="check-box"></span>Fonderie + lingot</div>
+            <div class="check-item is-done"><span class="check-box"></span>Influence + PC + leaderboard (DEC-026 / DEC-027)</div>
+            <div class="check-item is-done"><span class="check-box"></span>Mine + minerai + fonderie + lingot</div>
+            <div class="check-item is-done"><span class="check-box"></span>Processors bois / blé / argile (scierie, moulin, briqueterie)</div>
             <div class="check-item"><span class="check-box"></span>Forge + outils</div>
             <div class="check-item is-done"><span class="check-box"></span>Persistance</div>
             <div class="check-item is-done"><span class="check-box"></span>Session + pseudo + entrée jeu</div>
@@ -2901,7 +3056,7 @@
         </section>
 
         <footer class="page-foot">
-          Hexald — Project Hub. Site statique de documentation, pas le jeu. Ouvrir <code>docs/index.html</code> dans le navigateur. Dernière mise à jour du contenu : 27 août 2026 (DEC-026 influence · DEC-022 science · DEC-025 admin · Phase 4 Industry).
+          Hexald — Project Hub. Site statique de documentation, pas le jeu. Ouvrir <code>docs/index.html</code> dans le navigateur. Dernière mise à jour du contenu : 27 août 2026 (DEC-027 PC · DEC-026 influence · processors industry · lac sans fleuves · Phase 4 Industry).
         </footer>
       </div>
     </div>

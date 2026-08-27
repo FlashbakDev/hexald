@@ -3,8 +3,11 @@ definePageMeta({
   layout: "legal"
 });
 
-useHead({
-  title: "Politique cookies · Hexald"
+usePageSeo({
+  title: "Politique cookies · Hexald",
+  description:
+    "Politique cookies Hexald : quels cookies et traceurs sont utilisés pour le fonctionnement du jeu et comment les gérer.",
+  path: "/cookies"
 });
 </script>
 

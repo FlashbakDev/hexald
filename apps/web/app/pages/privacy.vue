@@ -3,8 +3,11 @@ definePageMeta({
   layout: "legal"
 });
 
-useHead({
-  title: "Politique de confidentialité · Hexald"
+usePageSeo({
+  title: "Politique de confidentialité · Hexald",
+  description:
+    "Politique de confidentialité Hexald : quelles données sont traitées, pourquoi, durée de conservation et vos droits.",
+  path: "/privacy"
 });
 </script>
 
