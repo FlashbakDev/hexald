@@ -42,6 +42,13 @@ services:
       dockerfile: apps/web/Dockerfile
       args:
         NUXT_API_PROXY_TARGET: http://api:9088
+        # Interpolated from `--env-file apps/web/.env` (deploy) or shell / root `.env`
+        NUXT_PUBLIC_FIREBASE_API_KEY: ${NUXT_PUBLIC_FIREBASE_API_KEY:-}
+        NUXT_PUBLIC_FIREBASE_AUTH_DOMAIN: ${NUXT_PUBLIC_FIREBASE_AUTH_DOMAIN:-}
+        NUXT_PUBLIC_FIREBASE_PROJECT_ID: ${NUXT_PUBLIC_FIREBASE_PROJECT_ID:-}
+        NUXT_PUBLIC_FIREBASE_APP_ID: ${NUXT_PUBLIC_FIREBASE_APP_ID:-}
+        NUXT_PUBLIC_SITE_URL: ${NUXT_PUBLIC_SITE_URL:-https://hexald.com}
+        NUXT_PUBLIC_ADSENSE_CLIENT_ID: ${NUXT_PUBLIC_ADSENSE_CLIENT_ID:-}
     container_name: hexald-web
     ports:
       - "9089:9089"

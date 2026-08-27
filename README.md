@@ -186,6 +186,12 @@ NUXT_PUBLIC_FIREBASE_APP_ID=
 
 Ajouter les domaines autorisés dans Firebase Console (localhost, IP LAN, prod). Desktop = popup Google ; mobile = redirect.
 
+**Docker / VPS** : `apps/web/.env` est gitignored mais doit exister sur le serveur. Il est lu **au build** de l’image web (la landing `/` est pré-rendue avec les boutons Firebase) et au runtime du container. Rebuild obligatoire après création / modification du fichier :
+
+```bash
+docker compose --env-file apps/web/.env -f docker-compose.yml -f docker-compose.prod.yml up -d --build web
+```
+
 ### PWA
 
 Installable via `@vite-pwa/nuxt` (manifest + service worker). **Pas de jeu hors ligne** : l’API (`/backend/**`) est `NetworkOnly`, et un overlay plein écran s’affiche dès que `navigator.onLine` est faux (`OfflineBlocker`).

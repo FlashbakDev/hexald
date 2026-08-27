@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { getFirebaseConfigDebug } from "~/utils/firebase.client";
+
 const open = defineModel<boolean>("open", { default: false });
 
 const emit = defineEmits<{
@@ -7,6 +9,7 @@ const emit = defineEmits<{
 }>();
 
 const {
+  configured,
   authBusy,
   authError,
   signInWithGoogle,
@@ -19,8 +22,29 @@ const emailMode = ref<"login" | "register">("login");
 const emailDraft = ref("");
 const passwordDraft = ref("");
 
+const firebaseDebug = computed(() => getFirebaseConfigDebug());
+
+watch(open, (isOpen) => {
+  if (!import.meta.client || !isOpen) return;
+  console.info("[hexald:link-account] dialog mounted/open", {
+    configured: configured.value,
+    firebase: firebaseDebug.value,
+    authError: authError.value
+  });
+});
+
 async function onGoogle() {
+  console.info("[hexald:link-account] Google click", {
+    configured: configured.value,
+    firebase: firebaseDebug.value
+  });
+  if (!configured.value) return;
   const session = await signInWithGoogle();
+  console.info("[hexald:link-account] Google result", {
+    ok: Boolean(session),
+    kind: session?.kind ?? null,
+    authError: authError.value
+  });
   if (session && session.kind === "firebase") {
     open.value = false;
     emit("linked");
@@ -30,11 +54,23 @@ async function onGoogle() {
 async function onEmailSubmit() {
   const email = emailDraft.value.trim();
   const password = passwordDraft.value;
+  console.info("[hexald:link-account] email submit", {
+    mode: emailMode.value,
+    hasEmail: Boolean(email),
+    passwordLen: password.length,
+    configured: configured.value
+  });
+  if (!configured.value) return;
   if (!email || password.length < 6) return;
   const session =
     emailMode.value === "register"
       ? await registerWithEmail(email, password)
       : await signInWithEmail(email, password);
+  console.info("[hexald:link-account] email result", {
+    ok: Boolean(session),
+    kind: session?.kind ?? null,
+    authError: authError.value
+  });
   if (session && session.kind === "firebase") {
     open.value = false;
     emit("linked");
@@ -42,6 +78,7 @@ async function onEmailSubmit() {
 }
 
 function onSkip() {
+  console.info("[hexald:link-account] skip/close");
   open.value = false;
   emit("dismiss");
 }
@@ -76,6 +113,23 @@ function onSkip() {
             village sur un autre appareil.
           </p>
 
+          <p v-if="!configured" class="link-account-card__error">
+            Connexion indisponible : Firebase n’est pas configuré sur ce serveur
+            (vars <code>NUXT_PUBLIC_FIREBASE_*</code> manquantes au build).
+            Ouvre la console (F12) — logs
+            <code>[hexald:link-account]</code>.
+          </p>
+          <p
+            v-if="!configured"
+            class="link-account-card__debug"
+            aria-hidden="true"
+          >
+            apiKey={{ firebaseDebug.hasApiKey ? "ok" : "manquant" }}
+            · domain={{ firebaseDebug.hasAuthDomain ? firebaseDebug.authDomain : "manquant" }}
+            · project={{ firebaseDebug.hasProjectId ? firebaseDebug.projectId : "manquant" }}
+            · appId={{ firebaseDebug.hasAppId ? "ok" : "manquant" }}
+          </p>
+
           <p v-if="authError" class="link-account-card__error">
             {{ authError }}
           </p>
@@ -84,7 +138,7 @@ function onSkip() {
             <button
               type="button"
               class="link-account-btn link-account-btn--primary"
-              :disabled="authBusy"
+              :disabled="authBusy || !configured"
               @click="onGoogle"
             >
               <UIcon name="i-lucide-chrome" class="size-4" aria-hidden="true" />
@@ -94,7 +148,7 @@ function onSkip() {
             <button
               type="button"
               class="link-account-btn link-account-btn--ghost"
-              :disabled="authBusy"
+              :disabled="authBusy || !configured"
               @click="emailPanelOpen = !emailPanelOpen"
             >
               <UIcon name="i-lucide-mail" class="size-4" aria-hidden="true" />
@@ -102,7 +156,7 @@ function onSkip() {
             </button>
 
             <form
-              v-if="emailPanelOpen"
+              v-if="emailPanelOpen && configured"
               class="link-account-email"
               @submit.prevent="onEmailSubmit"
             >
@@ -234,6 +288,19 @@ function onSkip() {
   margin: 0.75rem 0 0;
   font-size: 0.85rem;
   color: #9b4a4a;
+}
+
+.link-account-card__debug {
+  margin: 0.45rem 0 0;
+  font-size: 0.7rem;
+  line-height: 1.35;
+  color: #6b7c76;
+  word-break: break-all;
+}
+
+.link-account-card__error code,
+.link-account-card__debug code {
+  font-size: 0.68rem;
 }
 
 .link-account-card__actions {

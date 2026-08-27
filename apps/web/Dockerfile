@@ -21,7 +21,27 @@ COPY packages/game-core ./packages/game-core
 ARG NUXT_API_PROXY_TARGET=http://api:9088
 ENV NUXT_API_PROXY_TARGET=$NUXT_API_PROXY_TARGET
 
-RUN pnpm --filter @hexald/web build
+# Public client config — also overridable via build-args / apps/web/.env.
+# Required at *build* time because `/` is prerendered (Firebase buttons gated on config).
+ARG NUXT_PUBLIC_FIREBASE_API_KEY=
+ARG NUXT_PUBLIC_FIREBASE_AUTH_DOMAIN=
+ARG NUXT_PUBLIC_FIREBASE_PROJECT_ID=
+ARG NUXT_PUBLIC_FIREBASE_APP_ID=
+ARG NUXT_PUBLIC_SITE_URL=
+ARG NUXT_PUBLIC_ADSENSE_CLIENT_ID=
+ENV NUXT_PUBLIC_FIREBASE_API_KEY=$NUXT_PUBLIC_FIREBASE_API_KEY \
+    NUXT_PUBLIC_FIREBASE_AUTH_DOMAIN=$NUXT_PUBLIC_FIREBASE_AUTH_DOMAIN \
+    NUXT_PUBLIC_FIREBASE_PROJECT_ID=$NUXT_PUBLIC_FIREBASE_PROJECT_ID \
+    NUXT_PUBLIC_FIREBASE_APP_ID=$NUXT_PUBLIC_FIREBASE_APP_ID \
+    NUXT_PUBLIC_SITE_URL=$NUXT_PUBLIC_SITE_URL \
+    NUXT_PUBLIC_ADSENSE_CLIENT_ID=$NUXT_PUBLIC_ADSENSE_CLIENT_ID
+
+# Load apps/web/.env from the build context when present (VPS).
+# Needed at build time: `/` is prerendered and gates Firebase CTAs on public config.
+RUN set -a \
+  && if [ -f apps/web/.env ]; then . ./apps/web/.env; fi \
+  && set +a \
+  && pnpm --filter @hexald/web build
 
 FROM node:22-alpine AS production
 

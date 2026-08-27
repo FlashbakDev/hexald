@@ -232,7 +232,7 @@ function closeSettings() {
 
 function openLinkAccountFromSettings() {
   closeSettings();
-  showLinkAccount();
+  showLinkAccount("settings");
 }
 
 function openSupportFromSettings() {
@@ -261,7 +261,7 @@ function cancelDisconnect() {
 
 function openLinkAccountFromDisconnect() {
   cancelDisconnect();
-  showLinkAccount();
+  showLinkAccount("disconnect-prompt");
 }
 
 async function disconnect() {

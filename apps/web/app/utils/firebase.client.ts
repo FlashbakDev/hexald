@@ -14,9 +14,24 @@ function readFirebasePublicConfig() {
   };
 }
 
-export function isFirebaseClientConfigured(): boolean {
+/** Snapshot sans secrets — pour debug console / dialog. */
+export function getFirebaseConfigDebug() {
   const c = readFirebasePublicConfig();
-  return Boolean(c.apiKey && c.authDomain && c.projectId && c.appId);
+  return {
+    configured: Boolean(c.apiKey && c.authDomain && c.projectId && c.appId),
+    hasApiKey: Boolean(c.apiKey),
+    hasAuthDomain: Boolean(c.authDomain),
+    hasProjectId: Boolean(c.projectId),
+    hasAppId: Boolean(c.appId),
+    authDomain: c.authDomain || "(vide)",
+    projectId: c.projectId || "(vide)",
+    apiKeyLen: c.apiKey.length,
+    appIdLen: c.appId.length
+  };
+}
+
+export function isFirebaseClientConfigured(): boolean {
+  return getFirebaseConfigDebug().configured;
 }
 
 export function getFirebaseAuthClient(): Auth | null {

@@ -15,6 +15,8 @@ docs
 **/.env
 **/.env.*
 !**/.env.example
+# Public web client config (Firebase, AdSense) — required at image build for prerendered `/`
+!apps/web/.env
 .DS_Store
 *.md
 !apps/web/content/**/*.md

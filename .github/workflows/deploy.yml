@@ -21,5 +21,7 @@ jobs:
             cd ${{ secrets.VPS_DEPLOY_PATH }}
             git fetch origin main
             git reset --hard origin/main
-            docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build --remove-orphans
+            # apps/web/.env is gitignored and stays on the VPS — pass it for build-args
+            # (landing `/` is prerendered with Firebase public config) + container runtime.
+            docker compose --env-file apps/web/.env -f docker-compose.yml -f docker-compose.prod.yml up -d --build --remove-orphans
             docker image prune -f

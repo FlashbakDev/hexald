@@ -7,9 +7,14 @@ export default defineNuxtPlugin(async () => {
 
   const { watchAuth, configured, ensureHexaldSession, authError } =
     useFirebaseAuth();
+  const { getFirebaseConfigDebug } = await import("~/utils/firebase.client");
 
-  if (!configured.value) return;
+  if (!configured.value) {
+    console.warn("[hexald:firebase] client not configured", getFirebaseConfigDebug());
+    return;
+  }
 
+  console.info("[hexald:firebase] client configured", getFirebaseConfigDebug());
   watchAuth();
 
   const route = useRoute();
