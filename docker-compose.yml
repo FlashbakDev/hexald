@@ -45,6 +45,8 @@ services:
     container_name: hexald-web
     ports:
       - "9089:9089"
+    env_file:
+      - apps/web/.env
     environment:
       NODE_ENV: production
       HOST: 0.0.0.0
