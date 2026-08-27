@@ -184,8 +184,13 @@ export default defineNuxtConfig({
     },
     workbox: {
       // Fallback dédié offline — pas la homepage (évite shell marketing pour bots / routes manquantes).
+      // Important : les routes app (admin, play…) ne sont pas précachées → sans denylist,
+      // Workbox sert /offline même en ligne.
       navigateFallback: "/offline",
       navigateFallbackDenylist: [
+        /^\/admin/,
+        /^\/play/,
+        /^\/poc/,
         /^\/backend/,
         /^\/__\/auth/,
         /^\/api/,
