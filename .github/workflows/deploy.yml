@@ -16,6 +16,8 @@ jobs:
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
           port: ${{ secrets.VPS_SSH_PORT }}
+          # Nuxt client build alone can take ~6–7m on the VPS; default is 10m.
+          command_timeout: 30m
           script: |
             set -e
             cd ${{ secrets.VPS_DEPLOY_PATH }}
