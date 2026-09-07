@@ -95,11 +95,20 @@ export function useAds() {
     const clientId = adsenseClientId.value;
     if (!clientId) return;
 
-    if (document.querySelector("[data-adsense-script]")) return;
+    if (
+      document.querySelector("[data-adsense-script]") ||
+      document.querySelector('script[src*="pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"]')
+    ) {
+      return;
+    }
     if (adsenseLoadPromise) return adsenseLoadPromise;
 
     adsenseLoadPromise = new Promise<void>((resolve, reject) => {
-      const existing = document.querySelector("[data-adsense-script]");
+      const existing =
+        document.querySelector("[data-adsense-script]") ||
+        document.querySelector(
+          'script[src*="pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"]'
+        );
       if (existing) {
         resolve();
         return;
