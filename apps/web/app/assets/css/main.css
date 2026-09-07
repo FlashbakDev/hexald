@@ -20,12 +20,8 @@ html {
 }
 
 /*
- * Game shell — centered max width leaves natural Side Rail margins on wide
- * desktops. No reserved ad DOM in production; Google places rails itself.
- * `.game-shell--full` (No Ads) uses the full viewport — no side gutters.
- *
- * On mobile, free users get a modest `--play-ad-bottom-inset` so critical CTAs
- * stay above a typical Anchor ad. No Ads (`--full`) clears that inset.
+ * Game shell ? full viewport for now (AdSense rails disabled until approved).
+ * `--full` kept as the active layout class from play.vue.
  */
 .game-shell {
   --play-ad-bottom-inset: 0px;
@@ -36,7 +32,7 @@ html {
   --play-tech-bar-height: 0px;
   --play-building-sheet-height: 0px;
   --play-dev-chrome-gap: 0.75rem;
-  width: min(100%, 1400px);
+  width: 100%;
   margin-inline: auto;
 }
 
@@ -46,25 +42,6 @@ html {
   --play-bottom-ad-reserved: env(safe-area-inset-bottom, 0px);
   --play-bottom-stack-offset: max(0.65rem, var(--play-bottom-ad-reserved));
   width: 100%;
-}
-
-@media (max-width: 768px) {
-  .game-shell:not(.game-shell--full) {
-    --play-ad-bottom-inset: 3.25rem;
-    --play-ad-bottom-gap: 0.75rem;
-    --play-bottom-ad-reserved: calc(
-      env(safe-area-inset-bottom, 0px) + var(--play-ad-bottom-inset)
-    );
-    --play-bottom-stack-offset: calc(
-      var(--play-bottom-ad-reserved) + var(--play-ad-bottom-gap)
-    );
-  }
-}
-
-@media (max-width: 1500px) {
-  .game-shell:not(.game-shell--full) {
-    width: 100%;
-  }
 }
 
 .play-bottom-chrome {
@@ -112,7 +89,7 @@ html {
   animation: landing-cta-breathe 5s ease-in-out infinite;
 }
 
-/* Colonne unique landing — même départ gauche pour hero / how / footer */
+/* Colonne unique landing ? m?me d?part gauche pour hero / how / footer */
 .landing-col {
   width: 100%;
   max-width: 64rem;
@@ -171,7 +148,7 @@ html {
   background: #2d5248;
 }
 
-/* —— Landing : suite (principe + classement) —— */
+/* ?? Landing : suite (principe + classement) ?? */
 .landing-after {
   position: relative;
   background: #dfe8e4;
@@ -179,7 +156,7 @@ html {
   padding: 1.5rem 0 4rem;
 }
 
-/* —— Landing : texte crawlable (SEO) —— */
+/* ?? Landing : texte crawlable (SEO) ?? */
 .landing-about {
   position: relative;
   padding: 3.25rem 0 0.5rem;
@@ -224,7 +201,7 @@ html {
   color: #1c2b28;
 }
 
-/* —— Landing : teaser classement —— */
+/* ?? Landing : teaser classement ?? */
 .landing-board {
   position: relative;
   padding: 2.75rem 0 0;
@@ -384,7 +361,7 @@ html {
   }
 }
 
-/* —— Landing : 3 étapes —— */
+/* ?? Landing : 3 ?tapes ?? */
 .landing-how {
   position: relative;
   padding: 0;
@@ -692,7 +669,7 @@ html {
 
 /*
  * Grand ciel clair autour du centre carte ;
- * nuages repoussés en couronne basse / latérale.
+ * nuages repouss?s en couronne basse / lat?rale.
  */
 .landing-clouds__veil {
   position: absolute;
@@ -803,7 +780,7 @@ html {
   animation-delay: -7s;
 }
 
-/* Latéraux bas — n’empiètent pas sur le centre carte */
+/* Lat?raux bas ? n?empi?tent pas sur le centre carte */
 .landing-cloud--6 {
   width: 20rem;
   left: 62%;
@@ -965,7 +942,7 @@ html {
   }
 }
 
-/* Roue de sélection de biome */
+/* Roue de s?lection de biome */
 .biome-wheel-enter-active .biome-wheel__ring {
   transition:
     opacity 0.34s ease,
@@ -988,7 +965,7 @@ html {
   transform: scale(0.92);
 }
 
-/* Header HUD — nuage collé en haut d’écran */
+/* Header HUD ? nuage coll? en haut d??cran */
 .play-cloud-header {
   height: clamp(9rem, 22vw, 11rem);
 }
@@ -2535,7 +2512,7 @@ html {
   height: 0.85em;
 }
 
-/* Surplus food + place libre → remplit en vert */
+/* Surplus food + place libre ? remplit en vert */
 .play-cloud-header__growth--growing .play-cloud-header__growth-track {
   background: rgba(74, 124, 111, 0.2);
 }
@@ -2548,7 +2525,7 @@ html {
   color: #2d6b52;
 }
 
-/* Cap logements → remplit en orange + maison barrée */
+/* Cap logements ? remplit en orange + maison barr?e */
 .play-cloud-header__growth--housing .play-cloud-header__growth-track {
   background: rgba(180, 110, 40, 0.18);
 }
@@ -2586,7 +2563,7 @@ html {
   box-shadow: 0 0 0 0.5px rgb(255 248 240 / 0.65);
 }
 
-/* Bottom sheet — même nuage que la toolbar, retourné en lèvre haute */
+/* Bottom sheet ? m?me nuage que la toolbar, retourn? en l?vre haute */
 .building-sheet {
   display: flex;
   flex-direction: column;
@@ -2606,7 +2583,7 @@ html {
   filter: drop-shadow(0 -0.4rem 1rem rgb(210 222 214 / 0.2));
 }
 
-/* Voile blanc → transparent vers le haut (sous les bosses). */
+/* Voile blanc ? transparent vers le haut (sous les bosses). */
 .building-sheet__sky::before {
   content: "";
   position: absolute;
@@ -2624,7 +2601,7 @@ html {
   );
 }
 
-/* Sol blanc sous le SVG flou → jointure invisible avec le panneau. */
+/* Sol blanc sous le SVG flou ? jointure invisible avec le panneau. */
 .building-sheet__sky::after {
   content: "";
   position: absolute;
@@ -2667,7 +2644,7 @@ html {
   filter: blur(2.2px);
 }
 
-/* Bosses nettes, espacement irrégulier */
+/* Bosses nettes, espacement irr?gulier */
 .building-sheet__puff--1 {
   left: -6%;
   width: 26%;
@@ -2725,11 +2702,11 @@ html {
   justify-content: flex-start;
   min-height: 0;
   pointer-events: auto;
-  /* Titre proche de la lèvre nuage. */
+  /* Titre proche de la l?vre nuage. */
   padding: 0.7rem 1.15rem
     max(0.95rem, var(--play-bottom-ad-reserved, env(safe-area-inset-bottom, 0px)));
   color: #1c2b28;
-  /* Haut du dialogue : blanc → transparent vers le nuage / la carte. */
+  /* Haut du dialogue : blanc ? transparent vers le nuage / la carte. */
   background: linear-gradient(
     to bottom,
     transparent 0%,
@@ -2900,7 +2877,7 @@ html {
     0 1px 0 rgb(255 255 255 / 0.85);
 }
 
-/* Feedback démolition — +ressources / +pop qui montent depuis la tuile */
+/* Feedback d?molition ? +ressources / +pop qui montent depuis la tuile */
 .destroy-float {
   transform: translate(-50%, -50%);
   animation: destroy-float-rise 1.25s cubic-bezier(0.22, 1, 0.36, 1) both;
@@ -2961,7 +2938,7 @@ html {
   }
 }
 
-/* Pages légales */
+/* Pages l?gales */
 .legal-prose h1 {
   font-family: var(--font-display);
   font-size: clamp(2rem, 4vw, 2.75rem);
@@ -3057,7 +3034,7 @@ html {
   color: #6b7c76;
 }
 
-/* —— Offline blocker (PWA installable, pas de jeu hors ligne) —— */
+/* ?? Offline blocker (PWA installable, pas de jeu hors ligne) ?? */
 .offline-blocker {
   position: fixed;
   inset: 0;
@@ -3253,7 +3230,7 @@ html {
   }
 }
 
-/* Bottom sheet construction — hauteur = contenu */
+/* Bottom sheet construction ? hauteur = contenu */
 .construction-sheet {
   bottom: 0;
   min-height: 0;
@@ -3409,7 +3386,7 @@ html {
   );
 }
 
-/* Frise technologique — hauteur = contenu (graphe a son propre min-height) */
+/* Frise technologique ? hauteur = contenu (graphe a son propre min-height) */
 .tech-frise-sheet {
   bottom: 0;
   min-height: 0;
@@ -3688,18 +3665,18 @@ html {
   flex-shrink: 0;
 }
 
-/* Nouveau bâtiment — carré arrondi (défaut). */
+/* Nouveau b?timent ? carr? arrondi (d?faut). */
 .tech-frise__unlock--building {
   border-radius: 0.35rem;
 }
 
-/* Augmentation / bonus (et branche tech) — rond. */
+/* Augmentation / bonus (et branche tech) ? rond. */
 .tech-frise__unlock--passive_bonus,
 .tech-frise__unlock--tech_branch {
   border-radius: 999px;
 }
 
-/* Amélioration de bâtiment / cité — losange. */
+/* Am?lioration de b?timent / cit? ? losange. */
 .tech-frise__unlock--city_improvement {
   width: 1.2rem;
   height: 1.2rem;
@@ -3804,3 +3781,431 @@ html {
   box-shadow: none;
 }
 
+
+/* ??? Wiki ??? */
+.wiki-header {
+  border-bottom: 1px solid rgb(28 43 40 / 0.1);
+  background: rgb(223 232 228 / 0.85);
+  backdrop-filter: blur(10px);
+}
+
+.wiki-header__inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding-top: 1rem;
+  padding-bottom: 1rem;
+}
+
+.wiki-crumbs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.5rem;
+  margin-bottom: 1.25rem;
+  font-size: 0.85rem;
+  color: #5a6e68;
+}
+
+.wiki-crumbs__sep {
+  opacity: 0.55;
+}
+
+.wiki-crumbs__link {
+  color: #2d5248;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 0.15rem;
+}
+
+.wiki-crumbs__current {
+  color: #1c2b28;
+}
+
+.wiki-eyebrow {
+  margin-bottom: 0.35rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #4a7c6f;
+}
+
+.wiki-title {
+  font-size: clamp(2rem, 4vw, 2.75rem);
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+}
+
+.wiki-lead {
+  margin-top: 0.85rem;
+  max-width: 40rem;
+  font-size: 1.05rem;
+  line-height: 1.65;
+  color: #3d524c;
+}
+
+.wiki-article {
+  display: grid;
+  gap: 1.75rem;
+  margin-top: 1.75rem;
+  align-items: start;
+}
+
+@media (min-width: 960px) {
+  .wiki-article {
+    grid-template-columns: minmax(0, 1fr) min(18.5rem, 32%);
+    gap: 2.25rem;
+  }
+
+  .wiki-article__infobox {
+    order: 2;
+  }
+
+  .wiki-article__body {
+    order: 1;
+  }
+
+  .wiki-infobox {
+    position: sticky;
+    top: 1.25rem;
+  }
+}
+
+.wiki-toc {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem 1.15rem;
+  margin-bottom: 1.5rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.wiki-toc a {
+  color: #2d5248;
+  text-decoration: underline;
+  text-underline-offset: 0.2rem;
+}
+
+.wiki-prose {
+  max-width: 42rem;
+}
+
+.wiki-prose :deep(h2),
+.wiki-prose :deep(h3) {
+  font-family: var(--font-display, Fraunces, Georgia, serif);
+  font-weight: 500;
+  scroll-margin-top: 1.25rem;
+}
+
+.wiki-prose :deep(h2) {
+  font-size: 1.55rem;
+  margin: 2.1rem 0 0.75rem;
+}
+
+.wiki-prose :deep(h3) {
+  font-size: 1.2rem;
+  margin: 1.5rem 0 0.55rem;
+}
+
+.wiki-prose :deep(p),
+.wiki-prose :deep(li) {
+  color: #3d524c;
+  line-height: 1.65;
+}
+
+.wiki-prose :deep(p + p),
+.wiki-prose :deep(p + ul),
+.wiki-prose :deep(p + ol) {
+  margin-top: 0.85rem;
+}
+
+.wiki-prose :deep(ul),
+.wiki-prose :deep(ol) {
+  margin: 0.85rem 0 0;
+  padding-left: 1.25rem;
+}
+
+.wiki-prose :deep(li + li) {
+  margin-top: 0.35rem;
+}
+
+.wiki-prose :deep(a) {
+  color: #2d5248;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 0.15rem;
+}
+
+.wiki-prose :deep(strong) {
+  color: #1c2b28;
+  font-weight: 650;
+}
+
+.wiki-infobox {
+  border: 1px solid rgb(28 43 40 / 0.14);
+  background: rgb(248 251 249 / 0.92);
+  padding: 0.85rem;
+}
+
+.wiki-infobox__media {
+  display: grid;
+  place-items: center;
+  gap: 0.45rem;
+  min-height: 9.5rem;
+  margin-bottom: 0.75rem;
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgb(28 43 40 / 0.1);
+  background:
+    linear-gradient(160deg, rgb(74 124 111 / 0.18), rgb(45 82 72 / 0.08)),
+    #e7efeb;
+  color: #2d5248;
+}
+
+.wiki-infobox__media--mesh {
+  min-height: 0;
+  aspect-ratio: 1 / 1;
+  padding: 0;
+  display: block;
+  background: #c5d4cc;
+}
+
+.wiki-infobox__viewport {
+  position: absolute;
+  inset: 0;
+}
+
+.wiki-infobox__canvas {
+  display: block !important;
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  touch-action: none;
+}
+
+.wiki-infobox__fallback {
+  display: grid;
+  place-items: center;
+  gap: 0.45rem;
+  position: absolute;
+  inset: 0;
+}
+
+.wiki-infobox[data-role='extractor'] .wiki-infobox__media {
+  background:
+    linear-gradient(160deg, rgb(90 122 74 / 0.22), rgb(45 82 72 / 0.08)),
+    #e8efe4;
+}
+
+.wiki-infobox[data-role='processor'] .wiki-infobox__media {
+  background:
+    linear-gradient(160deg, rgb(122 96 74 / 0.2), rgb(45 82 72 / 0.08)),
+    #efe8e4;
+}
+
+.wiki-infobox[data-role='settlement'] .wiki-infobox__media {
+  background:
+    linear-gradient(160deg, rgb(74 110 122 / 0.2), rgb(45 82 72 / 0.08)),
+    #e4ecef;
+}
+
+.wiki-infobox[data-role='special'] .wiki-infobox__media {
+  background:
+    linear-gradient(160deg, rgb(110 90 122 / 0.18), rgb(45 82 72 / 0.08)),
+    #ebe4ef;
+}
+
+.wiki-infobox__media.wiki-infobox__media--mesh {
+  background: #c5d4cc;
+}
+
+.wiki-infobox__icon {
+  width: 2.75rem;
+  height: 2.75rem;
+  opacity: 0.85;
+}
+
+.wiki-infobox__media-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.7;
+}
+
+.wiki-infobox__title {
+  margin: 0 0 0.35rem;
+  font-size: 1.25rem;
+  font-weight: 500;
+  text-align: center;
+  line-height: 1.25;
+}
+
+.wiki-infobox__badge {
+  margin: 0 0 0.85rem;
+  text-align: center;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #4a7c6f;
+}
+
+.wiki-infobox[data-status='planned'] .wiki-infobox__badge,
+.wiki-infobox[data-status='later'] .wiki-infobox__badge {
+  color: #8a6a3d;
+}
+
+.wiki-infobox__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+
+.wiki-infobox__table th,
+.wiki-infobox__table td {
+  padding: 0.4rem 0.35rem;
+  border-top: 1px solid rgb(28 43 40 / 0.1);
+  vertical-align: top;
+  line-height: 1.4;
+}
+
+.wiki-infobox__table th {
+  width: 42%;
+  font-weight: 650;
+  color: #2d5248;
+  text-align: left;
+}
+
+.wiki-infobox__table td {
+  color: #3d524c;
+}
+
+.wiki-infobox__table a {
+  color: #2d5248;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 0.12rem;
+}
+
+.wiki-index-groups {
+  display: grid;
+  gap: 2rem;
+  margin-top: 2rem;
+}
+
+.wiki-index-group h2 {
+  font-family: var(--font-display, Fraunces, Georgia, serif);
+  font-size: 1.45rem;
+  font-weight: 500;
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.4rem;
+  border-bottom: 1px solid rgb(28 43 40 / 0.12);
+}
+
+.wiki-index-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.wiki-index-list li + li {
+  border-top: 1px solid rgb(28 43 40 / 0.08);
+}
+
+.wiki-index-list a {
+  display: grid;
+  gap: 0.15rem;
+  padding: 0.7rem 0.15rem;
+  text-decoration: none;
+  color: inherit;
+}
+
+.wiki-index-list a:hover .wiki-index-list__name {
+  color: #2d5248;
+  text-decoration: underline;
+  text-underline-offset: 0.15rem;
+}
+
+.wiki-index-list__name {
+  font-weight: 650;
+}
+
+.wiki-index-list__meta {
+  font-size: 0.88rem;
+  color: #5a6e68;
+}
+
+.wiki-hub-grid {
+  display: grid;
+  gap: 1rem;
+  margin-top: 1.75rem;
+}
+
+@media (min-width: 640px) {
+  .wiki-hub-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.wiki-hub-link {
+  display: block;
+  padding: 1.15rem 1.2rem;
+  border: 1px solid rgb(28 43 40 / 0.12);
+  background: rgb(248 251 249 / 0.7);
+  text-decoration: none;
+  color: inherit;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.wiki-hub-link:hover {
+  border-color: rgb(45 82 72 / 0.35);
+  background: rgb(255 255 255 / 0.75);
+}
+
+.wiki-hub-link__title {
+  font-family: var(--font-display, Fraunces, Georgia, serif);
+  font-size: 1.35rem;
+  font-weight: 500;
+}
+
+.wiki-hub-link__text {
+  margin-top: 0.4rem;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  color: #3d524c;
+}
+
+.wiki-related {
+  margin-top: 2.5rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid rgb(28 43 40 / 0.12);
+}
+
+.wiki-related h2 {
+  font-family: var(--font-display, Fraunces, Georgia, serif);
+  font-size: 1.25rem;
+  font-weight: 500;
+  margin-bottom: 0.65rem;
+}
+
+.wiki-related ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.wiki-related a {
+  color: #2d5248;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 0.15rem;
+}

@@ -32,6 +32,15 @@ apps/web/content/news/*.md
 
 Un fichier Markdown = une entrée sur `/news`. Frontmatter YAML (`kind`, `title`, `date`, `dateLabel`, `summary`) + corps Markdown. Ne pas dupliquer ailleurs.
 
+**Wiki joueur** (site Nuxt, pas ce hub) :
+
+```text
+apps/web/content/wiki/buildings/*.md
+apps/web/app/pages/wiki/**
+```
+
+Fiches publiques `/wiki` avec preview 3D (`HexPreview`). Le hub `docs/` reste la référence design / suivi technique.
+
 Le reste du monorepo (`apps/`, `packages/`) est un niveau au-dessus.
 
 ## Où modifier les données

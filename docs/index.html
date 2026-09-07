@@ -106,12 +106,12 @@
             <article class="card stat-card">
               <div class="label">Phase</div>
               <div class="value">POC</div>
-              <div class="hint">Processors live · boulangerie / forge · adjacence</div>
+              <div class="hint">Boulangerie · forge · adjacence · stocks UI</div>
             </article>
             <article class="card stat-card">
               <div class="label">Priority</div>
               <div class="value">Industry</div>
-              <div class="hint">Boulangerie · forge · adjacence Civ</div>
+              <div class="hint">Clôturer Phase 4 · wiki live</div>
             </article>
             <article class="card stat-card">
               <div class="label">Status</div>
@@ -141,8 +141,9 @@
                 <span class="badge badge-accent">Industry</span>
                 <span class="badge badge-accent">PC · leaderboard</span>
                 <span class="badge badge-accent">Influence</span>
+                <span class="badge badge-accent">Wiki public</span>
                 <span class="badge badge-neutral">ads.txt</span>
-                <span class="badge badge-neutral">Wiki contenu</span>
+                <span class="badge badge-neutral">Hub docs</span>
                 <span class="badge badge-neutral">UI nuages</span>
               </div>
             </article>
@@ -167,9 +168,10 @@
                 <li><span>08</span> Influence de civilisation (DEC-026) — fait</li>
                 <li><span>09</span> Mine fer / argile · processors (scierie, moulin, briqueterie, fonderie) — fait</li>
                 <li><span>10</span> Marché · bibliothèque · caserne (pose) — fait</li>
-                <li><span>11</span> Boulangerie · forge (outils)</li>
-                <li><span>12</span> Bonus d’adjacence Civ (voisins → rate)</li>
-                <li><span>13</span> Fleuves (retirés v0 — lac de départ conservé)</li>
+                <li><span>11</span> Wiki joueur <code>/wiki</code> + preview 3D (HexPreview) — fait</li>
+                <li><span>12</span> Boulangerie · forge (outils)</li>
+                <li><span>13</span> Bonus d’adjacence Civ (voisins → rate)</li>
+                <li><span>14</span> Stocks secondaires bandeau · fleuves (refaire)</li>
               </ol>
             </article>
             <article class="card notes-card">
@@ -1527,7 +1529,7 @@
         <section id="wiki">
           <p class="section-kicker">Référence</p>
           <h2>Wiki — Contenu du jeu</h2>
-          <p class="lead">Encyclopédie du contenu jouable. Source de vérité code : <code>packages/content</code> (+ règles de génération dans <code>packages/game-core</code>). Ce wiki décrit l’état prévu / implémenté pour le design et le POC.</p>
+          <p class="lead">Encyclopédie du contenu jouable. Source de vérité code : <code>packages/content</code> (+ règles dans <code>packages/game-core</code>). <strong>Wiki joueur live</strong> sur le site : <code>/wiki</code> et <code>/wiki/buildings/[id]</code> (<code>@nuxt/content</code> + preview 3D <code>HexPreview</code> dans l’infobox). Cette section du hub reste la référence design / suivi technique.</p>
 
           <div class="grid grid-3">
             <a class="card wiki-nav-card" href="#wiki-biomes">
@@ -1886,7 +1888,11 @@
                 </tr>
                 <tr data-wiki-kind="mvp">
                   <td>Cabane de pêcheur</td><td><code>fishing_hut</code></td><td>water + fish_bank</td><td>workers</td><td>food</td><td>1</td>
-                  <td><span class="status status-done">Live</span> <span class="badge badge-neutral">DEC-023</span> · gate <code>fishing</code> (DEC-022)</td>
+                  <td><span class="status status-done">Live</span> <span class="badge badge-neutral">DEC-023</span> · gate <code>sailing</code> (DEC-022)</td>
+                </tr>
+                <tr data-wiki-kind="mvp">
+                  <td>Maison</td><td><code>house</code></td><td>any</td><td>—</td><td>cap pop +1</td><td>1</td>
+                  <td><span class="status status-done">Live</span></td>
                 </tr>
                 <tr data-wiki-kind="mvp">
                   <td>Briqueterie</td><td><code>brickworks</code></td><td>any</td><td>clay</td><td>stone_blocks</td><td>1</td>
@@ -1898,6 +1904,14 @@
                 </tr>
                 <tr data-wiki-kind="mvp">
                   <td>Forge</td><td><code>forge</code></td><td>any</td><td>iron_ingot</td><td>tools</td><td>1</td>
+                  <td><span class="status status-planned">Planned</span> · catalogue, pas placeable</td>
+                </tr>
+                <tr data-wiki-kind="planned">
+                  <td>Jardin</td><td><code>garden</code></td><td>plains</td><td>workers</td><td>food</td><td>1</td>
+                  <td><span class="status status-planned">Planned</span></td>
+                </tr>
+                <tr data-wiki-kind="planned">
+                  <td>Bains</td><td><code>baths</code></td><td>any</td><td>—</td><td>prestige / bonheur</td><td>1</td>
                   <td><span class="status status-planned">Planned</span></td>
                 </tr>
                 <tr data-wiki-kind="mvp">
@@ -1909,8 +1923,8 @@
                   <td><span class="status status-done">Live</span></td>
                 </tr>
                 <tr data-wiki-kind="later">
-                  <td>Centre de recherche</td><td><code>research_center</code></td><td>any</td><td>workers</td><td>science (accélération prod.)</td><td>1</td>
-                  <td><span class="status status-planned">Later</span> <span class="badge badge-neutral">post DEC-022</span></td>
+                  <td>Centre de recherche</td><td><code>research_center</code></td><td>any</td><td>workers</td><td>science (accélération)</td><td>1</td>
+                  <td><span class="status status-planned">Later</span> · design only — <strong>absent</strong> du catalogue code</td>
                 </tr>
                 <tr data-wiki-kind="later">
                   <td>Monument</td><td><code>monument</code></td><td>any</td><td>—</td><td>prestige</td><td>multi</td>
@@ -2467,14 +2481,16 @@
                 <li>Frise <code>TechTimelinePanel</code> + action <code>set_research_target</code> — fait</li>
                 <li>Gate build processors / pêche / mine via techs — fait</li>
                 <li>Influence de civilisation (DEC-026) — fait</li>
-                <li>Points de civilisation + leaderboard (DEC-027) — fait (v0, pas de breakdown UI)</li>
+                <li>Points de civilisation + leaderboard (DEC-027) — fait (total + breakdown catégories en jeu)</li>
                 <li>Mine fer / argile + POI gisements — fait</li>
                 <li>Processors : scierie, moulin, briqueterie, fonderie — fait</li>
                 <li>Marché · bibliothèque · caserne (pose) — fait</li>
                 <li>Lac de départ — fait · fleuves — retirés (refaire plus tard)</li>
+                <li>Wiki joueur <code>/wiki</code> + preview 3D bâtiments — fait</li>
                 <li>Boulangerie · forge (outils)</li>
                 <li>Bonus d’adjacence Civ (voisins → rate)</li>
-                <li>Centre de recherche <code>research_center</code> (accélération prod science) — planned</li>
+                <li>Stocks secondaires dans le bandeau (planches, lingots…)</li>
+                <li>Centre de recherche (design only, pas encore au catalogue)</li>
                 <li>Bâtiments producteurs d’éclats (post-MVP)</li>
               </ul>
             </article>
@@ -2495,8 +2511,8 @@
               <ul>
                 <li>Comptes Firebase (lien invité Google / email) — fait (DEC-024)</li>
                 <li>Persistance multi-appareil via compte — fait (même monde lié)</li>
-                <li><strong>Points de civilisation (PC)</strong> (DEC-027) + <strong>leaderboard</strong> — fait v0 (comptes Firebase, pagination 20)</li>
-                <li>Breakdown PC par catégorie · classements amis / hebdo</li>
+                <li><strong>Points de civilisation (PC)</strong> (DEC-027) + <strong>leaderboard</strong> — fait (comptes Firebase, pagination 20, breakdown catégories en jeu)</li>
+                <li>Classements amis / hebdo</li>
                 <li>Interaction entre joueurs</li>
                 <li>Commerce</li>
               </ul>
@@ -2549,6 +2565,7 @@
                 <li>Influence DEC-026 + overlay play — validé</li>
                 <li>PC + leaderboard DEC-027 — validé</li>
                 <li>Mine fer / argile + processors (scierie, moulin, briqueterie, fonderie) — validé</li>
+                <li>Wiki joueur <code>/wiki</code> + HexPreview — validé</li>
               </ul>
             </article>
             <article class="card priority-col">
@@ -2741,8 +2758,12 @@
                 <p>Sessions, mondes, tuiles / régions (Drizzle + routes Fastify).</p>
               </article>
               <article class="task" draggable="true" data-id="task-wiki">
-                <strong>Wiki contenu</strong>
-                <p>Référence biomes, ressources, bâtiments, chaînes, monde dans le hub.</p>
+                <strong>Wiki hub (docs)</strong>
+                <p>Référence biomes, ressources, bâtiments, chaînes, monde dans le hub <code>docs/</code>.</p>
+              </article>
+              <article class="task" draggable="true" data-id="task-wiki-public">
+                <strong>Wiki joueur + HexPreview</strong>
+                <p><code>/wiki</code>, fiches bâtiments (<code>@nuxt/content</code>), infobox 3D comme en jeu.</p>
               </article>
               <article class="task" draggable="true" data-id="task-biome-look">
                 <strong>Look biomes</strong>
@@ -2820,7 +2841,7 @@
               <article class="card idea" data-status="confirmed">
                 <span class="status status-confirmed">Confirmed</span>
                 <h3>Points de civilisation (PC) + leaderboard</h3>
-                <p><span class="badge badge-neutral">DEC-027</span> <span class="status status-done">Live v0</span> Score dérivé <code>PC = Science + Production + Population + Militaire</code>. Pop ×&nbsp;10 ; techs = Σ&nbsp;<code>scienceCost</code> ; bâtiments actifs (≥&nbsp;1 worker). Classement global comptes Firebase · breakdown catégories plus tard.</p>
+                <p><span class="badge badge-neutral">DEC-027</span> <span class="status status-done">Live</span> Score dérivé <code>PC = Science + Production + Population + Militaire</code>. Pop ×&nbsp;10 ; techs = Σ&nbsp;<code>scienceCost</code> ; bâtiments actifs (≥&nbsp;1 worker). Classement Firebase · feuille breakdown catégories en jeu · amis / hebdo plus tard.</p>
               </article>
               <article class="card idea" data-status="confirmed">
                 <span class="status status-confirmed">Confirmed</span>
@@ -3056,7 +3077,7 @@
         </section>
 
         <footer class="page-foot">
-          Hexald — Project Hub. Site statique de documentation, pas le jeu. Ouvrir <code>docs/index.html</code> dans le navigateur. Dernière mise à jour du contenu : 27 août 2026 (DEC-027 PC · DEC-026 influence · processors industry · lac sans fleuves · Phase 4 Industry).
+          Hexald — Project Hub. Site statique de documentation, pas le jeu. Ouvrir <code>docs/index.html</code> dans le navigateur. Dernière mise à jour du contenu : 7 septembre 2026 (wiki joueur + HexPreview · PC breakdown · Phase 4 Industry · lac sans fleuves).
         </footer>
       </div>
     </div>

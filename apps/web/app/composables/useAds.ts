@@ -51,23 +51,13 @@ export function useAds() {
     () => String(config.public.adsenseClientId ?? "").trim()
   );
 
-  const adsEnabled = computed(
-    () =>
-      import.meta.prod &&
-      !hasNoAds.value &&
-      consentAllowsAds.value &&
-      adsenseClientId.value.length > 0
-  );
+  const adsEnabled = computed(() => false);
 
   /** Fake side rails — development only, never in production */
-  const showDevSideRails = computed(
-    () => import.meta.dev && !hasNoAds.value
-  );
+  const showDevSideRails = computed(() => false);
 
-  /** Fake mobile anchor bar — development only, never in production */
-  const showDevMobileAnchor = computed(
-    () => import.meta.dev && !hasNoAds.value
-  );
+  /** Fake mobile anchor bar — disabled until AdSense serves ads again. */
+  const showDevMobileAnchor = computed(() => false);
 
   function setDevNoAds(enabled: boolean) {
     if (!import.meta.dev) return;

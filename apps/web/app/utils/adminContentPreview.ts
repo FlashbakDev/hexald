@@ -17,6 +17,7 @@ export const ADMIN_PREVIEW_FOCUS = { q: 3, r: -1 } as const;
 
 /** Bâtiments avec mesh Three.js dans createHexScene. */
 export const BUILDINGS_WITH_MESH = new Set<BuildingId>([
+  "village",
   "lumber_camp",
   "farm",
   "quarry",

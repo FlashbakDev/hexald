@@ -57,6 +57,10 @@ function formatInline(text: string) {
   html = html.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
   html = html.replace(/\*(.+?)\*/g, "<em>$1</em>");
   html = html.replace(/`(.+?)`/g, "<code>$1</code>");
+  html = html.replace(
+    /\[([^\]]+)\]\(([^)\s]+)\)/g,
+    '<a href="$2">$1</a>'
+  );
   // Soft line break (trailing two spaces in Markdown)
   html = html.replace(/ {2}\n/g, "<br />\n");
   return html;

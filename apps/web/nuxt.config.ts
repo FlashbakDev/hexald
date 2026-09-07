@@ -11,8 +11,20 @@ const siteUrl = (
 
 export default defineNuxtConfig({
   compatibilityDate: "2025-07-15",
-  modules: ["@nuxt/ui", "@nuxtjs/seo", "@vite-pwa/nuxt"],
+  modules: ["@nuxt/ui", "@nuxt/content", "@nuxtjs/seo", "@vite-pwa/nuxt"],
   css: ["~/assets/css/main.css"],
+  content: {
+    experimental: { sqliteConnector: "native" },
+    build: {
+      markdown: {
+        toc: { depth: 2, searchDepth: 2 },
+        contentHeading: false
+      }
+    },
+    renderer: {
+      anchorLinks: { h2: true, h3: true, h4: false }
+    }
+  },
   site: {
     url: siteUrl,
     name: "Hexald",
@@ -106,6 +118,9 @@ export default defineNuxtConfig({
     "/news": { prerender: true },
     "/news/**": { prerender: true },
     "/guide": { prerender: true },
+    "/wiki": { prerender: true },
+    "/wiki/buildings": { prerender: true },
+    "/wiki/buildings/**": { prerender: true },
     "/leaderboard": { swr: 60 },
     "/legals": { prerender: true },
     "/privacy": { prerender: true },

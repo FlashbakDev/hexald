@@ -3,6 +3,7 @@
 export const SITE_NAV_LINKS = [
   { to: "/", label: "Accueil" },
   { to: "/guide", label: "Guide" },
+  { to: "/wiki", label: "Wiki" },
   { to: "/news", label: "Actualités" },
   { to: "/leaderboard", label: "Classement" }
 ] as const;

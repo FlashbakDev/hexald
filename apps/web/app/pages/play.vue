@@ -343,7 +343,6 @@ const {
   accelerateTimers,
   toggleDebugChrome
 } = useDebugMode();
-const { hasNoAds, setDevNoAds } = useAds();
 const {
   enabled: tiltEnabled,
   setEnabled: setTiltEnabled,
@@ -2702,13 +2701,10 @@ watch(
 </script>
 
 <template>
-  <AdsDevSideRails v-if="isDevClient" />
-  <AdsDevMobileAnchor v-if="isDevClient" />
   <div
     ref="stage"
-    class="game-shell relative h-dvh overflow-hidden bg-[#dfe8e4]"
+    class="game-shell game-shell--full relative h-dvh overflow-hidden bg-[#dfe8e4]"
     :class="{
-      'game-shell--full': hasNoAds,
       'game-shell--construction-bar': world,
       'game-shell--construction-bar-collapsed': world && !constructionMenuOpen,
       'game-shell--tech-bar': world,
@@ -3146,36 +3142,6 @@ watch(
         <UIcon name="i-lucide-package-plus" class="size-4" />
         {{ granting ? "…" : "+ Ressources" }}
       </button>
-      <div
-        class="flex h-11 items-center gap-1 rounded-full border border-[#1c2b28]/12 bg-white/75 px-2 text-[11px] font-semibold tracking-wide text-[#3d524c] shadow-[0_8px_24px_rgb(28_43_40_/_0.08)] backdrop-blur-md"
-        title="Ads simulation (dev)"
-      >
-        <span class="px-1 opacity-60">Ads</span>
-        <button
-          type="button"
-          class="rounded-full px-2.5 py-1 transition"
-          :class="
-            !hasNoAds
-              ? 'bg-[#2d5248] text-[#f2f7f4]'
-              : 'text-[#3d524c] hover:bg-[#1c2b28]/06'
-          "
-          @click="setDevNoAds(false)"
-        >
-          Free
-        </button>
-        <button
-          type="button"
-          class="rounded-full px-2.5 py-1 transition"
-          :class="
-            hasNoAds
-              ? 'bg-[#2d5248] text-[#f2f7f4]'
-              : 'text-[#3d524c] hover:bg-[#1c2b28]/06'
-          "
-          @click="setDevNoAds(true)"
-        >
-          No Ads
-        </button>
-      </div>
     </div>
 
     <div v-if="world" class="play-right-chrome">
