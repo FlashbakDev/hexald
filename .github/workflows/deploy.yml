@@ -26,4 +26,6 @@ jobs:
             # apps/web/.env is gitignored and stays on the VPS — pass it for build-args
             # (landing `/` is prerendered with Firebase public config) + container runtime.
             docker compose --env-file apps/web/.env -f docker-compose.yml -f docker-compose.prod.yml up -d --build --remove-orphans
-            docker image prune -f
+            # Best-effort cleanup: daemon may already be pruning; never fail the deploy for this.
+            sleep 5
+            docker image prune -f || { sleep 10; docker image prune -f; } || true
