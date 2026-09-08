@@ -1,25 +1,16 @@
 import {
-
+  BAKERY_CRAFT_DURATION_MS,
   BRICKWORKS_CRAFT_DURATION_MS,
-
   DEV_CRAFT_DURATION_MS,
-
+  FORGE_CRAFT_DURATION_MS,
   MILL_CRAFT_DURATION_MS,
-
   SAWMILL_CRAFT_DURATION_MS,
-
   SMELTER_CRAFT_DURATION_MS,
-
   getProcessorStepForBuilding,
-
   recipeInputCount,
-
   recipeOutputCount,
-
   stockCapFor,
-
   type PlaceableProcessorId
-
 } from "@hexald/content";
 
 import type { BuildingId } from "@hexald/shared";
@@ -104,17 +95,15 @@ function parseTime(value: number | string | Date | null | undefined): number | n
 
 
 function craftDurationMs(
-
   buildingId: PlaceableProcessorId,
-
   accelerate: boolean
-
 ): number {
-
   if (accelerate) return DEV_CRAFT_DURATION_MS;
   if (buildingId === "brickworks") return BRICKWORKS_CRAFT_DURATION_MS;
   if (buildingId === "mill") return MILL_CRAFT_DURATION_MS;
+  if (buildingId === "bakery") return BAKERY_CRAFT_DURATION_MS;
   if (buildingId === "smelter") return SMELTER_CRAFT_DURATION_MS;
+  if (buildingId === "forge") return FORGE_CRAFT_DURATION_MS;
   return SAWMILL_CRAFT_DURATION_MS;
 }
 
@@ -213,37 +202,33 @@ function settleOneProcessorTile<T extends ProcessorTileState>(
   for (let iter = 0; iter < 64; iter += 1) {
 
     if (craftEnd != null && craftEnd <= now) {
-
       const outStock = getStock(next, outputId);
-
       const cap = stockCapFor(outputId);
-
       const add = Math.min(
-
         pendingOut * outPerUnit,
-
         Math.max(0, cap - outStock.amount)
-
       );
-
+      // food : conserver lastCalculatedAt (prod continue HDV/pêche) pour éviter
+      // de rejouer le settle food entre craftEnd et now.
+      const deliveryAt =
+        outputId === "food" ? outStock.lastCalculatedAt : craftEnd;
       next = setStock(next, outputId, {
-
         amount: outStock.amount + add,
-
-        lastCalculatedAt: craftEnd
-
+        lastCalculatedAt: deliveryAt
       });
-
+      // Nourriture craftée → même surplus que la prod continue (croissance).
+      if (outputId === "food" && add > 0) {
+        next = {
+          ...next,
+          foodSurplusAccumulated:
+            Math.max(0, Math.floor(next.foodSurplusAccumulated)) + add
+        };
+      }
       clock = craftEnd;
-
       craftEnd = null;
-
       pendingOut = 0;
-
       changed = true;
-
       continue;
-
     }
 
 

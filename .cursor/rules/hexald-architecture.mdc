@@ -1,0 +1,29 @@
+---
+description: Architecture monorepo Hexald — où placer règles, contenu, UI
+alwaysApply: true
+---
+
+# Architecture Hexald
+
+Respecter la séparation existante. Pas de seconde implémentation parallèle.
+
+| Zone | Rôle |
+| --- | --- |
+| `docs/index.html` | Source de vérité design / DEC / roadmap |
+| `docs/lots/` | Plan d’exécution & statut des lots |
+| `packages/content` | Données (bâtiments, recettes, techs, économie) |
+| `packages/game-core` | Règles (validation, settle, craft, influence) |
+| `packages/shared` | Contrats / types / actions |
+| `packages/db` | Schéma Drizzle + accès PG |
+| `apps/api` | Autorité serveur |
+| `apps/web` | UI + renderer Three.js (carte uniquement) |
+
+Règles dures :
+
+- Settle **lazy** — pas de tick serveur permanent.
+- Mutations monde **sérialisées** (`withWorldLock`).
+- Logique autoritaire **hors** du client.
+- Three.js **isolé** à la carte / previews.
+- Avant un gros changement : lire l’existant et réutiliser les patterns (processors, actions, content catalogue).
+
+DEC : prochain id **DEC-028** — seulement pour décisions structurantes. Mettre à jour le hub si le comportement réel change.

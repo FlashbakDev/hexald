@@ -650,7 +650,7 @@ export function worldshardMinutesUntilNext(state: EconomyState, now = Date.now()
   return remainingMs / 60_000;
 }
 
-function settleFoodAndGrowth(state: EconomyState, now: number): EconomyState {
+export function settleFoodAndGrowth(state: EconomyState, now: number): EconomyState {
   const foodCap = stockCapFor("food");
   const current = state.stocks.food ?? { amount: 0, lastCalculatedAt: now };
   const elapsedMinutes = Math.max(0, (now - current.lastCalculatedAt) / 60_000);
@@ -751,8 +751,11 @@ function settleFoodAndGrowth(state: EconomyState, now: number): EconomyState {
   };
 }
 
-/** DEC-006 — recalcul lazy extracteurs + food / croissance (DEC-016 / 017) + éclats. */
-export function settleEconomy(state: EconomyState, now: number): EconomyState {
+/** DEC-006 — extracteurs + éclats (sans food / croissance). */
+export function settleEconomyProduction(
+  state: EconomyState,
+  now: number
+): EconomyState {
   // Soft-migration : stocks déjà au-dessus du cap (avant caps / grant hors plafond)
   // sont ramenés au max au premier settle après déploiement.
   let next = clampStocksToCaps(state);
@@ -775,7 +778,16 @@ export function settleEconomy(state: EconomyState, now: number): EconomyState {
   }
   next = settleWorldshard(next, now);
   next = settleProcessors(next, now);
-  return settleFoodAndGrowth(next, now);
+  return next;
+}
+
+/**
+ * DEC-006 — recalcul lazy extracteurs + food / croissance (DEC-016 / 017) + éclats.
+ * Pour un monde avec processors, orchestrer : production → settleProcessorTiles → food
+ * (voir `settleEconomyWithProcessors` côté API) pour que la food craftée alimente le surplus.
+ */
+export function settleEconomy(state: EconomyState, now: number): EconomyState {
+  return settleFoodAndGrowth(settleEconomyProduction(state, now), now);
 }
 
 export type AssignWorkersResult =

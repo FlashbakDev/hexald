@@ -228,10 +228,10 @@ export const TECH_NODES: readonly TechNodeDefinition[] = [
     ageId: "craft",
     label: "Poterie",
     description:
-      "+1 nourriture / plantation, briqueterie, mine d’argile, moulin.",
+      "+1 nourriture / plantation, briqueterie, mine d’argile, moulin, boulangerie.",
     scienceCost: 40,
     prerequisites: ["agriculture"],
-    unlocksLabel: "Plantation · Briques · Argile · Moulin",
+    unlocksLabel: "Plantation · Briques · Argile · Moulin · Boulangerie",
     icon: "i-lucide-amphora",
     unlocks: [
       {
@@ -257,6 +257,12 @@ export const TECH_NODES: readonly TechNodeDefinition[] = [
         refId: "mill",
         label: "Moulin",
         icon: "i-lucide-wind",
+      },
+      {
+        kind: "building",
+        refId: "bakery",
+        label: "Boulangerie",
+        icon: "i-lucide-cooking-pot",
       },
     ],
   },

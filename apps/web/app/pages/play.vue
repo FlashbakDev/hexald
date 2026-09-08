@@ -4,6 +4,7 @@ import type {
   BuildingId,
   HexCoord,
   PrimaryBiomeId,
+  ResourceId,
   WorldTileSnapshot
 } from "@hexald/shared";
 import {
@@ -29,7 +30,9 @@ import {
   SAWMILL_CRAFT_DURATION_MS,
   BRICKWORKS_CRAFT_DURATION_MS,
   MILL_CRAFT_DURATION_MS,
+  BAKERY_CRAFT_DURATION_MS,
   SMELTER_CRAFT_DURATION_MS,
+  FORGE_CRAFT_DURATION_MS,
   DEV_CRAFT_DURATION_MS,
   GOLD_RATE_PER_WORKER_PER_MINUTE,
   LIBRARY_SCIENCE_PER_WORKER_PER_MINUTE,
@@ -64,6 +67,11 @@ import {
   usePlayTutorial
 } from "~/composables/usePlayTutorial";
 import { profileAvatarSrc } from "~/utils/profileAvatars";
+import {
+  getProcessorIo,
+  resourceIcon,
+  resourceLabel
+} from "~/utils/resourceUi";
 
 definePageMeta({
   layout: "blank",
@@ -167,6 +175,8 @@ const supportOpen = ref(false);
 const notificationSettingsOpen = ref(false);
 const techTimelineOpen = ref(false);
 const constructionMenuOpen = ref(false);
+/** Évite de replier le menu quand clearSelection() émet un select(null) programmatique. */
+let suppressConstructionCloseOnSelect = false;
 const selectingResearch = ref(false);
 const researchUnlockNotice = ref<string | null>(null);
 const unlockedTechKey = ref("");
@@ -292,6 +302,49 @@ onMounted(() => {
 });
 onBeforeUnmount(() => {
   document.removeEventListener("pointerdown", onSettingsPointerDown, true);
+});
+
+/** Mobile play : privilégier le paysage (HUD rail gauche + panneaux à droite). */
+const playLandscapeLayout = ref(false);
+const playPortraitGate = ref(false);
+
+function refreshPlayOrientationLayout() {
+  if (!import.meta.client) return;
+  const narrow = window.matchMedia("(max-width: 1024px)").matches;
+  const portrait = window.matchMedia("(orientation: portrait)").matches;
+  playLandscapeLayout.value = narrow && !portrait;
+  playPortraitGate.value = narrow && portrait;
+}
+
+async function tryLockLandscape() {
+  if (!import.meta.client) return;
+  try {
+    const narrow = window.matchMedia("(max-width: 1024px)").matches;
+    const orientation = screen.orientation as ScreenOrientation & {
+      lock?: (orientation: string) => Promise<void>;
+    };
+    if (narrow && typeof orientation?.lock === "function") {
+      await orientation.lock("landscape");
+    }
+  } catch {
+    /* ignore — navigateur / gesture requis */
+  }
+}
+
+onMounted(() => {
+  refreshPlayOrientationLayout();
+  void tryLockLandscape();
+  window.addEventListener("resize", refreshPlayOrientationLayout);
+  window.addEventListener("orientationchange", refreshPlayOrientationLayout);
+});
+onBeforeUnmount(() => {
+  window.removeEventListener("resize", refreshPlayOrientationLayout);
+  window.removeEventListener("orientationchange", refreshPlayOrientationLayout);
+  try {
+    screen.orientation?.unlock?.();
+  } catch {
+    /* ignore */
+  }
 });
 
 const session = await ensureSession();
@@ -470,9 +523,22 @@ const civilizationPointsLabel = computed(() => {
   return `${total.toLocaleString("fr-FR")} PC`;
 });
 const civilizationPointsOpen = ref(false);
+const economyPanelOpen = ref(false);
+
+const {
+  ingest: ingestStockFeedback,
+  resetBaseline: resetStockFeedback,
+  isPulsing: isStockPulsing,
+  floaters: stockFloaters
+} = useStockFeedback();
 
 function openCivilizationPoints() {
   civilizationPointsOpen.value = true;
+}
+
+function openEconomyPanel() {
+  economyPanelOpen.value = true;
+  settingsOpen.value = false;
 }
 
 /** Icônes UI — labels / coûts viennent du catalogue `buildings`. */
@@ -487,7 +553,9 @@ const buildingIcons: Record<PlaceableBuildingId, { icon: string; short: string }
   market: { icon: "i-lucide-store", short: "Marché" },
   sawmill: { icon: "i-lucide-axe", short: "Scierie" },
   mill: { icon: "i-lucide-wind", short: "Moulin" },
+  bakery: { icon: "i-lucide-cooking-pot", short: "Pain" },
   smelter: { icon: "i-lucide-flame", short: "Fonte" },
+  forge: { icon: "i-lucide-hammer", short: "Forge" },
   clay_mine: { icon: "i-lucide-brick-wall", short: "Argile" },
   mine: { icon: "i-lucide-mountain", short: "Fer" },
   brickworks: { icon: "i-lucide-brick-wall", short: "Briques" }
@@ -666,6 +734,73 @@ const ironOreCap = computed(() => {
   return eco.stocks?.find((s) => s.resourceId === "iron_ore")?.cap ?? 80;
 });
 
+/** Farine — sortie moulin / entrée boulangerie (snapshot craft). */
+const displayedFlour = computed(() => {
+  const eco = economy.value;
+  if (!eco) return 0;
+  const stock = eco.stocks?.find((s) => s.resourceId === "flour");
+  return Math.floor(stock?.amount ?? 0);
+});
+
+/** Lingots — pas de rate live (sortie craft) ; stock snapshot pour gate forge. */
+const displayedIronIngot = computed(() => {
+  const eco = economy.value;
+  if (!eco) return 0;
+  const stock = eco.stocks?.find((s) => s.resourceId === "iron_ingot");
+  return Math.floor(stock?.amount ?? 0);
+});
+
+/** Outils — sortie forge ; visible pour feedback panneau. */
+const displayedTools = computed(() => {
+  const eco = economy.value;
+  if (!eco) return 0;
+  const stock = eco.stocks?.find((s) => s.resourceId === "tools");
+  return Math.floor(stock?.amount ?? 0);
+});
+
+/** Planches — sortie scierie. */
+const displayedPlanks = computed(() => {
+  const eco = economy.value;
+  if (!eco) return 0;
+  const stock = eco.stocks?.find((s) => s.resourceId === "planks");
+  return Math.floor(stock?.amount ?? 0);
+});
+
+/** Briques — sortie briqueterie. */
+const displayedStoneBlocks = computed(() => {
+  const eco = economy.value;
+  if (!eco) return 0;
+  const stock = eco.stocks?.find((s) => s.resourceId === "stone_blocks");
+  return Math.floor(stock?.amount ?? 0);
+});
+
+function stockCapOf(
+  resourceId:
+    | "wood"
+    | "wheat"
+    | "stone"
+    | "clay"
+    | "iron_ore"
+    | "flour"
+    | "iron_ingot"
+    | "tools"
+    | "planks"
+    | "stone_blocks"
+    | "gold"
+    | "food"
+    | "worldshard"
+): number | null {
+  const eco = economy.value;
+  if (!eco) return null;
+  const stock = eco.stocks?.find((s) => s.resourceId === resourceId);
+  if (stock?.cap != null && stock.cap > 0) return stock.cap;
+  if (resourceId === "wood") return eco.woodCap ?? null;
+  if (resourceId === "wheat") return eco.wheatCap ?? null;
+  if (resourceId === "stone") return eco.stoneCap ?? null;
+  if (resourceId === "food") return eco.foodCap ?? null;
+  return stock?.cap ?? null;
+}
+
 const displayedGold = computed(() => {
   const eco = economy.value;
   if (!eco) return 0;
@@ -796,7 +931,7 @@ const woodStockUi = computed(() => {
     level,
     rate,
     ratio: stockFillRatio(amount, cap),
-    yield: formatYieldBadge(rawRate, level === "full")
+    yield: formatStock(amount)
   };
 });
 
@@ -853,7 +988,7 @@ const goldStockUi = computed(() => {
     level,
     rate,
     ratio: stockFillRatio(amount, cap),
-    yield: level === "full" || rawRate <= 0 ? "+0" : formatGoldRateLabel(rawRate, true)
+    yield: formatStock(amount)
   };
 });
 
@@ -872,14 +1007,13 @@ const foodStockUi = computed(() => {
       rate = formatRatePerMinute(net);
     }
   }
-  const yieldRate = level === "full" && net > 0 ? 0 : net;
   return {
     amount,
     cap,
     level,
     rate,
     ratio: stockFillRatio(amount, cap),
-    yield: formatYieldBadge(yieldRate, false)
+    yield: formatStock(amount)
   };
 });
 
@@ -888,8 +1022,83 @@ const worldshardStockUi = computed(() => {
   const cap = worldshardCap.value;
   const level = stockFillLevel(amount, cap);
   const rate = level === "full" ? "plein" : worldshardRateLabel.value;
-  return { amount, cap, level, rate };
+  return {
+    amount,
+    cap,
+    level,
+    rate,
+    ratio: stockFillRatio(amount, cap),
+    yield: formatStock(amount)
+  };
 });
+
+/** Montants / caps pour la vue Économie (affichage serveur + projections déjà calculées). */
+const economyPanelAmounts = computed(() => ({
+  wood: displayedWood.value,
+  planks: displayedPlanks.value,
+  wheat: displayedWheat.value,
+  flour: displayedFlour.value,
+  food: displayedFood.value,
+  stone: displayedStone.value,
+  clay: displayedClay.value,
+  stone_blocks: displayedStoneBlocks.value,
+  iron_ore: displayedIronOre.value,
+  iron_ingot: displayedIronIngot.value,
+  tools: displayedTools.value,
+  gold: displayedGold.value,
+  worldshard: displayedWorldshard.value
+}));
+
+const economyPanelCaps = computed(() => ({
+  wood: woodCap.value,
+  planks: stockCapOf("planks"),
+  wheat: wheatCap.value,
+  flour: stockCapOf("flour"),
+  food: foodCap.value,
+  stone: stoneCap.value,
+  clay: clayCap.value,
+  stone_blocks: stockCapOf("stone_blocks"),
+  iron_ore: ironOreCap.value,
+  iron_ingot: stockCapOf("iron_ingot"),
+  tools: stockCapOf("tools"),
+  gold: goldCap.value,
+  worldshard: worldshardCap.value
+}));
+
+const ownedBuildingIds = computed(() => {
+  const ids = new Set<BuildingId>();
+  for (const tile of world.value?.tiles ?? []) {
+    if (tile.buildingId) ids.add(tile.buildingId);
+  }
+  return [...ids];
+});
+
+const unlockedTechIdsList = computed(
+  () => world.value?.research?.unlockedTechIds ?? []
+);
+
+/** Feedback stocks : baseline sur snapshot serveur (pas la projection live). */
+watch(
+  () => world.value?.updatedAt,
+  () => {
+    const stocks = economy.value?.stocks;
+    if (!stocks) return;
+    const next: Partial<Record<ResourceId, number>> = {};
+    for (const row of stocks) {
+      next[row.resourceId] = row.amount;
+    }
+    ingestStockFeedback(next);
+  }
+);
+
+const hudStockFloaters = computed(() =>
+  stockFloaters.value.filter((f) =>
+    f.resourceId === "food" ||
+    f.resourceId === "wood" ||
+    f.resourceId === "worldshard" ||
+    f.resourceId === "gold"
+  )
+);
 
 /** Prod HDV science — pas de stock ; progress/cost si une recherche est active. */
 const scienceStockUi = computed(() => {
@@ -1018,7 +1227,9 @@ const selectedConstruction = computed(() => {
     buildingId !== "market" &&
     buildingId !== "sawmill" &&
     buildingId !== "mill" &&
+    buildingId !== "bakery" &&
     buildingId !== "smelter" &&
+    buildingId !== "forge" &&
     buildingId !== "clay_mine" &&
     buildingId !== "mine" &&
     buildingId !== "brickworks"
@@ -1103,7 +1314,9 @@ function workersForBuilding(
     buildingId !== "fishing_hut" &&
     buildingId !== "sawmill" &&
     buildingId !== "mill" &&
+    buildingId !== "bakery" &&
     buildingId !== "smelter" &&
+    buildingId !== "forge" &&
     buildingId !== "clay_mine" &&
     buildingId !== "mine" &&
     buildingId !== "brickworks" &&
@@ -1604,6 +1817,36 @@ const selectedWorkerPanel = computed((): WorkerPanel | null => {
       canRemove: !orphan && !assigning.value && assigned > 0
     };
   }
+  if (tile.buildingId === "bakery") {
+    const flour = displayedFlour.value;
+    const canCraft = flour + 1e-9 >= 1;
+    const stockFull = foodStockUi.value.level === "full";
+    const crafting = Boolean(
+      tile.craftCompletesAt &&
+        Date.parse(tile.craftCompletesAt) > nowTick.value
+    );
+    return {
+      title: "Artisan",
+      hint: orphan
+        ? orphanHint
+        : stockFull
+          ? "Stock de nourriture plein — la boulangerie attend."
+          : crafting
+            ? "Cuisson en cours…"
+            : assigned <= 0
+              ? "Assigne un artisan pour transformer la farine en nourriture."
+              : !canCraft
+                ? "Farine insuffisante (1 farine → 2 nourriture)."
+                : `1 artisan → 2 nourriture toutes les 2 min.${
+                    flour > 0 ? ` Farine : ${flour}.` : ""
+                  }`,
+      count: assigned,
+      max,
+      rateLabel: "",
+      canAdd: !orphan && !assigning.value && assigned < max && idlePop.value > 0,
+      canRemove: !orphan && !assigning.value && assigned > 0
+    };
+  }
   if (tile.buildingId === "smelter") {
     const ore = displayedIronOre.value;
     const canCraft = ore + 1e-9 >= 5;
@@ -1622,6 +1865,35 @@ const selectedWorkerPanel = computed((): WorkerPanel | null => {
             : !canCraft
               ? "Pas assez de minerai (5 minerai → 1 lingot)."
               : "1 artisan → 1 lingot toutes les 2 min.",
+      count: assigned,
+      max,
+      rateLabel: "",
+      canAdd: !orphan && !assigning.value && assigned < max && idlePop.value > 0,
+      canRemove: !orphan && !assigning.value && assigned > 0
+    };
+  }
+  if (tile.buildingId === "forge") {
+    const ingots = displayedIronIngot.value;
+    const canCraft = ingots + 1e-9 >= 5;
+    const crafting = Boolean(
+      tile.craftCompletesAt &&
+        Date.parse(tile.craftCompletesAt) > nowTick.value
+    );
+    return {
+      title: "Artisan",
+      hint: orphan
+        ? orphanHint
+        : crafting
+          ? "Forgeage en cours…"
+          : assigned <= 0
+            ? "Assigne un artisan pour forger des outils."
+            : !canCraft
+              ? "Pas assez de lingots (5 lingots → 1 outil)."
+              : `1 artisan → 1 outil toutes les 2 min.${
+                  displayedTools.value > 0
+                    ? ` Stock : ${displayedTools.value} outil${displayedTools.value > 1 ? "s" : ""}.`
+                    : ""
+                }`,
       count: assigned,
       max,
       rateLabel: "",
@@ -1675,6 +1947,98 @@ const selectedWorkerPanel = computed((): WorkerPanel | null => {
   return null;
 });
 
+/** Chaîne input → output pour processors (Lot 3 — lisibilité). */
+const selectedProcessorIoUi = computed(() => {
+  const tile = selectedWorldTile.value;
+  if (!tile?.buildingId || selectedConstruction.value) return null;
+  const io = getProcessorIo(tile.buildingId);
+  if (!io) return null;
+
+  const inputAmount = (() => {
+    switch (io.inputId) {
+      case "wood":
+        return Math.floor(displayedWood.value);
+      case "wheat":
+        return Math.floor(displayedWheat.value);
+      case "flour":
+        return displayedFlour.value;
+      case "iron_ore":
+        return Math.floor(displayedIronOre.value);
+      case "iron_ingot":
+        return displayedIronIngot.value;
+      case "clay":
+        return Math.floor(displayedClay.value);
+      default:
+        return 0;
+    }
+  })();
+
+  const outputAmount = (() => {
+    switch (io.outputId) {
+      case "planks":
+        return displayedPlanks.value;
+      case "flour":
+        return displayedFlour.value;
+      case "food":
+        return Math.floor(displayedFood.value);
+      case "iron_ingot":
+        return displayedIronIngot.value;
+      case "tools":
+        return displayedTools.value;
+      case "stone_blocks":
+        return displayedStoneBlocks.value;
+      default:
+        return 0;
+    }
+  })();
+
+  const assigned = tile.assignedWorkers ?? 0;
+  const orphan = selectedOutsideInfluence.value;
+  const crafting = Boolean(
+    tile.craftCompletesAt && Date.parse(tile.craftCompletesAt) > nowTick.value
+  );
+  const canCraft = inputAmount + 1e-9 >= io.inputPerCraft;
+  const outputFull =
+    io.outputId === "food" && foodStockUi.value.level === "full";
+
+  let status: "active" | "crafting" | "blocked" = "blocked";
+  let statusLabel = "Bloqué";
+  let blockReason: string | null = null;
+
+  if (orphan) {
+    blockReason = "Hors civilisation — inutilisable";
+  } else if (outputFull) {
+    blockReason = "Stock de sortie plein";
+  } else if (crafting) {
+    status = "crafting";
+    statusLabel = "En cours";
+  } else if (assigned <= 0) {
+    blockReason = "Aucun artisan assigné";
+  } else if (!canCraft) {
+    blockReason = `${resourceLabel(io.inputId)} insuffisant (${io.inputPerCraft} → ${io.outputPerCraft})`;
+  } else {
+    status = "active";
+    statusLabel = "Actif";
+  }
+
+  return {
+    chainLabel: io.chainLabel,
+    inputId: io.inputId,
+    outputId: io.outputId,
+    inputLabel: resourceLabel(io.inputId),
+    outputLabel: resourceLabel(io.outputId),
+    inputIcon: resourceIcon(io.inputId),
+    outputIcon: resourceIcon(io.outputId),
+    inputAmount,
+    outputAmount,
+    inputNeed: io.inputPerCraft,
+    outputPerCraft: io.outputPerCraft,
+    status,
+    statusLabel,
+    blockReason
+  };
+});
+
 /** Progression craft processor (barre sous les steppers). */
 const selectedProcessorCraft = computed(() => {
   const tile = selectedWorldTile.value;
@@ -1683,7 +2047,9 @@ const selectedProcessorCraft = computed(() => {
     tile.buildingId !== "sawmill" &&
     tile.buildingId !== "brickworks" &&
     tile.buildingId !== "mill" &&
-    tile.buildingId !== "smelter"
+    tile.buildingId !== "bakery" &&
+    tile.buildingId !== "smelter" &&
+    tile.buildingId !== "forge"
   ) {
     return null;
   }
@@ -1698,9 +2064,13 @@ const selectedProcessorCraft = computed(() => {
       ? BRICKWORKS_CRAFT_DURATION_MS
       : tile.buildingId === "mill"
         ? MILL_CRAFT_DURATION_MS
-        : tile.buildingId === "smelter"
-          ? SMELTER_CRAFT_DURATION_MS
-          : SAWMILL_CRAFT_DURATION_MS;
+        : tile.buildingId === "bakery"
+          ? BAKERY_CRAFT_DURATION_MS
+          : tile.buildingId === "smelter"
+            ? SMELTER_CRAFT_DURATION_MS
+            : tile.buildingId === "forge"
+              ? FORGE_CRAFT_DURATION_MS
+              : SAWMILL_CRAFT_DURATION_MS;
   const progress = Math.min(
     1,
     Math.max(0, 1 - (craftEnds - nowTick.value) / Math.max(1, durationMs))
@@ -1711,12 +2081,17 @@ const selectedProcessorCraft = computed(() => {
       ? { verb: "Cuisson", unit: "brique" }
       : tile.buildingId === "mill"
         ? { verb: "Meunerie", unit: "farine" }
-        : tile.buildingId === "smelter"
-          ? { verb: "Fonte", unit: "lingot" }
-          : { verb: "Sciage", unit: "planche" };
+        : tile.buildingId === "bakery"
+          ? { verb: "Cuisson", unit: "nourriture" }
+          : tile.buildingId === "smelter"
+            ? { verb: "Fonte", unit: "lingot" }
+            : tile.buildingId === "forge"
+              ? { verb: "Forgeage", unit: "outil" }
+              : { verb: "Sciage", unit: "planche" };
   return {
     progress,
     label: formatRemaining(Math.max(0, craftEnds - nowTick.value)),
+    /** Legacy buffer = outputs réservés ; non affiché (valve abandonnée). */
     pending,
     verb: meta.verb,
     unit: meta.unit
@@ -1810,6 +2185,17 @@ const selectedProductionLine = computed((): string | null => {
     const label = n === 1 ? "1 farine" : `${n} farines`;
     return `${label} / ${formatRemaining(durationMs)}`;
   }
+  if (tile.buildingId === "bakery") {
+    if (assigned <= 0) return "—";
+    if (foodStockUi.value.level === "full") return "—";
+    if (displayedFlour.value + 1e-9 < assigned * 1) return "—";
+    const durationMs = accelerateTimers.value
+      ? DEV_CRAFT_DURATION_MS
+      : BAKERY_CRAFT_DURATION_MS;
+    const n = assigned * 2;
+    const label = n === 1 ? "1 nourriture" : `${n} nourriture`;
+    return `${label} / ${formatRemaining(durationMs)}`;
+  }
   if (tile.buildingId === "smelter") {
     if (assigned <= 0) return "—";
     if (displayedIronOre.value + 1e-9 < assigned * 5) return "—";
@@ -1818,6 +2204,16 @@ const selectedProductionLine = computed((): string | null => {
       : SMELTER_CRAFT_DURATION_MS;
     const n = assigned;
     const label = n === 1 ? "1 lingot" : `${n} lingots`;
+    return `${label} / ${formatRemaining(durationMs)}`;
+  }
+  if (tile.buildingId === "forge") {
+    if (assigned <= 0) return "—";
+    if (displayedIronIngot.value + 1e-9 < assigned * 5) return "—";
+    const durationMs = accelerateTimers.value
+      ? DEV_CRAFT_DURATION_MS
+      : FORGE_CRAFT_DURATION_MS;
+    const n = assigned;
+    const label = n === 1 ? "1 outil" : `${n} outils`;
     return `${label} / ${formatRemaining(durationMs)}`;
   }
   if (tile.buildingId === "brickworks") {
@@ -2264,9 +2660,22 @@ function selectConstruction(id: PlaceableBuildingId) {
 }
 
 function onStagePointerDown(event: PointerEvent) {
-  if (event.pointerType !== "touch" || !anyWheelOpen.value) return;
   const target = event.target;
   if (!(target instanceof Node)) return;
+
+  // Clic hors du dialogue construction (HUD, chrome…) → replier.
+  // La carte (canvas) est gérée par onSelect pour ne pas casser le placement.
+  if (constructionMenuOpen.value) {
+    const insideSheet = constructionBarRef.value?.contains(target);
+    const onFab =
+      target instanceof Element && !!target.closest(".play-construction-fab");
+    const onCanvas = target instanceof HTMLCanvasElement;
+    if (!insideSheet && !onFab && !onCanvas) {
+      closeConstructionMenu();
+    }
+  }
+
+  if (event.pointerType !== "touch" || !anyWheelOpen.value) return;
   if (wheelRoot.value?.contains(target)) return;
   if (buildingSheet.value?.contains(target)) return;
   if (constructionBarRef.value?.contains(target)) return;
@@ -2302,7 +2711,10 @@ function onSelect(tile: SelectedTile | null) {
 
   debugBiomeOpen.value = false;
   destroyConfirm.value = false;
-  if (tile != null) {
+  if (
+    constructionMenuOpen.value &&
+    (tile != null || !suppressConstructionCloseOnSelect)
+  ) {
     closeConstructionMenu();
   }
   selected.value = tile;
@@ -2319,7 +2731,12 @@ function clearSelection() {
   selected.value = null;
   debugBiomeOpen.value = false;
   destroyConfirm.value = false;
-  preview.value?.clearSelection();
+  suppressConstructionCloseOnSelect = true;
+  try {
+    preview.value?.clearSelection();
+  } finally {
+    suppressConstructionCloseOnSelect = false;
+  }
 }
 
 function openDebugBiomeWheel() {
@@ -2488,6 +2905,7 @@ async function onResetWorld() {
   resetting.value = true;
   expandError.value = null;
   clearSelection();
+  resetStockFeedback();
   try {
     const snapshot = await resetWorld(id);
     if (!snapshot) {
@@ -2709,10 +3127,27 @@ watch(
       'game-shell--construction-bar-collapsed': world && !constructionMenuOpen,
       'game-shell--tech-bar': world,
       'game-shell--tech-bar-collapsed': world && !techTimelineOpen,
-      'game-shell--building-sheet': showBuildingSheet
+      'game-shell--building-sheet': showBuildingSheet,
+      'game-shell--play-landscape': playLandscapeLayout,
+      'game-shell--play-portrait-gate': playPortraitGate
     }"
     @pointerdown.capture="onStagePointerDown"
   >
+    <div
+      v-if="playPortraitGate"
+      class="play-rotate-gate"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="play-rotate-title"
+    >
+      <div class="play-rotate-gate__card">
+        <UIcon name="i-lucide-smartphone" class="play-rotate-gate__icon" aria-hidden="true" />
+        <p id="play-rotate-title" class="play-rotate-gate__title">Tourne ton appareil</p>
+        <p class="play-rotate-gate__body">
+          Hexald se joue en paysage sur mobile.
+        </p>
+      </div>
+    </div>
     <div
       v-if="!world"
       class="absolute inset-0 z-50 flex items-center justify-center bg-[#dfe8e4] p-6 text-center"
@@ -2824,76 +3259,173 @@ watch(
       </div>
 
       <div class="play-cloud-header__content pointer-events-auto">
-        <div class="play-cloud-header__identity">
-          <div class="play-cloud-header__identity-top">
-            <button
-              type="button"
-              class="play-cloud-header__avatar"
-              :class="{ 'play-cloud-header__avatar--interactive': true }"
-              :aria-label="`Ouvrir le profil${pseudo ? ` (${pseudo})` : ''}`"
-              :title="pseudo ? `${pseudo} · profil` : 'Profil'"
-              :style="
-                profileAvatarUrl
-                  ? { backgroundImage: `url(${profileAvatarUrl})` }
-                  : undefined
-              "
-              @click="openAvatarPicker"
-            />
-            <div class="play-cloud-header__identity-text min-w-0">
+        <div class="play-cloud-header__rail">
+          <div class="play-cloud-header__identity">
+            <div class="play-cloud-header__identity-top">
               <button
                 type="button"
-                class="play-cloud-header__name play-cloud-header__name--btn truncate"
-                :title="pseudo ? `${pseudo} · modifier le profil` : 'Modifier le profil'"
+                class="play-cloud-header__avatar"
+                :class="{ 'play-cloud-header__avatar--interactive': true }"
+                :aria-label="`Ouvrir le profil${pseudo ? ` (${pseudo})` : ''}`"
+                :title="pseudo ? `${pseudo} · profil` : 'Profil'"
+                :style="
+                  profileAvatarUrl
+                    ? { backgroundImage: `url(${profileAvatarUrl})` }
+                    : undefined
+                "
                 @click="openAvatarPicker"
-              >
-                {{ pseudo ?? "…" }}
-              </button>
-              <div class="play-cloud-header__pc-row">
-                <p class="play-cloud-header__pc">
-                  {{ civilizationPointsLabel }}
-                </p>
+              />
+              <div class="play-cloud-header__identity-text min-w-0">
                 <button
                   type="button"
-                  class="play-cloud-header__pc-help"
-                  aria-label="Détail des points de civilisation"
-                  @click="openCivilizationPoints"
+                  class="play-cloud-header__name play-cloud-header__name--btn"
+                  :class="{ truncate: !playLandscapeLayout }"
+                  :title="pseudo ? `${pseudo} · modifier le profil` : 'Modifier le profil'"
+                  @click="openAvatarPicker"
                 >
-                  ?
+                  {{ pseudo ?? "…" }}
                 </button>
+                <div class="play-cloud-header__pc-row">
+                  <p class="play-cloud-header__pc">
+                    {{ civilizationPointsLabel }}
+                  </p>
+                  <button
+                    type="button"
+                    class="play-cloud-header__pc-help"
+                    aria-label="Détail des points de civilisation"
+                    @click="openCivilizationPoints"
+                  >
+                    ?
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div
+              v-if="economy"
+              class="play-cloud-header__pop-row"
+              :title="`Population ${population}/${populationCap}`"
+            >
+              <p class="play-cloud-header__stat play-cloud-header__stat--pop">
+                <UIcon name="i-lucide-users" class="play-cloud-header__stat-icon" aria-hidden="true" />
+                <span class="sr-only">Population</span>
+                {{ population }}/{{ populationCap }}
+              </p>
+              <div
+                class="play-cloud-header__growth"
+                :class="`play-cloud-header__growth--${popGrowthTone}`"
+                :title="popGrowthTitle"
+              >
+                <div class="play-cloud-header__growth-track">
+                  <div
+                    class="play-cloud-header__growth-fill"
+                    :style="{ width: `${popGrowthPercent}%` }"
+                  />
+                </div>
+                <span class="play-cloud-header__growth-next">
+                  +1
+                  <UIcon name="i-lucide-users" class="play-cloud-header__growth-next-icon" aria-hidden="true" />
+                  <span
+                    v-if="popGrowthTone === 'housing'"
+                    class="play-cloud-header__growth-housing"
+                    aria-label="Manque de logements"
+                  >
+                    <UIcon name="i-lucide-house" class="play-cloud-header__growth-housing-icon" aria-hidden="true" />
+                  </span>
+                </span>
               </div>
             </div>
           </div>
+
           <div
             v-if="economy"
-            class="play-cloud-header__pop-row"
-            :title="`Population ${population}/${populationCap}`"
+            class="play-cloud-header__resources"
+            aria-label="Ressources de base"
           >
-            <p class="play-cloud-header__stat play-cloud-header__stat--pop">
-              <UIcon name="i-lucide-users" class="play-cloud-header__stat-icon" aria-hidden="true" />
-              <span class="sr-only">Population</span>
-              {{ population }}/{{ populationCap }}
-            </p>
-            <div
-              class="play-cloud-header__growth"
-              :class="`play-cloud-header__growth--${popGrowthTone}`"
-              :title="popGrowthTitle"
+            <button
+              type="button"
+              class="play-cloud-header__res"
+              :class="[
+                `play-cloud-header__res--${foodStockUi.level}`,
+                { 'play-cloud-header__res--pulse': isStockPulsing('food') }
+              ]"
+              :style="{ '--fill': foodStockUi.ratio }"
+              :title="`Nourriture ${formatStock(foodStockUi.amount)}/${formatStock(foodStockUi.cap)} · ${foodStockUi.rate}`"
+              :aria-label="`Nourriture ${formatStock(foodStockUi.amount)} sur ${formatStock(foodStockUi.cap)}. Ouvrir l’économie`"
+              @click="openEconomyPanel"
             >
-              <div class="play-cloud-header__growth-track">
-                <div
-                  class="play-cloud-header__growth-fill"
-                  :style="{ width: `${popGrowthPercent}%` }"
-                />
-              </div>
-              <span class="play-cloud-header__growth-next">
-                +1
-                <UIcon name="i-lucide-users" class="play-cloud-header__growth-next-icon" aria-hidden="true" />
-                <span
-                  v-if="popGrowthTone === 'housing'"
-                  class="play-cloud-header__growth-housing"
-                  aria-label="Manque de logements"
-                >
-                  <UIcon name="i-lucide-house" class="play-cloud-header__growth-housing-icon" aria-hidden="true" />
-                </span>
+              <span class="play-cloud-header__res-ring" aria-hidden="true" />
+              <span class="play-cloud-header__res-core">
+                <UIcon name="i-lucide-beef" class="play-cloud-header__res-glyph" aria-hidden="true" />
+                <span class="play-cloud-header__res-yield">{{ foodStockUi.yield }}</span>
+              </span>
+            </button>
+            <button
+              type="button"
+              class="play-cloud-header__res"
+              :class="[
+                `play-cloud-header__res--${woodStockUi.level}`,
+                { 'play-cloud-header__res--pulse': isStockPulsing('wood') }
+              ]"
+              :style="{ '--fill': woodStockUi.ratio }"
+              :title="`Bois ${formatStock(woodStockUi.amount)}/${formatStock(woodStockUi.cap)} · ${woodStockUi.rate}`"
+              :aria-label="`Bois ${formatStock(woodStockUi.amount)} sur ${formatStock(woodStockUi.cap)}. Ouvrir l’économie`"
+              @click="openEconomyPanel"
+            >
+              <span class="play-cloud-header__res-ring" aria-hidden="true" />
+              <span class="play-cloud-header__res-core">
+                <UIcon name="i-lucide-tree-pine" class="play-cloud-header__res-glyph" aria-hidden="true" />
+                <span class="play-cloud-header__res-yield">{{ woodStockUi.yield }}</span>
+              </span>
+            </button>
+            <button
+              type="button"
+              class="play-cloud-header__res"
+              :class="[
+                `play-cloud-header__res--${worldshardStockUi.level}`,
+                { 'play-cloud-header__res--pulse': isStockPulsing('worldshard') }
+              ]"
+              :style="{ '--fill': worldshardStockUi.ratio }"
+              :title="`Éclats ${formatStock(worldshardStockUi.amount)}/${formatStock(worldshardStockUi.cap)} · ${worldshardStockUi.rate}`"
+              :aria-label="`Éclats de monde ${formatStock(worldshardStockUi.amount)} sur ${formatStock(worldshardStockUi.cap)}. Ouvrir l’économie`"
+              @click="openEconomyPanel"
+            >
+              <span class="play-cloud-header__res-ring" aria-hidden="true" />
+              <span class="play-cloud-header__res-core">
+                <UIcon name="i-lucide-sparkles" class="play-cloud-header__res-glyph" aria-hidden="true" />
+                <span class="play-cloud-header__res-yield">{{ worldshardStockUi.yield }}</span>
+              </span>
+            </button>
+            <button
+              type="button"
+              class="play-cloud-header__res"
+              :class="[
+                `play-cloud-header__res--${goldStockUi.level}`,
+                { 'play-cloud-header__res--pulse': isStockPulsing('gold') }
+              ]"
+              :style="{ '--fill': goldStockUi.ratio }"
+              :title="`Or ${formatStock(goldStockUi.amount)}/${formatStock(goldStockUi.cap)} · ${goldStockUi.rate}`"
+              :aria-label="`Or ${formatStock(goldStockUi.amount)} sur ${formatStock(goldStockUi.cap)}. Ouvrir l’économie`"
+              @click="openEconomyPanel"
+            >
+              <span class="play-cloud-header__res-ring" aria-hidden="true" />
+              <span class="play-cloud-header__res-core">
+                <UIcon name="i-lucide-coins" class="play-cloud-header__res-glyph" aria-hidden="true" />
+                <span class="play-cloud-header__res-yield">{{ goldStockUi.yield }}</span>
+              </span>
+            </button>
+
+            <div
+              v-if="hudStockFloaters.length"
+              class="play-cloud-header__floaters"
+              aria-hidden="true"
+            >
+              <span
+                v-for="floater in hudStockFloaters"
+                :key="floater.key"
+                class="play-cloud-header__floater"
+                :class="floater.delta > 0 ? 'play-cloud-header__floater--plus' : 'play-cloud-header__floater--minus'"
+              >
+                {{ floater.delta > 0 ? `+${floater.delta}` : floater.delta }}
               </span>
             </div>
           </div>
@@ -2901,6 +3433,17 @@ watch(
 
         <div class="play-cloud-header__end">
           <nav class="play-top-actions" aria-label="Raccourcis">
+            <button
+              type="button"
+              class="play-top-actions__btn"
+              :class="{ 'play-top-actions__btn--active': economyPanelOpen }"
+              title="Économie"
+              aria-label="Ouvrir l’économie détaillée"
+              :aria-expanded="economyPanelOpen"
+              @click="openEconomyPanel"
+            >
+              <UIcon name="i-lucide-chart-column" class="play-top-actions__icon" />
+            </button>
             <NuxtLink
               to="/news"
               class="play-top-actions__btn"
@@ -2987,70 +3530,6 @@ watch(
               </div>
             </div>
           </nav>
-
-          <div
-            v-if="economy"
-            class="play-cloud-header__resources"
-            aria-label="Ressources de base"
-          >
-            <div
-              class="play-cloud-header__res"
-              :class="`play-cloud-header__res--${woodStockUi.level}`"
-              :style="{ '--fill': woodStockUi.ratio }"
-              :title="`Bois ${formatStock(woodStockUi.amount)}/${formatStock(woodStockUi.cap)} · ${woodStockUi.rate}`"
-              role="img"
-              :aria-label="`Bois ${formatStock(woodStockUi.amount)} sur ${formatStock(woodStockUi.cap)}, rendement ${woodStockUi.yield}`"
-            >
-              <span class="play-cloud-header__res-ring" aria-hidden="true" />
-              <span class="play-cloud-header__res-core">
-                <UIcon name="i-lucide-tree-pine" class="play-cloud-header__res-glyph" aria-hidden="true" />
-                <span class="play-cloud-header__res-yield">{{ woodStockUi.yield }}</span>
-              </span>
-            </div>
-            <div
-              class="play-cloud-header__res"
-              :class="`play-cloud-header__res--${foodStockUi.level}`"
-              :style="{ '--fill': foodStockUi.ratio }"
-              :title="`Nourriture ${formatStock(foodStockUi.amount)}/${formatStock(foodStockUi.cap)} · ${foodStockUi.rate}`"
-              role="img"
-              :aria-label="`Nourriture ${formatStock(foodStockUi.amount)} sur ${formatStock(foodStockUi.cap)}, rendement ${foodStockUi.yield}`"
-            >
-              <span class="play-cloud-header__res-ring" aria-hidden="true" />
-              <span class="play-cloud-header__res-core">
-                <UIcon name="i-lucide-beef" class="play-cloud-header__res-glyph" aria-hidden="true" />
-                <span class="play-cloud-header__res-yield">{{ foodStockUi.yield }}</span>
-              </span>
-            </div>
-            <div
-              class="play-cloud-header__res"
-              :class="`play-cloud-header__res--${stoneStockUi.level}`"
-              :style="{ '--fill': stoneStockUi.ratio }"
-              :title="`Pierre ${formatStock(stoneStockUi.amount)}/${formatStock(stoneStockUi.cap)} · ${stoneStockUi.rate}`"
-              role="img"
-              :aria-label="`Pierre ${formatStock(stoneStockUi.amount)} sur ${formatStock(stoneStockUi.cap)}, rendement ${stoneStockUi.yield}`"
-            >
-              <span class="play-cloud-header__res-ring" aria-hidden="true" />
-              <span class="play-cloud-header__res-core">
-                <UIcon name="i-lucide-stone" class="play-cloud-header__res-glyph" aria-hidden="true" />
-                <span class="play-cloud-header__res-yield">{{ stoneStockUi.yield }}</span>
-              </span>
-            </div>
-            <div
-              v-if="economy.hasMarket || goldStockUi.amount > 0 || liveGoldRate > 0"
-              class="play-cloud-header__res"
-              :class="`play-cloud-header__res--${goldStockUi.level}`"
-              :style="{ '--fill': goldStockUi.ratio }"
-              :title="`Or ${formatStock(goldStockUi.amount)}/${formatStock(goldStockUi.cap)} · ${goldStockUi.rate}`"
-              role="img"
-              :aria-label="`Or ${formatStock(goldStockUi.amount)} sur ${formatStock(goldStockUi.cap)}, rendement ${goldStockUi.yield}`"
-            >
-              <span class="play-cloud-header__res-ring" aria-hidden="true" />
-              <span class="play-cloud-header__res-core">
-                <UIcon name="i-lucide-coins" class="play-cloud-header__res-glyph" aria-hidden="true" />
-                <span class="play-cloud-header__res-yield">{{ goldStockUi.yield }}</span>
-              </span>
-            </div>
-          </div>
         </div>
       </div>
 
@@ -3093,7 +3572,7 @@ watch(
     <button
       v-if="world && isDevClient && !debugChromeVisible"
       type="button"
-      class="play-dev-chrome play-dev-chrome--toggle pointer-events-auto absolute left-3 z-30 flex size-11 items-center justify-center rounded-full border border-[#1c2b28]/12 bg-white/80 text-[#2d5248] shadow-[0_8px_24px_rgb(28_43_40_/_0.1)] backdrop-blur-md transition hover:border-[#4a7c6f]/45 hover:text-[#1c2b28] active:scale-95"
+      class="play-dev-chrome play-dev-chrome--toggle pointer-events-auto absolute left-1/2 z-30 flex size-11 -translate-x-1/2 items-center justify-center rounded-full border border-[#1c2b28]/12 bg-white/80 text-[#2d5248] shadow-[0_8px_24px_rgb(28_43_40_/_0.1)] backdrop-blur-md transition hover:border-[#4a7c6f]/45 hover:text-[#1c2b28] active:scale-95"
       title="Afficher l’interface debug (accélère chantiers & recherches à 5 s)"
       aria-label="Afficher l’interface debug"
       @click="toggleDebugChrome"
@@ -3103,7 +3582,7 @@ watch(
 
     <div
       v-if="world && isDevClient && debugChromeVisible"
-      class="play-dev-chrome play-dev-chrome--panel pointer-events-auto absolute left-3 z-30 flex max-w-[calc(100%-5.5rem)] flex-wrap items-center gap-2"
+      class="play-dev-chrome play-dev-chrome--panel pointer-events-auto absolute left-1/2 z-30 flex max-w-[min(96%,42rem)] -translate-x-1/2 flex-wrap items-center justify-center gap-2"
     >
       <button
         type="button"
@@ -3381,6 +3860,14 @@ watch(
       :points="world?.civilizationPoints ?? null"
     />
 
+    <PlayEconomyPanel
+      v-model:open="economyPanelOpen"
+      :amounts="economyPanelAmounts"
+      :caps="economyPanelCaps"
+      :unlocked-tech-ids="unlockedTechIdsList"
+      :owned-building-ids="ownedBuildingIds"
+    />
+
     <Transition name="biome-wheel">
       <div
         v-if="showDebugHub"
@@ -3548,7 +4035,10 @@ watch(
                 <p v-if="selectedConstruction && !destroyConfirm" class="building-sheet__hint">
                   En construction · {{ selectedConstruction.label }} · 1 habitant réservé
                 </p>
-                <p v-else-if="selectedWorkerPanel && !destroyConfirm" class="building-sheet__hint">
+                <p
+                  v-else-if="selectedWorkerPanel && !selectedProcessorIoUi && !destroyConfirm"
+                  class="building-sheet__hint"
+                >
                   {{ selectedWorkerPanel.hint }}
                 </p>
                 <p v-else-if="selected.hasVillage" class="building-sheet__hint">
@@ -3560,27 +4050,6 @@ watch(
               </template>
             </div>
             <div class="flex shrink-0 items-center gap-1.5">
-              <button
-                v-if="canDestroySelectedBuilding && !destroyConfirm"
-                type="button"
-                class="building-sheet__close"
-                title="Détruire le bâtiment"
-                aria-label="Détruire le bâtiment"
-                :disabled="destroying"
-                @click="askDestroyBuilding"
-              >
-                <UIcon name="i-lucide-trash-2" class="size-4 text-[#9b4a4a]" />
-              </button>
-              <button
-                v-if="showDebugBugOnSheet"
-                type="button"
-                class="building-sheet__close"
-                title="Debug biome"
-                aria-label="Debug biome"
-                @click="openDebugBiomeWheel"
-              >
-                <UIcon name="i-lucide-bug" class="size-4 text-[#9b4a4a]" />
-              </button>
               <button
                 type="button"
                 class="building-sheet__close"
@@ -3662,6 +4131,53 @@ watch(
           </div>
 
           <div
+            v-if="selectedProcessorIoUi && !destroyConfirm && !selectedConstruction"
+            class="processor-io"
+          >
+            <div class="processor-io__chain">
+              <span class="processor-io__node">
+                <UIcon
+                  :name="selectedProcessorIoUi.inputIcon"
+                  class="processor-io__icon"
+                  aria-hidden="true"
+                />
+                <span class="processor-io__stock">
+                  {{ formatStock(selectedProcessorIoUi.inputAmount) }}
+                </span>
+                <span class="processor-io__need">
+                  /{{ selectedProcessorIoUi.inputNeed }}
+                </span>
+              </span>
+              <span class="processor-io__arrow" aria-hidden="true">→</span>
+              <span class="processor-io__node">
+                <UIcon
+                  :name="selectedProcessorIoUi.outputIcon"
+                  class="processor-io__icon"
+                  aria-hidden="true"
+                />
+                <span class="processor-io__stock">
+                  {{ formatStock(selectedProcessorIoUi.outputAmount) }}
+                </span>
+              </span>
+              <span
+                class="processor-io__status"
+                :class="`processor-io__status--${selectedProcessorIoUi.status}`"
+              >
+                {{ selectedProcessorIoUi.statusLabel }}
+              </span>
+            </div>
+            <p class="processor-io__labels">
+              {{ selectedProcessorIoUi.chainLabel }}
+            </p>
+            <p
+              v-if="selectedProcessorIoUi.blockReason"
+              class="processor-io__block"
+            >
+              {{ selectedProcessorIoUi.blockReason }}
+            </p>
+          </div>
+
+          <div
             v-if="selectedWorkerPanel && !destroyConfirm"
             class="mt-3 flex items-center justify-between gap-3"
           >
@@ -3700,7 +4216,7 @@ watch(
             class="mt-3"
           >
             <p class="building-sheet__hint mb-1.5">
-              {{ selectedProcessorCraft.verb }}{{ selectedProcessorCraft.pending > 0 ? ` · ${selectedProcessorCraft.pending} ${selectedProcessorCraft.unit}${selectedProcessorCraft.pending > 1 ? "s" : ""}` : "" }}
+              {{ selectedProcessorCraft.verb }}
               · {{ selectedProcessorCraft.label }}
             </p>
             <div class="h-1.5 overflow-hidden rounded-full bg-[#1c2b28]/10">
@@ -3718,6 +4234,33 @@ watch(
             Production :
             <span class="font-mono">{{ selectedProductionLine }}</span>
           </p>
+
+          <div
+            v-if="(canDestroySelectedBuilding && !destroyConfirm) || showDebugBugOnSheet"
+            class="building-sheet__footer-actions"
+          >
+            <button
+              v-if="canDestroySelectedBuilding && !destroyConfirm"
+              type="button"
+              class="building-sheet__close"
+              title="Détruire le bâtiment"
+              aria-label="Détruire le bâtiment"
+              :disabled="destroying"
+              @click="askDestroyBuilding"
+            >
+              <UIcon name="i-lucide-trash-2" class="size-4 text-[#9b4a4a]" />
+            </button>
+            <button
+              v-if="showDebugBugOnSheet"
+              type="button"
+              class="building-sheet__close"
+              title="Debug biome"
+              aria-label="Debug biome"
+              @click="openDebugBiomeWheel"
+            >
+              <UIcon name="i-lucide-bug" class="size-4 text-[#9b4a4a]" />
+            </button>
+          </div>
         </div>
       </aside>
     </Transition>

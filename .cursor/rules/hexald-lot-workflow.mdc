@@ -1,0 +1,30 @@
+---
+description: Workflow obligatoire par lot (audit → proposition → impl → validation → CR)
+alwaysApply: true
+---
+
+# Workflow par lot
+
+Lire `docs/lots/STATUS.md` puis la fiche `LOT-XX-*.md` du lot courant.
+
+## A — Audit (avant code)
+
+Fichiers, modèles, helpers existants, incohérences content/runtime/UI/docs. Plus petit changement pour **terminer** le système. Pas de refactor hors lot.
+
+## B — Proposition
+
+Comportement, diffs content / game-core / API / UI / DB, tests. Solution la plus simple compatible avec l’existant.
+
+## C — Implémentation
+
+Règles + données + persistance + API + UI + feedback + erreurs + docs utiles. Rien de « présent mais invisible ».
+
+## D — Validation
+
+Typecheck, lint, tests (+ nouveaux ciblés), build. Cas : stock insuffisant, worker manquant, chantier, sans input, stock plein, influence, settle lazy, refresh.
+
+## E — Compte rendu
+
+Réalisé · fichiers clés · validation · restes non bloquants · **prochain lot nommé sans l’implémenter**. Mettre à jour `STATUS.md` + fiche lot → `done`.
+
+Lot 3 actuel : HUD / stocks secondaires. **Interdit** de commencer un lot `blocked` ; un seul lot `in_progress` à la fois.

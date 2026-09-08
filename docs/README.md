@@ -20,9 +20,20 @@ docs/
 ├── css/style.css       Design system et composants
 ├── js/app.js           Navigation, recherche, kanban, notes
 ├── assets/             Logo, favicon, motif
+├── lots/               Plan d’exécution des lots (Phase 4+)
 ├── patchnotes/         Pointeur → source unique des actus joueurs
 └── README.md
 ```
+
+**Lots d’exécution** (ordre de travail agent / équipe) :
+
+```text
+docs/lots/EXECUTION-PLAN.md   Plan maître
+docs/lots/STATUS.md           Lot courant
+docs/lots/LOT-XX-*.md         Fiches opérationnelles
+```
+
+Voir aussi `.cursor/rules/hexald-*.mdc` (priorités, architecture, workflow).
 
 **Actualités / patch notes joueurs** (source unique) :
 

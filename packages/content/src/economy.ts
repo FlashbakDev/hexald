@@ -159,6 +159,12 @@ export const MILL_CRAFT_DURATION_MS = 120_000;
 /** Durée d’un cycle craft fonderie L1 (ouvriers × lingots). */
 export const SMELTER_CRAFT_DURATION_MS = 120_000;
 
+/** Durée d’un cycle craft forge L1 (ouvriers × outils). */
+export const FORGE_CRAFT_DURATION_MS = 120_000;
+
+/** Durée d’un cycle craft boulangerie L1 (ouvriers × nourriture). */
+export const BAKERY_CRAFT_DURATION_MS = 120_000;
+
 /** En mode debug client (dev), craft accéléré à 5 s. */
 export const DEV_CRAFT_DURATION_MS = 5_000;
 

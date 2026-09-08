@@ -26,6 +26,8 @@ export const BUILDINGS_WITH_MESH = new Set<BuildingId>([
   "sawmill",
   "mill",
   "smelter",
+  "forge",
+  "bakery",
   "clay_mine",
   "mine",
   "brickworks",

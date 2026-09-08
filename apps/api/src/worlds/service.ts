@@ -50,6 +50,8 @@ import {
   researchStateChanged,
   scienceProductionPerMinute,
   settleEconomy,
+  settleEconomyProduction,
+  settleFoodAndGrowth,
   settleProcessorTiles,
   clampProcessorInputRate,
   isPlaceableProcessor,
@@ -298,15 +300,16 @@ function settleEconomyWithProcessors(
   tiles: WorldTileRow[],
   now: number
 ): { state: EconomyState; tiles: WorldTileRow[]; changed: boolean } {
-  const settled = settleEconomy(state, now);
+  // Ordre : extracteurs → crafts (dont bakery → food) → food/surplus/pop.
+  const beforeFood = settleEconomyProduction(state, now);
   const proc = settleProcessorTiles(
-    settled,
+    beforeFood,
     tiles.map(toProcessorTile),
     now,
     { accelerate: wantDevTimers() }
   );
   return {
-    state: proc.state,
+    state: settleFoodAndGrowth(proc.state, now),
     tiles: applyProcessorSettleToRows(tiles, proc.tiles),
     changed: proc.changed
   };

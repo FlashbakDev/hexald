@@ -53,6 +53,8 @@ import { createLumberCampMesh } from "./createLumberCampMesh";
 import { createSawmillMesh } from "./createSawmillMesh";
 import { createMillMesh } from "./createMillMesh";
 import { createSmelterMesh } from "./createSmelterMesh";
+import { createForgeMesh } from "./createForgeMesh";
+import { createBakeryMesh } from "./createBakeryMesh";
 import { createBrickworksMesh } from "./createBrickworksMesh";
 import { createQuarryMesh } from "./createQuarryMesh";
 import {
@@ -757,6 +759,10 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
   millKit.group.position.y = HEX_HEIGHT / 2;
   const smelterKit = createSmelterMesh();
   smelterKit.group.position.y = HEX_HEIGHT / 2;
+  const forgeKit = createForgeMesh();
+  forgeKit.group.position.y = HEX_HEIGHT / 2;
+  const bakeryKit = createBakeryMesh();
+  bakeryKit.group.position.y = HEX_HEIGHT / 2;
   const brickworksKit = createBrickworksMesh();
   brickworksKit.group.position.y = HEX_HEIGHT / 2;
   const clayMineKit = createClayMineMesh();
@@ -1069,6 +1075,10 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
                     ? millKit
                   : buildingId === "smelter"
                     ? smelterKit
+                  : buildingId === "forge"
+                    ? forgeKit
+                  : buildingId === "bakery"
+                    ? bakeryKit
                   : buildingId === "brickworks"
                     ? brickworksKit
                   : buildingId === "clay_mine"
@@ -2494,6 +2504,8 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
       sawmillKit.dispose();
       millKit.dispose();
       smelterKit.dispose();
+      forgeKit.dispose();
+      bakeryKit.dispose();
       brickworksKit.dispose();
       clayMineKit.dispose();
       mineKit.dispose();

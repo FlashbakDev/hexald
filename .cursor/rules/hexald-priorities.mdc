@@ -1,0 +1,25 @@
+---
+description: Priorités Hexald — boucle joueur avant feature creep
+alwaysApply: true
+---
+
+# Priorités Hexald
+
+Objectif : jeu **fonctionnel, compréhensible, agréable** — pas le maximum de features.
+
+Ordre de décision :
+
+1. La boucle fonctionne-t-elle ?
+2. Le joueur comprend-il quoi faire ?
+3. Feedback satisfaisant ?
+4. Raison de continuer ?
+5. UI lisible ?
+6. Robustesse technique ?
+7. Seulement ensuite : profondeur.
+
+- Une feature **incomplète** > une feature **nouvelle**.
+- Avancer **un seul lot** à la fois (`docs/lots/STATUS.md`).
+- Ne pas démarrer le lot N+1 avant DoD + validation du lot N.
+- Lots reportés (fleuves, multi-villages, PvP, combat, monétisation…) : hors priorité tant que le cœur n’est pas excellent.
+
+Plan : `docs/lots/EXECUTION-PLAN.md`.

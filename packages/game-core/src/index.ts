@@ -23,6 +23,8 @@ export {
   idleWorkers,
   maxAssignableWorkersForJob,
   settleEconomy,
+  settleEconomyProduction,
+  settleFoodAndGrowth,
   settleWorldshard,
   worldshardMinutesUntilNext,
   spendWood,

@@ -1055,6 +1055,15 @@ html {
   gap: 0.4rem;
 }
 
+.play-cloud-header__rail {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 0.85rem;
+}
+
 .play-cloud-header__identity-top {
   display: flex;
   min-width: 0;
@@ -2337,13 +2346,325 @@ html {
   }
 }
 
+/* —— Lot 3 : vue Économie —— */
+.play-economy {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 0;
+}
+
+.play-economy__backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: rgb(28 43 40 / 0.35);
+  cursor: pointer;
+}
+
+.play-economy__panel {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  width: 100%;
+  max-height: min(88dvh, 36rem);
+  flex-direction: column;
+  padding: 0.75rem 1rem 1.25rem;
+  border-radius: 1.25rem 1.25rem 0 0;
+  border: 1px solid rgb(28 43 40 / 0.1);
+  border-bottom: 0;
+  background: rgb(255 255 255 / 0.97);
+  box-shadow: 0 -8px 40px rgb(28 43 40 / 0.14);
+  backdrop-filter: blur(12px);
+}
+
+.play-economy__handle {
+  width: 2.5rem;
+  height: 0.28rem;
+  margin: 0 auto 0.85rem;
+  border-radius: 999px;
+  background: rgb(28 43 40 / 0.14);
+}
+
+.play-economy__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.play-economy__eyebrow {
+  margin: 0;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #6b7c76;
+}
+
+.play-economy__title {
+  margin: 0.2rem 0 0;
+  font-family: var(--font-display, "Fraunces", serif);
+  font-size: 1.35rem;
+  font-weight: 600;
+  color: #1c2b28;
+}
+
+.play-economy__close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border: 0;
+  border-radius: 999px;
+  background: rgb(28 43 40 / 0.06);
+  color: #3d524c;
+  cursor: pointer;
+  transition: background-color 0.12s ease;
+}
+
+.play-economy__close:hover {
+  background: rgb(28 43 40 / 0.1);
+}
+
+.play-economy__intro {
+  margin: 0.65rem 0 0;
+  font-size: 0.84rem;
+  line-height: 1.4;
+  color: #4a5f58;
+}
+
+.play-economy__scroll {
+  margin-top: 0.85rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  padding-bottom: 0.35rem;
+}
+
+.play-economy__chain {
+  padding: 0.7rem 0.75rem;
+  border-radius: 1rem;
+  background: rgb(28 43 40 / 0.035);
+}
+
+.play-economy__chain-flow {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-bottom: 0.45rem;
+  color: #4a7c6f;
+}
+
+.play-economy__flow-icon {
+  width: 0.95rem;
+  height: 0.95rem;
+}
+
+.play-economy__arrow {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: rgb(28 43 40 / 0.35);
+}
+
+.play-economy__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.play-economy__row {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  min-width: 0;
+}
+
+.play-economy__row-icon {
+  width: 1.05rem;
+  height: 1.05rem;
+  flex-shrink: 0;
+  color: #4a7c6f;
+}
+
+.play-economy__row-label {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #1c2b28;
+}
+
+.play-economy__row-stock {
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #1c2b28;
+}
+
+.play-economy__row-cap {
+  font-weight: 500;
+  color: #6b7c76;
+}
+
+.play-economy__empty {
+  margin: 0.5rem 0 0;
+  font-size: 0.85rem;
+  color: #6b7c76;
+}
+
+.play-economy-enter-active,
+.play-economy-leave-active {
+  transition: opacity 0.2s ease;
+}
+
+.play-economy-enter-active .play-economy__panel,
+.play-economy-leave-active .play-economy__panel {
+  transition: transform 0.26s ease;
+}
+
+.play-economy-enter-from,
+.play-economy-leave-to {
+  opacity: 0;
+}
+
+.play-economy-enter-from .play-economy__panel,
+.play-economy-leave-to .play-economy__panel {
+  transform: translateY(100%);
+}
+
+@media (min-width: 768px) {
+  .play-economy {
+    align-items: flex-start;
+    justify-content: flex-end;
+    padding: 5.5rem 1.25rem 1.25rem;
+    pointer-events: none;
+  }
+
+  .play-economy__backdrop {
+    background: transparent;
+    pointer-events: auto;
+  }
+
+  .play-economy__panel {
+    pointer-events: auto;
+    width: min(100%, 22rem);
+    max-height: min(75dvh, 34rem);
+    padding: 1.15rem 1.15rem 1.1rem;
+    border-radius: 1.35rem;
+    border-bottom: 1px solid rgb(28 43 40 / 0.1);
+    box-shadow: 0 18px 48px rgb(28 43 40 / 0.16);
+  }
+
+  .play-economy__handle {
+    display: none;
+  }
+
+  .play-economy-enter-from .play-economy__panel,
+  .play-economy-leave-to .play-economy__panel {
+    transform: translateY(0.55rem) scale(0.98);
+  }
+}
+
+/* Processor I/O — sheet bâtiment */
+.processor-io {
+  margin-top: 0.75rem;
+  padding: 0.65rem 0.75rem;
+  border-radius: 0.95rem;
+  background: rgb(74 124 111 / 0.08);
+}
+
+.processor-io__chain {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 0.55rem;
+}
+
+.processor-io__node {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28rem;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: #1c2b28;
+}
+
+.processor-io__icon {
+  width: 1rem;
+  height: 1rem;
+  color: #4a7c6f;
+}
+
+.processor-io__need {
+  font-weight: 500;
+  color: #6b7c76;
+}
+
+.processor-io__arrow {
+  font-weight: 700;
+  color: rgb(28 43 40 / 0.35);
+}
+
+.processor-io__status {
+  margin-left: auto;
+  padding: 0.18rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.processor-io__status--active {
+  background: rgb(47 158 106 / 0.18);
+  color: #1f7a4f;
+}
+
+.processor-io__status--crafting {
+  background: rgb(74 124 111 / 0.2);
+  color: #2d5248;
+}
+
+.processor-io__status--blocked {
+  background: rgb(201 68 58 / 0.14);
+  color: #9b4a4a;
+}
+
+.processor-io__labels {
+  margin: 0.35rem 0 0;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #3d524c;
+}
+
+.processor-io__block {
+  margin: 0.25rem 0 0;
+  font-size: 0.78rem;
+  line-height: 1.35;
+  color: #9b4a4a;
+}
+
 .play-cloud-header__resources {
+  position: relative;
   display: flex;
   flex-shrink: 0;
   flex-direction: row;
   align-items: center;
   justify-content: flex-end;
   gap: 0.45rem;
+  margin-left: auto;
   padding-top: 0.1rem;
 }
 
@@ -2360,6 +2681,18 @@ html {
   width: 2.85rem;
   height: 2.85rem;
   flex-shrink: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  appearance: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.play-cloud-header__res:focus-visible {
+  outline: 2px solid #4a7c6f;
+  outline-offset: 2px;
+  border-radius: 999px;
 }
 
 .play-cloud-header__res--ok {
@@ -2372,6 +2705,10 @@ html {
 
 .play-cloud-header__res--full {
   --res-color: var(--res-full);
+}
+
+.play-cloud-header__res--pulse .play-cloud-header__res-core {
+  animation: play-res-pulse 0.55s ease;
 }
 
 .play-cloud-header__res-ring {
@@ -2413,6 +2750,406 @@ html {
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.02em;
+}
+
+.play-cloud-header__floaters {
+  pointer-events: none;
+  position: absolute;
+  right: 0;
+  top: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.15rem;
+  margin-top: 0.2rem;
+}
+
+.play-cloud-header__floater {
+  font-size: 0.72rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  animation: play-res-floater 1.05s ease forwards;
+}
+
+.play-cloud-header__floater--plus {
+  color: #2f9e6a;
+}
+
+.play-cloud-header__floater--minus {
+  color: #c9443a;
+}
+
+@keyframes play-res-pulse {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.08);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes play-res-floater {
+  0% {
+    opacity: 0;
+    transform: translateY(0.2rem);
+  }
+  15% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-0.85rem);
+  }
+}
+
+@media (max-width: 639px) {
+  .play-cloud-header__resources {
+    gap: 0.28rem;
+  }
+
+  .play-cloud-header__res {
+    width: 2.45rem;
+    height: 2.45rem;
+  }
+
+  .play-cloud-header__res-glyph {
+    width: 0.75rem;
+    height: 0.75rem;
+  }
+
+  .play-cloud-header__res-yield {
+    font-size: 0.55rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .play-cloud-header__res--pulse .play-cloud-header__res-core,
+  .play-cloud-header__floater {
+    animation: none;
+  }
+}
+
+/* —— Play mobile paysage : rail gauche + panneaux depuis la droite —— */
+.play-rotate-gate {
+  position: absolute;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  background:
+    radial-gradient(circle at 50% 40%, rgb(255 255 255 / 0.72), transparent 55%),
+    rgb(223 232 228 / 0.94);
+  backdrop-filter: blur(8px);
+}
+
+.play-rotate-gate__card {
+  display: flex;
+  max-width: 18rem;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 1.25rem 1.35rem;
+  border-radius: 1.25rem;
+  border: 1px solid rgb(28 43 40 / 0.1);
+  background: rgb(255 255 255 / 0.92);
+  box-shadow: 0 18px 48px rgb(28 43 40 / 0.12);
+  text-align: center;
+}
+
+.play-rotate-gate__icon {
+  width: 2rem;
+  height: 2rem;
+  color: #4a7c6f;
+  transform: rotate(90deg);
+}
+
+.play-rotate-gate__title {
+  margin: 0.35rem 0 0;
+  font-family: var(--font-display, "Fraunces", serif);
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: #1c2b28;
+}
+
+.play-rotate-gate__body {
+  margin: 0;
+  font-size: 0.88rem;
+  line-height: 1.4;
+  color: #4a5f58;
+}
+
+.game-shell--play-landscape {
+  --play-building-sheet-height: 0px;
+}
+
+.game-shell--play-landscape.game-shell--building-sheet .play-dev-chrome {
+  bottom: max(
+    0.75rem,
+    env(safe-area-inset-bottom, 0px)
+  );
+}
+
+.game-shell--play-landscape .play-cloud-header {
+  height: auto;
+  min-height: 0;
+  inset: 0 auto auto 0;
+  width: min(16.5rem, 48vw);
+  pointer-events: none;
+}
+
+.game-shell--play-landscape .play-cloud-header__sky {
+  display: none;
+}
+
+.game-shell--play-landscape .play-cloud-header__content {
+  flex-direction: column;
+  align-items: flex-start;
+  height: auto;
+  min-height: 0;
+  gap: 0.55rem;
+  padding:
+    max(0.4rem, env(safe-area-inset-top))
+    0.55rem
+    0.5rem
+    max(0.55rem, env(safe-area-inset-left));
+}
+
+.game-shell--play-landscape .play-cloud-header__rail {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.55rem;
+  width: 100%;
+}
+
+.game-shell--play-landscape .play-cloud-header__identity {
+  max-width: none;
+  width: 100%;
+}
+
+.game-shell--play-landscape .play-cloud-header__identity-text {
+  min-width: 0;
+  flex: 1 1 auto;
+  max-width: none;
+}
+
+.game-shell--play-landscape .play-cloud-header__name,
+.game-shell--play-landscape .play-cloud-header__name--btn {
+  max-width: none;
+  overflow: visible;
+  text-overflow: unset;
+  white-space: nowrap;
+}
+
+.game-shell--play-landscape .play-cloud-header__resources {
+  margin-left: 0;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
+  gap: 0.35rem;
+  padding-top: 0;
+}
+
+.game-shell--play-landscape .play-cloud-header__floaters {
+  right: auto;
+  left: 100%;
+  top: 0;
+  margin-top: 0;
+  margin-left: 0.25rem;
+}
+
+.game-shell--play-landscape .play-cloud-header__end {
+  position: fixed;
+  top: auto;
+  right: auto;
+  bottom: max(0.55rem, env(safe-area-inset-bottom));
+  left: max(0.55rem, env(safe-area-inset-left));
+  z-index: 55;
+  pointer-events: auto;
+}
+
+.game-shell--play-landscape .play-top-actions {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.35rem;
+}
+
+.game-shell--play-landscape .play-top-actions__btn {
+  width: 2rem;
+  height: 2rem;
+}
+
+.game-shell--play-landscape .play-top-actions__icon {
+  width: 1rem;
+  height: 1rem;
+}
+
+.game-shell--play-landscape .play-settings__menu {
+  top: auto;
+  bottom: calc(100% + 0.4rem);
+  right: auto;
+  left: 0;
+}
+
+.game-shell--play-landscape .play-cloud-header__res {
+  width: 2.05rem;
+  height: 2.05rem;
+}
+
+.game-shell--play-landscape .play-cloud-header__res-glyph {
+  width: 0.68rem;
+  height: 0.68rem;
+}
+
+.game-shell--play-landscape .play-cloud-header__res-yield {
+  font-size: 0.5rem;
+}
+
+.game-shell--play-landscape .play-cloud-header__resources {
+  gap: 0.28rem;
+}
+
+/* Panneaux / dialogues : entrée depuis la droite (mobile paysage) */
+.game-shell--play-landscape
+  .building-sheet:not(.tech-frise-sheet):not(.tech-frise-sheet--embedded),
+.game-shell--play-landscape .avatar-picker-sheet,
+.game-shell--play-landscape .civ-points-sheet {
+  inset: 0 0 0 auto !important;
+  top: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  left: auto !important;
+  width: min(17rem, 52vw);
+  max-width: 100%;
+  height: 100%;
+  max-height: 100%;
+}
+
+.game-shell--play-landscape
+  .building-sheet:not(.tech-frise-sheet):not(.tech-frise-sheet--embedded)
+  .building-sheet__sky,
+.game-shell--play-landscape .avatar-picker-sheet .building-sheet__sky,
+.game-shell--play-landscape .civ-points-sheet .building-sheet__sky {
+  display: none;
+}
+
+.game-shell--play-landscape
+  .building-sheet:not(.tech-frise-sheet):not(.tech-frise-sheet--embedded)
+  .building-sheet__content,
+.game-shell--play-landscape .avatar-picker-sheet .building-sheet__content,
+.game-shell--play-landscape .civ-points-sheet .building-sheet__content {
+  height: 100%;
+  max-height: 100%;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding:
+    max(0.85rem, env(safe-area-inset-top))
+    max(1rem, env(safe-area-inset-right))
+    max(0.95rem, env(safe-area-inset-bottom))
+    1rem;
+  border-radius: 1.25rem 0 0 1.25rem;
+  border-left: 1px solid rgb(28 43 40 / 0.1);
+  background: rgb(255 255 255 / 0.97);
+  box-shadow: -12px 0 40px rgb(28 43 40 / 0.14);
+  backdrop-filter: blur(12px);
+}
+
+/* Arbre techno : pleine largeur, au-dessus du HUD */
+.game-shell--play-landscape .tech-frise-sheet:not(.tech-frise-sheet--embedded) {
+  inset: 0 !important;
+  top: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  left: 0 !important;
+  z-index: 70 !important;
+  width: 100%;
+  max-width: 100%;
+  height: 100%;
+  max-height: 100%;
+}
+
+.game-shell--play-landscape .tech-frise-sheet:not(.tech-frise-sheet--embedded) .building-sheet__sky {
+  display: none;
+}
+
+.game-shell--play-landscape
+  .tech-frise-sheet:not(.tech-frise-sheet--embedded)
+  .building-sheet__content {
+  height: 100%;
+  max-height: 100%;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding:
+    max(0.85rem, env(safe-area-inset-top))
+    max(1rem, env(safe-area-inset-right))
+    max(0.95rem, env(safe-area-inset-bottom))
+    max(1rem, env(safe-area-inset-left));
+  border-radius: 0;
+  border: 0;
+  background: rgb(255 255 255 / 0.97);
+  box-shadow: none;
+  backdrop-filter: blur(12px);
+}
+
+.game-shell--play-landscape .tech-frise-sheet:not(.tech-frise-sheet--embedded).building-sheet-enter-from,
+.game-shell--play-landscape .tech-frise-sheet:not(.tech-frise-sheet--embedded).building-sheet-leave-to {
+  opacity: 0;
+  transform: translateY(0.65rem);
+}
+
+.game-shell--play-landscape
+  .building-sheet:not(.tech-frise-sheet).building-sheet-enter-from,
+.game-shell--play-landscape
+  .building-sheet:not(.tech-frise-sheet).building-sheet-leave-to {
+  opacity: 1;
+  transform: translateX(100%);
+}
+
+.game-shell--play-landscape .building-sheet-enter-active,
+.game-shell--play-landscape .building-sheet-leave-active {
+  transition: transform 0.26s ease, opacity 0.2s ease;
+}
+
+@media (max-width: 1024px) {
+  .play-economy,
+  .play-notif-settings,
+  .play-support-sheet {
+    align-items: stretch;
+    justify-content: flex-end;
+    padding: 0;
+  }
+
+  .play-economy__panel,
+  .play-notif-settings__panel,
+  .play-support-sheet__panel {
+    width: min(17rem, 55vw);
+    max-width: 100%;
+    height: 100%;
+    max-height: 100%;
+    border-radius: 1.25rem 0 0 1.25rem;
+    border-bottom: 1px solid rgb(28 43 40 / 0.1);
+    border-left: 1px solid rgb(28 43 40 / 0.1);
+    box-shadow: -12px 0 40px rgb(28 43 40 / 0.14);
+  }
+
+  .play-economy__handle,
+  .play-notif-settings__handle,
+  .play-support-sheet__handle {
+    display: none;
+  }
+
+  .play-economy-enter-from .play-economy__panel,
+  .play-economy-leave-to .play-economy__panel,
+  .play-notif-settings-enter-from .play-notif-settings__panel,
+  .play-notif-settings-leave-to .play-notif-settings__panel,
+  .play-support-sheet-enter-from .play-support-sheet__panel,
+  .play-support-sheet-leave-to .play-support-sheet__panel {
+    transform: translateX(100%);
+  }
 }
 
 .play-cloud-header__stat {
@@ -2761,6 +3498,15 @@ html {
 .building-sheet__close:hover {
   color: #1c2b28;
   background: rgb(28 43 40 / 0.08);
+}
+
+.building-sheet__footer-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.375rem;
+  margin-top: auto;
+  padding-top: 0.75rem;
 }
 
 .building-sheet__stepper {
@@ -3459,11 +4205,15 @@ html {
 }
 
 .tech-frise-sheet__notice {
-  margin: 0.35rem 0 0;
-  padding: 0.35rem 0.55rem;
-  border-radius: 0.45rem;
-  font-size: 0.68rem;
-  line-height: 1.35;
+  display: inline-block;
+  width: fit-content;
+  max-width: min(100%, 22rem);
+  margin: 0.4rem 0 0;
+  padding: 0.28rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.65rem;
+  line-height: 1.3;
+  font-weight: 600;
 }
 
 .tech-frise-sheet__notice--pause {
@@ -3532,7 +4282,7 @@ html {
   z-index: 1;
   display: flex;
   align-items: stretch;
-  gap: 3.25rem;
+  gap: 2.35rem;
   flex: 0 0 auto;
   min-height: 100%;
   padding: 0.15rem 0.5rem;
@@ -3542,7 +4292,7 @@ html {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  gap: 0.85rem;
+  gap: 0.55rem;
   flex: 0 0 auto;
   min-height: 100%;
 }
@@ -3552,12 +4302,12 @@ html {
   display: flex;
   align-items: center;
   width: 100%;
-  min-width: 9.5rem;
-  max-width: 11rem;
-  min-height: 4.35rem;
-  padding: 0.55rem 0.6rem;
+  min-width: 7.25rem;
+  max-width: 8.5rem;
+  min-height: 3.25rem;
+  padding: 0.35rem 0.4rem;
   border: 1px solid rgb(28 43 40 / 0.12);
-  border-radius: 0.65rem;
+  border-radius: 0.55rem;
   background: #fff;
   color: #2d5248;
   box-shadow: 0 2px 8px rgb(28 43 40 / 0.06);
@@ -3574,21 +4324,21 @@ html {
 .tech-frise__node-main {
   display: flex;
   align-items: center;
-  gap: 0.55rem;
+  gap: 0.4rem;
   width: 100%;
 }
 
 .tech-frise__portrait {
   position: relative;
   flex: 0 0 auto;
-  width: 2.65rem;
-  height: 2.65rem;
+  width: 2rem;
+  height: 2rem;
 }
 
 .tech-frise__ring {
   display: block;
-  width: 2.65rem;
-  height: 2.65rem;
+  width: 2rem;
+  height: 2rem;
   transform: rotate(-90deg);
 }
 
@@ -3630,15 +4380,15 @@ html {
 
 .tech-frise__node-title {
   margin: 0;
-  font-size: 0.72rem;
+  font-size: 0.62rem;
   font-weight: 700;
   line-height: 1.15;
   color: #1c2b28;
 }
 
 .tech-frise__node-meta {
-  margin: 0.2rem 0 0;
-  font-size: 0.62rem;
+  margin: 0.12rem 0 0;
+  font-size: 0.55rem;
   font-weight: 600;
   line-height: 1.2;
   color: #6b7c76;
@@ -3648,18 +4398,18 @@ html {
 .tech-frise__unlocks {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.28rem;
-  margin-top: 0.35rem;
+  gap: 0.2rem;
+  margin-top: 0.22rem;
 }
 
 .tech-frise__unlock {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 1.35rem;
-  height: 1.35rem;
+  width: 1.1rem;
+  height: 1.1rem;
   border: 1px solid rgb(28 43 40 / 0.1);
-  border-radius: 0.35rem;
+  border-radius: 0.3rem;
   background: rgb(28 43 40 / 0.03);
   color: #4a7c6f;
   flex-shrink: 0;
@@ -3678,9 +4428,9 @@ html {
 
 /* Am?lioration de b?timent / cit? ? losange. */
 .tech-frise__unlock--city_improvement {
-  width: 1.2rem;
-  height: 1.2rem;
-  margin: 0.12rem;
+  width: 1rem;
+  height: 1rem;
+  margin: 0.1rem;
   border: 1px solid rgb(28 43 40 / 0.12);
   border-radius: 0.2rem;
   background: rgb(28 43 40 / 0.04);
@@ -3736,13 +4486,13 @@ html {
 
 .tech-frise__node-check {
   position: absolute;
-  right: -0.12rem;
-  bottom: -0.12rem;
+  right: -0.1rem;
+  bottom: -0.1rem;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 1rem;
-  height: 1rem;
+  width: 0.85rem;
+  height: 0.85rem;
   border: 1.5px solid #fff;
   border-radius: 999px;
   background: #2563eb;

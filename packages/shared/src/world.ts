@@ -212,7 +212,9 @@ export type PlaceableBuildingId =
   | "mine"
   | "brickworks"
   | "mill"
+  | "bakery"
   | "smelter"
+  | "forge"
   | "library"
   | "barracks"
   | "market";

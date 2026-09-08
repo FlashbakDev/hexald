@@ -428,7 +428,7 @@ onBeforeUnmount(() => {
       :class="
         embedded
           ? 'tech-frise-sheet--embedded pointer-events-auto relative'
-          : 'pointer-events-none absolute inset-x-0 z-40'
+          : 'pointer-events-none absolute inset-x-0 z-[70]'
       "
       role="region"
       aria-label="Arbre technologique"
@@ -500,6 +500,18 @@ onBeforeUnmount(() => {
             <p v-else class="tech-frise-sheet__prod">
               Arbre live · {{ layoutColumns.reduce((n, c) => n + c.nodes.length, 0) }} techs
             </p>
+            <p
+              v-if="unlockNotice"
+              class="tech-frise-sheet__notice tech-frise-sheet__notice--unlock"
+            >
+              {{ unlockNotice }}
+            </p>
+            <p
+              v-else-if="pauseHint"
+              class="tech-frise-sheet__notice tech-frise-sheet__notice--pause"
+            >
+              {{ pauseHint }}
+            </p>
           </div>
           <button
             v-if="!embedded"
@@ -511,13 +523,6 @@ onBeforeUnmount(() => {
             <UIcon name="i-lucide-x" class="size-4" />
           </button>
         </div>
-
-        <p v-if="unlockNotice" class="tech-frise-sheet__notice tech-frise-sheet__notice--unlock">
-          {{ unlockNotice }}
-        </p>
-        <p v-else-if="pauseHint" class="tech-frise-sheet__notice tech-frise-sheet__notice--pause">
-          {{ pauseHint }}
-        </p>
 
         <div ref="graphEl" class="tech-frise__graph">
           <div ref="trackEl" class="tech-frise__track">
@@ -588,7 +593,7 @@ onBeforeUnmount(() => {
                       />
                     </svg>
                     <span class="tech-frise__portrait-icon" aria-hidden="true">
-                      <UIcon :name="node.icon" class="size-5" />
+                      <UIcon :name="node.icon" class="size-3.5" />
                     </span>
                     <span
                       v-if="!embedded && statusFor(node.id) === 'unlocked'"
@@ -624,7 +629,7 @@ onBeforeUnmount(() => {
                         :class="`tech-frise__unlock--${unlock.kind}`"
                         :title="unlock.label"
                       >
-                        <UIcon :name="unlock.icon" class="size-3.5" />
+                        <UIcon :name="unlock.icon" class="size-2.5" />
                       </span>
                     </div>
                   </div>

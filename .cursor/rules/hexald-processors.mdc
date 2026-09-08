@@ -1,0 +1,18 @@
+---
+description: Processors Hexald — réutiliser le modèle craft existant
+globs: packages/content/**/*.ts,packages/game-core/**/*.{ts,tsx},packages/shared/**/*.ts
+alwaysApply: false
+---
+
+# Processors & chaînes
+
+Quand on ajoute ou termine un transformateur (forge, boulangerie…) :
+
+- Réutiliser le modèle des processors live (scierie, moulin, briqueterie, fonderie).
+- Même pipeline : workers, input, buffer, `processorInputRate`, `craftCompletesAt`, settle lazy.
+- Catalogue `packages/content` d’abord (`placeable`, coûts, tech, recipe dans `chains`).
+- Ne pas inventer un second système industriel.
+- PC : vérifier `civilizationPoints.ts` si le bâtiment doit scorer.
+- Après content : game-core settle/craft → API actions → UI play (états bloqués explicites).
+
+Lot courant / ordre : `docs/lots/STATUS.md`.

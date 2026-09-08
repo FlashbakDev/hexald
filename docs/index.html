@@ -106,7 +106,7 @@
             <article class="card stat-card">
               <div class="label">Phase</div>
               <div class="value">POC</div>
-              <div class="hint">Boulangerie · forge · adjacence · stocks UI</div>
+              <div class="hint">HUD stocks · adjacence · polish</div>
             </article>
             <article class="card stat-card">
               <div class="label">Priority</div>
@@ -169,7 +169,7 @@
                 <li><span>09</span> Mine fer / argile · processors (scierie, moulin, briqueterie, fonderie) — fait</li>
                 <li><span>10</span> Marché · bibliothèque · caserne (pose) — fait</li>
                 <li><span>11</span> Wiki joueur <code>/wiki</code> + preview 3D (HexPreview) — fait</li>
-                <li><span>12</span> Boulangerie · forge (outils)</li>
+                <li><span>12</span> Boulangerie (food depuis farine) — fait</li>
                 <li><span>13</span> Bonus d’adjacence Civ (voisins → rate)</li>
                 <li><span>14</span> Stocks secondaires bandeau · fleuves (refaire)</li>
               </ol>
@@ -443,9 +443,8 @@
                 <h4 style="margin:0 0 8px">Chaîne</h4>
                 <ul class="tech-list">
                   <li><strong>Cible</strong> — ferme → blé → moulin → farine → boulangerie → food</li>
-                  <li><strong>Live</strong> — moulin (farine) ; cabane de pêcheur sur <code>fish_bank</code> → food directe (DEC-023)</li>
-                  <li><strong>Reste</strong> — boulangerie (food depuis farine)</li>
-                  <li><strong>Secours</strong> — 5 blé ≈ 1 food si pas encore de boulangerie</li>
+                  <li><strong>Live</strong> — moulin (farine) ; boulangerie (1 farine → 2 food / 2 min) ; cabane de pêcheur sur <code>fish_bank</code> → food directe (DEC-023)</li>
+                  <li><strong>Secours</strong> — 5 blé ≈ 1 food (filet, moins rentable que la chaîne)</li>
                   <li>Le pain reste la voie efficace ; le blé brut = filet de sécurité, pas la meta</li>
                   <li>Balance : le worker mange aussi — une ferme qui nourrit juste son fermier = 0 surplus</li>
                 </ul>
@@ -586,7 +585,7 @@
                 <span class="chain-node">Forge</span><span class="chain-arrow">→</span>
                 <span class="chain-node resource">Outils</span>
               </div>
-              <p class="wiki-meta" style="margin-top:8px">Forge — catalogue + gate tech OK, runtime craft <span class="status status-planned">Planned</span></p>
+              <p class="wiki-meta" style="margin-top:8px">Forge — posable + craft live (5 lingots → 1 outil / 2 min)</p>
             </article>
             <article class="resource-chain">
               <h3>Wood <span class="status status-done">Live</span></h3>
@@ -600,7 +599,7 @@
               </div>
             </article>
             <article class="resource-chain">
-              <h3>Food <span class="status status-mvp">MVP</span></h3>
+              <h3>Food <span class="status status-done">Live</span></h3>
               <div class="chain">
                 <span class="chain-node">Plaine</span><span class="chain-arrow">→</span>
                 <span class="chain-node">Ferme</span><span class="chain-arrow">→</span>
@@ -610,7 +609,7 @@
                 <span class="chain-node">Boulangerie</span><span class="chain-arrow">→</span>
                 <span class="chain-node resource">Nourriture</span>
               </div>
-              <p class="wiki-meta" style="margin-top:8px">Moulin live · boulangerie à brancher</p>
+              <p class="wiki-meta" style="margin-top:8px">Chaîne complète live (ferme → moulin → boulangerie → food)</p>
             </article>
             <article class="resource-chain">
               <h3>Stone &amp; clay <span class="status status-done">Live</span></h3>
@@ -1814,7 +1813,7 @@
                 <tr><td><code>clay</code></td><td>Argile</td><td>Mine d’argile sur <code>clay_deposit</code> → briqueterie</td></tr>
                 <tr><td><code>iron_ore</code></td><td>Minerai de fer</td><td>Gisement <code>iron_deposit</code> + mine</td></tr>
                 <tr><td><code>iron_ingot</code></td><td>Lingot de fer</td><td>Fonderie — live</td></tr>
-                <tr><td><code>tools</code></td><td>Outils</td><td>Forge — catalogue, runtime à brancher</td></tr>
+                <tr><td><code>tools</code></td><td>Outils</td><td>Forge — live (5 lingots → 1 outil)</td></tr>
                 <tr><td><code>gold</code></td><td>Or</td><td>Marché (1 / 5&nbsp;min / worker) · gate <code>currency</code></td></tr>
                 <tr><td><code>worldshard</code></td><td>Éclat de monde</td><td>Ancrage / révélation de région (DEC-020) ; prod HDV 1/15&nbsp;min, cap 5</td></tr>
               </tbody>
@@ -1878,9 +1877,9 @@
                   <td>Moulin</td><td><code>mill</code></td><td>any</td><td>wheat</td><td>flour</td><td>1</td>
                   <td><span class="status status-done">Live</span></td>
                 </tr>
-                <tr data-wiki-kind="planned">
+                <tr data-wiki-kind="mvp">
                   <td>Boulangerie</td><td><code>bakery</code></td><td>any</td><td>flour</td><td>food</td><td>1</td>
-                  <td><span class="status status-planned">Planned</span></td>
+                  <td><span class="status status-done">Live</span> · 1 farine → 2 food / 2 min · gate <code>pottery</code></td>
                 </tr>
                 <tr data-wiki-kind="mvp">
                   <td>Carrière</td><td><code>quarry</code></td><td>mountain</td><td>workers</td><td>stone</td><td>1</td>
@@ -1904,7 +1903,7 @@
                 </tr>
                 <tr data-wiki-kind="mvp">
                   <td>Forge</td><td><code>forge</code></td><td>any</td><td>iron_ingot</td><td>tools</td><td>1</td>
-                  <td><span class="status status-planned">Planned</span> · catalogue, pas placeable</td>
+                  <td><span class="status status-done">Live</span> · 5 lingots → 1 outil / 2 min</td>
                 </tr>
                 <tr data-wiki-kind="planned">
                   <td>Jardin</td><td><code>garden</code></td><td>plains</td><td>workers</td><td>food</td><td>1</td>
@@ -1950,7 +1949,7 @@
               <div class="wiki-chain">
                 <span>Gisement <code>iron_deposit</code> → Mine → <code>iron_ore</code></span>
                 <span>Fonderie → <code>iron_ingot</code></span>
-                <span>Forge → <code>tools</code> (catalogue — runtime à brancher)</span>
+                <span>Forge → <code>tools</code> (live)</span>
               </div>
             </article>
             <article class="card wiki-entry">
@@ -1967,7 +1966,7 @@
                 <span>Cabane de pêcheur → <code>food</code> (sur <code>fish_bank</code>)</span>
                 <span>Ferme → <code>wheat</code> (récolte, pas food)</span>
                 <span>Moulin → <code>flour</code> <span class="status status-done">Live</span></span>
-                <span>Boulangerie → <code>food</code> (planned)</span>
+                <span>Boulangerie → <code>food</code> <span class="status status-done">Live</span> · 1 farine → 2 food</span>
               </div>
               <p class="wiki-meta">DEC-016 / DEC-017 · Conso 1 food/pop/min · Hôtel de ville 4 food/min · Croissance si surplus (barre 60) · Blé secours 5→1 · settle + UI header live</p>
             </article>
@@ -2069,7 +2068,7 @@
                   <td><code>metallurgy</code></td>
                   <td>50</td>
                   <td><code>mining</code></td>
-                  <td><code>smelter</code> live · <code>forge</code> catalogue</td>
+                  <td><code>smelter</code> + <code>forge</code> live</td>
                   <td><span class="status status-mvp">Live</span></td>
                 </tr>
               </tbody>
@@ -2081,7 +2080,7 @@
             <h3>Gate build (DEC-022)</h3>
             <ul class="tech-list">
               <li><strong>Hors gate</strong> : <code>lumber_camp</code>, <code>farm</code>, <code>quarry</code>, <code>house</code>, expansion région</li>
-              <li><strong>Gated</strong> : <code>fishing_hut</code> (<code>sailing</code>), processors (<code>sawmill</code>, <code>mill</code>, <code>brickworks</code>, <code>smelter</code>, <code>bakery</code> planned, <code>forge</code> planned), <code>mine</code>, <code>clay_mine</code>, <code>library</code>, <code>market</code>, <code>barracks</code></li>
+              <li><strong>Gated</strong> : <code>fishing_hut</code> (<code>sailing</code>), processors (<code>sawmill</code>, <code>mill</code>, <code>bakery</code>, <code>brickworks</code>, <code>smelter</code>, <code>forge</code>), <code>mine</code>, <code>clay_mine</code>, <code>library</code>, <code>market</code>, <code>barracks</code></li>
               <li>Mondes existants : bâtiments déjà posés conservés ; gate sur nouvelles poses seulement</li>
             </ul>
           </article>
@@ -2483,11 +2482,10 @@
                 <li>Influence de civilisation (DEC-026) — fait</li>
                 <li>Points de civilisation + leaderboard (DEC-027) — fait (total + breakdown catégories en jeu)</li>
                 <li>Mine fer / argile + POI gisements — fait</li>
-                <li>Processors : scierie, moulin, briqueterie, fonderie — fait</li>
+                <li>Processors : scierie, moulin, briqueterie, fonderie, forge, boulangerie — fait</li>
                 <li>Marché · bibliothèque · caserne (pose) — fait</li>
                 <li>Lac de départ — fait · fleuves — retirés (refaire plus tard)</li>
                 <li>Wiki joueur <code>/wiki</code> + preview 3D bâtiments — fait</li>
-                <li>Boulangerie · forge (outils)</li>
                 <li>Bonus d’adjacence Civ (voisins → rate)</li>
                 <li>Stocks secondaires dans le bandeau (planches, lingots…)</li>
                 <li>Centre de recherche (design only, pas encore au catalogue)</li>
@@ -2564,14 +2562,13 @@
                 <li>Admin protégé (DEC-025) — validé</li>
                 <li>Influence DEC-026 + overlay play — validé</li>
                 <li>PC + leaderboard DEC-027 — validé</li>
-                <li>Mine fer / argile + processors (scierie, moulin, briqueterie, fonderie) — validé</li>
+                <li>Mine fer / argile + processors (scierie, moulin, briqueterie, fonderie, forge, boulangerie) — validé</li>
                 <li>Wiki joueur <code>/wiki</code> + HexPreview — validé</li>
               </ul>
             </article>
             <article class="card priority-col">
               <h3><span class="priority priority-p1">P1</span> Important</h3>
               <ul>
-                <li>Boulangerie · forge (outils)</li>
                 <li>Bonus d’adjacence (Civ-like)</li>
                 <li>Stocks secondaires dans le bandeau (planches, lingots…)</li>
                 <li>Centre de recherche (accélération science)</li>
@@ -2639,10 +2636,6 @@
             </div>
             <div class="kanban-col" data-column="todo">
               <h3>Todo</h3>
-              <article class="task" draggable="true" data-id="task-bakery-forge">
-                <strong>Boulangerie + forge</strong>
-                <p>Processors restants : food depuis farine, outils depuis lingots — craft runtime + meshes.</p>
-              </article>
               <article class="task" draggable="true" data-id="task-adjacency-after-extractors">
                 <strong>Adjacence après extracteurs</strong>
                 <p>Bonus voisins → rate une fois camp/ferme/carrière en place.</p>
@@ -2653,6 +2646,10 @@
             </div>
             <div class="kanban-col" data-column="done">
               <h3>Done</h3>
+              <article class="task" draggable="true" data-id="task-bakery-forge">
+                <strong>Boulangerie</strong>
+                <p>1 farine → 2 food / 2 min · settle food/surplus · mesh.</p>
+              </article>
               <article class="task" draggable="true" data-id="task-firebase-accounts">
                 <strong>Comptes Firebase</strong>
                 <p>Invité → lien Google / email, <code>POST /v1/session/firebase</code>, DEC-024.</p>

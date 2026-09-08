@@ -1,22 +1,24 @@
 ---
-summary: Transformera les lingots en outils — craft pas encore posable.
+summary: Transforme les lingots de fer en outils.
 ---
 
 ## Description
 
-La **forge** doit transformer les lingots de fer en outils. Le bâtiment est catalogue **MVP** côté design, mais **pas encore posable** (runtime craft à finaliser).
+La **forge** transforme les lingots de fer en outils. Dernière étape de la chaîne métallurgique après la fonderie.
 
 ## Construction
 
-Tech prévue : **Métallurgie**. Coûts et durée suivront le catalogue à l’activation.
+- Terrain : tout terrain constructible
+- Tech : **Métallurgie**
+- Coût : 40 bois · durée 60 s
 
 ## Production
 
-Entrée prévue : lingots. Sortie prévue : outils.
+Cycle craft : **5 lingots → 1 outil** (~2 min par artisan). Besoin d’un stock de lingots (fonderie active) et d’un artisan.
 
 ## Conseils
 
-En attendant, empile minerai / lingots via mine + fonderie pour être prêt le jour J.
+Ne pose la forge que si ta fonderie tourne déjà. Sans lingots, la forge reste inactive.
 
 ## Voir aussi
 

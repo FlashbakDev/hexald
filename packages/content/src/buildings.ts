@@ -171,9 +171,15 @@ export const buildings: BuildingDefinition[] = [
     input: "flour",
     output: "food",
     hexSize: 1,
-    status: "planned",
+    status: "mvp",
     role: "processor",
-    placeable: false,
+    placeable: true,
+    woodCost: 30,
+    buildDurationMs: 60_000,
+    maxWorkers: 1,
+    /** Legacy ; craft = durée fixe, output = ouvriers. */
+    ratePerWorkerPerMinute: 1,
+    workerJob: "artisan",
     requiredTechId: "pottery",
   },
   {
@@ -269,7 +275,13 @@ export const buildings: BuildingDefinition[] = [
     hexSize: 1,
     status: "mvp",
     role: "processor",
-    placeable: false,
+    placeable: true,
+    woodCost: 40,
+    buildDurationMs: 60_000,
+    maxWorkers: 1,
+    /** Legacy ; craft = durée fixe, output = ouvriers. */
+    ratePerWorkerPerMinute: 1,
+    workerJob: "artisan",
     requiredTechId: "metallurgy",
   },
   {
@@ -391,7 +403,9 @@ export type PlaceableBuildingId =
   | "mine"
   | "brickworks"
   | "mill"
+  | "bakery"
   | "smelter"
+  | "forge"
   | "library"
   | "barracks"
   | "market";
@@ -409,7 +423,9 @@ export type PlaceableProcessorId =
   | "sawmill"
   | "brickworks"
   | "mill"
-  | "smelter";
+  | "bakery"
+  | "smelter"
+  | "forge";
 
 /** Bâtiments spéciaux posables (hors extracteur / processor). */
 export type PlaceableSpecialId = "library" | "barracks";
@@ -441,7 +457,9 @@ const EXPECTED_PLACEABLES: readonly PlaceableBuildingId[] = [
   "mine",
   "brickworks",
   "mill",
+  "bakery",
   "smelter",
+  "forge",
   "library",
   "barracks",
   "market",

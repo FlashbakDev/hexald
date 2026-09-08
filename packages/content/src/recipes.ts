@@ -30,7 +30,13 @@ export const chains: ProductionChain[] = [
         inputCount: 5,
         outputCount: 1
       },
-      { buildingId: "forge", input: "iron_ingot", output: "tools" }
+      {
+        buildingId: "forge",
+        input: "iron_ingot",
+        output: "tools",
+        inputCount: 5,
+        outputCount: 1
+      }
     ]
   },
   {
@@ -59,7 +65,13 @@ export const chains: ProductionChain[] = [
         inputCount: 5,
         outputCount: 1
       },
-      { buildingId: "bakery", input: "flour", output: "food" },
+      {
+        buildingId: "bakery",
+        input: "flour",
+        output: "food",
+        inputCount: 1,
+        outputCount: 2
+      },
       { buildingId: "fishing_hut", input: null, output: "food" }
     ]
   },
