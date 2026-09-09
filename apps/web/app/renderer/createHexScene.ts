@@ -309,6 +309,8 @@ export type HexSceneApi = {
   ) => void;
   /** Emprise de civilisation (DEC-026) — teinte discrète. */
   setInfluenceHighlights: (coords: readonly HexCoord[]) => void;
+  /** Flash emissive court (game feel) — no-op si prefers-reduced-motion. */
+  pulseTile: (q: number, r: number) => void;
 };
 
 export type HexSceneFraming = {
@@ -1354,6 +1356,9 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
   let selectedMesh: Mesh | null = null;
   let tutorialHighlightKeys = new Set<string>();
   let buildValidHighlightKeys = new Set<string>();
+  /** key → performance.now() start of feel pulse */
+  const feelPulseAt = new Map<string, number>();
+  const FEEL_PULSE_MS = 380;
   let buildInvalidHighlightKeys = new Set<string>();
   let influenceHighlightKeys = new Set<string>();
   let previewCenter: HexCoord | null = null;
@@ -2247,13 +2252,23 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
     const now = performance.now();
     const tutorialPulse = 0.55 + 0.45 * Math.sin(now * 0.006);
     for (const tile of biomeTiles) {
+      const key = hexKey(tile.q, tile.r);
       const hoveredHere = tile.mesh === hoveredMesh;
       const selectedHere = tile.mesh === selectedMesh;
-      const tutorialHere = tutorialHighlightKeys.has(hexKey(tile.q, tile.r));
-      const buildValidHere = buildValidHighlightKeys.has(hexKey(tile.q, tile.r));
-      const buildInvalidHere = buildInvalidHighlightKeys.has(hexKey(tile.q, tile.r));
-      const influenceHere = influenceHighlightKeys.has(hexKey(tile.q, tile.r));
-      const inPreview = previewKeys.has(hexKey(tile.q, tile.r));
+      const tutorialHere = tutorialHighlightKeys.has(key);
+      const buildValidHere = buildValidHighlightKeys.has(key);
+      const buildInvalidHere = buildInvalidHighlightKeys.has(key);
+      const influenceHere = influenceHighlightKeys.has(key);
+      const inPreview = previewKeys.has(key);
+      const feelT0 = feelPulseAt.get(key);
+      const feelElapsed = feelT0 != null ? now - feelT0 : -1;
+      if (feelT0 != null && feelElapsed >= FEEL_PULSE_MS) {
+        feelPulseAt.delete(key);
+      }
+      const feelActive = feelT0 != null && feelElapsed >= 0 && feelElapsed < FEEL_PULSE_MS;
+      const feelStrength = feelActive
+        ? (1 - feelElapsed / FEEL_PULSE_MS) * (0.55 + 0.45 * Math.sin(feelElapsed * 0.045))
+        : 0;
 
       if (tile.spawn) {
         const elapsed = now - tile.spawn.t0 - tile.spawn.delayMs;
@@ -2270,21 +2285,26 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
       } else {
         const targetY =
           tile.restY +
-          (hoveredHere
-            ? HOVER_LIFT
-            : selectedHere
-              ? SELECT_LIFT
-              : buildValidHere
-                ? SELECT_LIFT * 0.45
-                : buildInvalidHere
-                  ? SELECT_LIFT * 0.3
-                  : tutorialHere
-                    ? SELECT_LIFT * 0.55
-                    : 0);
+          (feelActive
+            ? SELECT_LIFT * (0.65 + feelStrength * 0.55)
+            : hoveredHere
+              ? HOVER_LIFT
+              : selectedHere
+                ? SELECT_LIFT
+                : buildValidHere
+                  ? SELECT_LIFT * 0.45
+                  : buildInvalidHere
+                    ? SELECT_LIFT * 0.3
+                    : tutorialHere
+                      ? SELECT_LIFT * 0.55
+                      : 0);
         tile.mesh.position.y += (targetY - tile.mesh.position.y) * 0.18;
       }
 
-      if (hoveredHere) {
+      if (feelActive) {
+        const e = 0.2 + feelStrength * 0.55;
+        setEmissive(tile.materials, e * 0.95, e * 0.72, e * 0.18);
+      } else if (hoveredHere) {
         setEmissive(tile.materials, 0.14, 0.115, 0.056);
       } else if (selectedHere) {
         setEmissive(tile.materials, 0.22, 0.16, 0.04);
@@ -2469,6 +2489,16 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
     });
   };
 
+  const pulseTile = (q: number, r: number) => {
+    if (
+      typeof window !== "undefined" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    ) {
+      return;
+    }
+    feelPulseAt.set(hexKey(q, r), performance.now());
+  };
+
   const api = {
     recenter,
     clearSelection,
@@ -2482,6 +2512,7 @@ export function createHexScene(canvas: HTMLCanvasElement, options: HexSceneOptio
     setTutorialHighlights,
     setBuildHighlights,
     setInfluenceHighlights,
+    pulseTile,
     dispose: () => {
       cancelAnimationFrame(frame);
       window.removeEventListener("resize", resize);

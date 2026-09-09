@@ -39,10 +39,7 @@ import {
   TOWN_HALL_WORLDSHARD_INTERVAL_MS,
   type PlaceableBuildingId,
   type PlaceableExtractorId,
-  type TechId,
-  lumberCampTechBonusPerMinute,
-  quarryMasonryBonusPerMinute,
-  mineMasonryBonusPerMinute
+  type TechId
 } from "@hexald/content";
 import {
   computePopulationCap,
@@ -55,10 +52,14 @@ import {
   isFusionBiome,
   committedWorkersFromTiles,
   tileProductionMultiplier,
+  extractorSiteRateBreakdown,
+  techFoodBonusBreakdown,
+  countPastureTiles,
   woodRefundOnDestroy,
   adjacentRegionCenters,
   canPlaceRegion,
-  WORKERS_PER_EXTRACTOR_L1
+  WORKERS_PER_EXTRACTOR_L1,
+  type ExtractorRateBreakdown
 } from "@hexald/game-core";
 import type { HexScreenPoint, SelectedTile } from "~/renderer/createHexScene";
 import type { TutorialHole } from "~/composables/usePlayTutorial";
@@ -162,7 +163,22 @@ const {
   dismiss: dismissLinkAccount
 } = useLinkAccountPrompt();
 
-useGameNotifications(world);
+useGameNotifications(world, {
+  onConstructionComplete: (event) => {
+    celebrateTileFeel(event.tile.q, event.tile.r, {
+      kind: "ready",
+      label: "Prêt",
+      icon: "i-lucide-check"
+    });
+  },
+  onCraftComplete: (event) => {
+    celebrateTileFeel(event.tile.q, event.tile.r, {
+      kind: "craft",
+      label: `+${event.amount}`,
+      icon: resourceIcon(event.resourceId)
+    });
+  }
+});
 
 const { enabledCount: notificationEnabledCount, totalCount: notificationTotalCount } =
   useNotificationPreferences();
@@ -371,6 +387,7 @@ const preview = useTemplateRef<{
     invalid?: readonly HexCoord[]
   ) => void;
   setInfluenceHighlights: (coords: readonly HexCoord[]) => void;
+  pulseTile: (q: number, r: number) => void;
 }>("preview");
 
 const stage = useTemplateRef<HTMLElement>("stage");
@@ -503,8 +520,10 @@ onBeforeUnmount(() => {
     cancelAnimationFrame(tutorialHoleRaf);
     tutorialHoleRaf = null;
   }
-  for (const timer of destroyFloatTimers) clearTimeout(timer);
-  destroyFloatTimers.clear();
+  for (const timer of mapFloatTimers) clearTimeout(timer);
+  mapFloatTimers.clear();
+  if (workerBadgePulseTimer) clearTimeout(workerBadgePulseTimer);
+  if (workerStepperPulseTimer) clearTimeout(workerStepperPulseTimer);
 });
 
 const economy = computed(() => world.value?.economy ?? null);
@@ -583,74 +602,35 @@ function projectedStock(
   return Math.min(cap, stock + ratePerMinute * minutes);
 }
 
-function extractorRatePerMinute(
-  buildingId: PlaceableExtractorId,
-  baseRate: number
-): number {
+function extractorRatePerMinute(buildingId: PlaceableExtractorId): number {
   const tiles = world.value?.tiles;
   if (!tiles?.length) return 0;
   const now = nowTick.value;
+  const unlocked = world.value?.research.unlockedTechIds ?? ["foundations"];
+  const influenced = computeInfluencedTiles(tiles, now);
   let total = 0;
   for (const tile of tiles) {
     if (tile.buildingId !== buildingId) continue;
     if (isBuildingUnderConstruction(tile.constructionCompletesAt, now)) continue;
+    if (isBuildingOrphan(tile, influenced, now)) continue;
     const workers = Math.max(0, Math.floor(tile.assignedWorkers ?? 0));
-    total += workers * baseRate * tileProductionMultiplier(tile.biome);
+    total += extractorSiteRateBreakdown({
+      buildingId,
+      biome: tile.biome,
+      workers,
+      complete: true,
+      unlockedTechIds: unlocked
+    }).total;
   }
   return total;
 }
 
-const liveWoodRate = computed(() => {
-  const base = extractorRatePerMinute("lumber_camp", WOOD_RATE_PER_WORKER_PER_MINUTE);
-  const unlocked = world.value?.research.unlockedTechIds ?? ["foundations"];
-  const tiles = world.value?.tiles;
-  if (!tiles?.length) return base;
-  const now = nowTick.value;
-  let campCount = 0;
-  for (const tile of tiles) {
-    if (tile.buildingId !== "lumber_camp") continue;
-    if (isBuildingUnderConstruction(tile.constructionCompletesAt, now)) continue;
-    campCount++;
-  }
-  return base + lumberCampTechBonusPerMinute(unlocked, campCount);
-});
-const liveWheatRate = computed(() =>
-  extractorRatePerMinute("farm", WHEAT_RATE_PER_WORKER_PER_MINUTE)
-);
-const liveStoneRate = computed(() => {
-  const base = extractorRatePerMinute("quarry", STONE_RATE_PER_WORKER_PER_MINUTE);
-  const unlocked = world.value?.research.unlockedTechIds ?? ["foundations"];
-  const tiles = world.value?.tiles;
-  if (!tiles?.length) return base;
-  const now = nowTick.value;
-  let quarryCount = 0;
-  for (const tile of tiles) {
-    if (tile.buildingId !== "quarry") continue;
-    if (isBuildingUnderConstruction(tile.constructionCompletesAt, now)) continue;
-    quarryCount++;
-  }
-  return base + quarryMasonryBonusPerMinute(unlocked, quarryCount);
-});
-const liveClayRate = computed(() =>
-  extractorRatePerMinute("clay_mine", CLAY_RATE_PER_WORKER_PER_MINUTE)
-);
-const liveIronOreRate = computed(() => {
-  const base = extractorRatePerMinute("mine", IRON_ORE_RATE_PER_WORKER_PER_MINUTE);
-  const unlocked = world.value?.research.unlockedTechIds ?? ["foundations"];
-  const tiles = world.value?.tiles;
-  if (!tiles?.length) return base;
-  const now = nowTick.value;
-  let mineCount = 0;
-  for (const tile of tiles) {
-    if (tile.buildingId !== "mine") continue;
-    if (isBuildingUnderConstruction(tile.constructionCompletesAt, now)) continue;
-    mineCount++;
-  }
-  return base + mineMasonryBonusPerMinute(unlocked, mineCount);
-});
-const liveGoldRate = computed(() =>
-  extractorRatePerMinute("market", GOLD_RATE_PER_WORKER_PER_MINUTE)
-);
+const liveWoodRate = computed(() => extractorRatePerMinute("lumber_camp"));
+const liveWheatRate = computed(() => extractorRatePerMinute("farm"));
+const liveStoneRate = computed(() => extractorRatePerMinute("quarry"));
+const liveClayRate = computed(() => extractorRatePerMinute("clay_mine"));
+const liveIronOreRate = computed(() => extractorRatePerMinute("mine"));
+const liveGoldRate = computed(() => extractorRatePerMinute("market"));
 
 const displayedWood = computed(() => {
   const eco = economy.value;
@@ -1279,11 +1259,11 @@ type MapBadge = {
   needsWorkers?: boolean;
 };
 
-type DestroyFloatKind = "wood" | "workers";
+type MapFloatKind = "wood" | "workers" | "build" | "ready" | "craft";
 
-type DestroyFloat = {
+type MapFloat = {
   id: number;
-  kind: DestroyFloatKind;
+  kind: MapFloatKind;
   label: string;
   icon: string;
   x: number;
@@ -1293,9 +1273,111 @@ type DestroyFloat = {
   delayMs: number;
 };
 
-const destroyFloats = ref<DestroyFloat[]>([]);
-let destroyFloatSeq = 0;
-const destroyFloatTimers = new Set<ReturnType<typeof setTimeout>>();
+const mapFloats = ref<MapFloat[]>([]);
+let mapFloatSeq = 0;
+const mapFloatTimers = new Set<ReturnType<typeof setTimeout>>();
+
+const workerBadgePulseKey = ref<string | null>(null);
+let workerBadgePulseTimer: ReturnType<typeof setTimeout> | null = null;
+const workerStepperPulse = ref(false);
+let workerStepperPulseTimer: ReturnType<typeof setTimeout> | null = null;
+
+function prefersReducedMotion(): boolean {
+  if (!import.meta.client) return false;
+  return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+
+function spawnMapFloater(input: {
+  q: number;
+  r: number;
+  label: string;
+  icon: string;
+  kind: MapFloatKind;
+  origin?: { x: number; y: number } | null;
+  offsetX?: number;
+  delayMs?: number;
+}) {
+  if (prefersReducedMotion()) return;
+  const point =
+    input.origin ??
+    preview.value?.projectTile(input.q, input.r) ??
+    overlayPositions.value.get(`${input.q},${input.r}`) ??
+    null;
+  if (!point || point.visible === false) return;
+
+  const chip: MapFloat = {
+    id: ++mapFloatSeq,
+    kind: input.kind,
+    label: input.label,
+    icon: input.icon,
+    x: point.x,
+    y: point.y,
+    offsetX: input.offsetX ?? 0,
+    delayMs: input.delayMs ?? 0
+  };
+  mapFloats.value = [...mapFloats.value, chip];
+  const timer = setTimeout(() => {
+    mapFloats.value = mapFloats.value.filter((f) => f.id !== chip.id);
+    mapFloatTimers.delete(timer);
+  }, 1400 + chip.delayMs);
+  mapFloatTimers.add(timer);
+}
+
+function pulseMapTile(q: number, r: number) {
+  preview.value?.pulseTile(q, r);
+}
+
+function celebrateTileFeel(
+  q: number,
+  r: number,
+  floater: { label: string; icon: string; kind: MapFloatKind }
+) {
+  pulseMapTile(q, r);
+  spawnMapFloater({ q, r, ...floater });
+}
+
+function spawnDestroyFloats(
+  q: number,
+  r: number,
+  refunds: { wood: number; workers: number },
+  origin?: { x: number; y: number } | null
+) {
+  const chips: { kind: MapFloatKind; label: string; icon: string; offsetX: number; delayMs: number }[] =
+    [];
+  if (refunds.wood > 0) {
+    chips.push({
+      kind: "wood",
+      label: `+${Math.floor(refunds.wood)}`,
+      icon: "i-lucide-tree-pine",
+      offsetX: 0,
+      delayMs: 0
+    });
+  }
+  if (refunds.workers > 0) {
+    chips.push({
+      kind: "workers",
+      label: `+${refunds.workers}`,
+      icon: "i-lucide-users",
+      offsetX: chips.length === 0 ? 0 : 20,
+      delayMs: chips.length === 0 ? 0 : 90
+    });
+  }
+  if (chips.length === 0) return;
+  if (chips.length === 2) chips[0]!.offsetX = -20;
+
+  for (const chip of chips) {
+    spawnMapFloater({
+      q,
+      r,
+      origin,
+      label: chip.label,
+      icon: chip.icon,
+      kind: chip.kind,
+      offsetX: chip.offsetX,
+      delayMs: chip.delayMs
+    });
+  }
+}
 
 const overlayPositions = ref(
   new Map<string, { x: number; y: number; visible: boolean }>()
@@ -1631,6 +1713,13 @@ const selectedWorkerPanel = computed((): WorkerPanel | null => {
 
   if (tile.buildingId === "lumber_camp") {
     const stockFull = woodStockUi.value.level === "full";
+    const rate = extractorSiteRateBreakdown({
+      buildingId: "lumber_camp",
+      biome: tile.biome,
+      workers: assigned,
+      complete: true,
+      unlockedTechIds: world.value?.research.unlockedTechIds ?? ["foundations"]
+    }).total;
     return {
       title: "Bûcheron",
       hint: orphan
@@ -1642,7 +1731,7 @@ const selectedWorkerPanel = computed((): WorkerPanel | null => {
       max,
       rateLabel:
         !orphan && assigned > 0 && !stockFull
-          ? formatRatePerMinute(assigned * WOOD_RATE_PER_WORKER_PER_MINUTE * mult)
+          ? formatRatePerMinute(rate)
           : "0/min",
       canAdd: !orphan && !assigning.value && assigned < max && idlePop.value > 0,
       canRemove: !orphan && !assigning.value && assigned > 0
@@ -1669,6 +1758,13 @@ const selectedWorkerPanel = computed((): WorkerPanel | null => {
   }
   if (tile.buildingId === "quarry") {
     const stockFull = stoneStockUi.value.level === "full";
+    const rate = extractorSiteRateBreakdown({
+      buildingId: "quarry",
+      biome: tile.biome,
+      workers: assigned,
+      complete: true,
+      unlockedTechIds: world.value?.research.unlockedTechIds ?? ["foundations"]
+    }).total;
     return {
       title: "Carrier",
       hint: orphan
@@ -1680,7 +1776,7 @@ const selectedWorkerPanel = computed((): WorkerPanel | null => {
       max,
       rateLabel:
         !orphan && assigned > 0 && !stockFull
-          ? formatRatePerMinute(assigned * STONE_RATE_PER_WORKER_PER_MINUTE * mult)
+          ? formatRatePerMinute(rate)
           : "0/min",
       canAdd: !orphan && !assigning.value && assigned < max && idlePop.value > 0,
       canRemove: !orphan && !assigning.value && assigned > 0
@@ -1728,6 +1824,13 @@ const selectedWorkerPanel = computed((): WorkerPanel | null => {
   }
   if (tile.buildingId === "mine") {
     const stockFull = ironOreStockUi.value.level === "full";
+    const rate = extractorSiteRateBreakdown({
+      buildingId: "mine",
+      biome: tile.biome,
+      workers: assigned,
+      complete: true,
+      unlockedTechIds: world.value?.research.unlockedTechIds ?? ["foundations"]
+    }).total;
     return {
       title: "Mineur",
       hint: orphan
@@ -1739,9 +1842,7 @@ const selectedWorkerPanel = computed((): WorkerPanel | null => {
       max,
       rateLabel:
         !orphan && assigned > 0 && !stockFull
-          ? formatRatePerMinute(
-              assigned * IRON_ORE_RATE_PER_WORKER_PER_MINUTE * mult
-            )
+          ? formatRatePerMinute(rate)
           : "0/min",
       canAdd: !orphan && !assigning.value && assigned < max && idlePop.value > 0,
       canRemove: !orphan && !assigning.value && assigned > 0
@@ -2098,142 +2199,282 @@ const selectedProcessorCraft = computed(() => {
   };
 });
 
+type SelectedProductionView = {
+  line: string;
+  breakdown: ExtractorRateBreakdown | null;
+  /** Sous-ligne food tech (ferme / village). */
+  techFoodHint: string | null;
+};
+
 /** Ligne « Production : X / temps » sous les steppers d’attribution. */
-const selectedProductionLine = computed((): string | null => {
+const selectedProductionView = computed((): SelectedProductionView | null => {
   const tile = selectedWorldTile.value;
   if (!tile?.buildingId || selectedConstruction.value) return null;
-  if (selectedOutsideInfluence.value) return "—";
+  if (selectedOutsideInfluence.value) {
+    return { line: "—", breakdown: null, techFoodHint: null };
+  }
 
   const assigned = tile.assignedWorkers ?? 0;
-  const mult = tileProductionMultiplier(tile.biome);
+  const unlocked = world.value?.research.unlockedTechIds ?? ["foundations"];
+  const now = nowTick.value;
+  const complete = !isBuildingUnderConstruction(tile.constructionCompletesAt, now);
 
-  const continuous = (
+  const continuousFromBreakdown = (
     active: boolean,
-    amount: number,
-    resource: string
-  ) =>
+    resource: string,
+    stockFull: boolean
+  ): SelectedProductionView => {
+    const breakdown = extractorSiteRateBreakdown({
+      buildingId: tile.buildingId as PlaceableExtractorId,
+      biome: tile.biome,
+      workers: assigned,
+      complete,
+      unlockedTechIds: unlocked
+    });
+    // Tech flat s’applique même à 0 worker (comme rateFromSites serveur).
+    if (stockFull || (!active && breakdown.techBonus <= 0) || breakdown.total <= 0) {
+      return { line: "—", breakdown: null, techFoodHint: null };
+    }
+    const hasParts = breakdown.fusionBonus > 0 || breakdown.techBonus > 0;
+    return {
+      line: `${formatProductionAmount(breakdown.total)} ${resource} / min`,
+      breakdown: hasParts ? breakdown : null,
+      techFoodHint: null
+    };
+  };
+
+  if (tile.buildingId === "lumber_camp") {
+    return continuousFromBreakdown(true, "bois", woodStockUi.value.level === "full");
+  }
+  if (tile.buildingId === "farm") {
+    const wheat = continuousFromBreakdown(
+      true,
+      "blé",
+      wheatStockUi.value.level === "full"
+    );
+    const plantation = techFoodBonusBreakdown({
+      unlockedTechIds: unlocked,
+      pastureTileCount: 0,
+      completedFarmCount: complete ? 1 : 0
+    }).plantation;
+    return {
+      ...wheat,
+      techFoodHint:
+        plantation > 0
+          ? `+${formatProductionAmount(plantation)} nourriture / min (plantation)`
+          : null
+    };
+  }
+  if (tile.buildingId === "quarry") {
+    return continuousFromBreakdown(true, "pierre", stoneStockUi.value.level === "full");
+  }
+  if (tile.buildingId === "fishing_hut") {
+    return continuousFromBreakdown(
+      assigned > 0,
+      "nourriture",
+      foodStockUi.value.level === "full"
+    );
+  }
+  if (tile.buildingId === "clay_mine") {
+    return continuousFromBreakdown(
+      assigned > 0,
+      "argile",
+      clayStockUi.value.level === "full"
+    );
+  }
+  if (tile.buildingId === "mine") {
+    return continuousFromBreakdown(
+      true,
+      "minerai de fer",
+      ironOreStockUi.value.level === "full"
+    );
+  }
+  if (tile.buildingId === "market") {
+    const breakdown = extractorSiteRateBreakdown({
+      buildingId: "market",
+      biome: tile.biome,
+      workers: assigned,
+      complete,
+      unlockedTechIds: unlocked
+    });
+    if (assigned <= 0 || goldStockUi.value.level === "full" || breakdown.total <= 0) {
+      return { line: "—", breakdown: null, techFoodHint: null };
+    }
+    const hasParts = breakdown.fusionBonus > 0;
+    return {
+      line: formatGoldProductionLine(breakdown.total),
+      breakdown: hasParts ? breakdown : null,
+      techFoodHint: null
+    };
+  }
+
+  const continuous = (active: boolean, amount: number, resource: string) =>
     active && amount > 0
       ? `${formatProductionAmount(amount)} ${resource} / min`
       : "—";
 
-  if (tile.buildingId === "lumber_camp") {
-    return continuous(
-      assigned > 0 && woodStockUi.value.level !== "full",
-      assigned * WOOD_RATE_PER_WORKER_PER_MINUTE * mult,
-      "bois"
-    );
-  }
-  if (tile.buildingId === "farm") {
-    return continuous(
-      assigned > 0 && wheatStockUi.value.level !== "full",
-      assigned * WHEAT_RATE_PER_WORKER_PER_MINUTE * mult,
-      "blé"
-    );
-  }
-  if (tile.buildingId === "quarry") {
-    return continuous(
-      assigned > 0 && stoneStockUi.value.level !== "full",
-      assigned * STONE_RATE_PER_WORKER_PER_MINUTE * mult,
-      "pierre"
-    );
-  }
-  if (tile.buildingId === "fishing_hut") {
-    return continuous(
-      assigned > 0 && foodStockUi.value.level !== "full",
-      assigned * FISHING_HUT_FOOD_RATE_PER_WORKER_PER_MINUTE * mult,
-      "nourriture"
-    );
-  }
-  if (tile.buildingId === "clay_mine") {
-    return continuous(
-      assigned > 0 && clayStockUi.value.level !== "full",
-      assigned * CLAY_RATE_PER_WORKER_PER_MINUTE * mult,
-      "argile"
-    );
-  }
-  if (tile.buildingId === "mine") {
-    return continuous(
-      assigned > 0 && ironOreStockUi.value.level !== "full",
-      assigned * IRON_ORE_RATE_PER_WORKER_PER_MINUTE * mult,
-      "minerai de fer"
-    );
-  }
-  if (tile.buildingId === "market") {
-    const rate = assigned * GOLD_RATE_PER_WORKER_PER_MINUTE * mult;
-    if (assigned <= 0 || goldStockUi.value.level === "full" || rate <= 0) {
-      return "—";
-    }
-    return formatGoldProductionLine(rate);
-  }
   if (tile.buildingId === "sawmill") {
-    if (assigned <= 0) return "—";
-    if (displayedWood.value + 1e-9 < assigned * 5) return "—";
+    if (assigned <= 0) return { line: "—", breakdown: null, techFoodHint: null };
+    if (displayedWood.value + 1e-9 < assigned * 5) {
+      return { line: "—", breakdown: null, techFoodHint: null };
+    }
     const durationMs = accelerateTimers.value
       ? DEV_CRAFT_DURATION_MS
       : SAWMILL_CRAFT_DURATION_MS;
     const n = assigned;
     const label = n === 1 ? "1 planche" : `${n} planches`;
-    return `${label} / ${formatRemaining(durationMs)}`;
+    return {
+      line: `${label} / ${formatRemaining(durationMs)}`,
+      breakdown: null,
+      techFoodHint: null
+    };
   }
   if (tile.buildingId === "mill") {
-    if (assigned <= 0) return "—";
-    if (displayedWheat.value + 1e-9 < assigned * 5) return "—";
+    if (assigned <= 0) return { line: "—", breakdown: null, techFoodHint: null };
+    if (displayedWheat.value + 1e-9 < assigned * 5) {
+      return { line: "—", breakdown: null, techFoodHint: null };
+    }
     const durationMs = accelerateTimers.value
       ? DEV_CRAFT_DURATION_MS
       : MILL_CRAFT_DURATION_MS;
     const n = assigned;
     const label = n === 1 ? "1 farine" : `${n} farines`;
-    return `${label} / ${formatRemaining(durationMs)}`;
+    return {
+      line: `${label} / ${formatRemaining(durationMs)}`,
+      breakdown: null,
+      techFoodHint: null
+    };
   }
   if (tile.buildingId === "bakery") {
-    if (assigned <= 0) return "—";
-    if (foodStockUi.value.level === "full") return "—";
-    if (displayedFlour.value + 1e-9 < assigned * 1) return "—";
+    if (assigned <= 0) return { line: "—", breakdown: null, techFoodHint: null };
+    if (foodStockUi.value.level === "full") {
+      return { line: "—", breakdown: null, techFoodHint: null };
+    }
+    if (displayedFlour.value + 1e-9 < assigned * 1) {
+      return { line: "—", breakdown: null, techFoodHint: null };
+    }
     const durationMs = accelerateTimers.value
       ? DEV_CRAFT_DURATION_MS
       : BAKERY_CRAFT_DURATION_MS;
     const n = assigned * 2;
     const label = n === 1 ? "1 nourriture" : `${n} nourriture`;
-    return `${label} / ${formatRemaining(durationMs)}`;
+    return {
+      line: `${label} / ${formatRemaining(durationMs)}`,
+      breakdown: null,
+      techFoodHint: null
+    };
   }
   if (tile.buildingId === "smelter") {
-    if (assigned <= 0) return "—";
-    if (displayedIronOre.value + 1e-9 < assigned * 5) return "—";
+    if (assigned <= 0) return { line: "—", breakdown: null, techFoodHint: null };
+    if (displayedIronOre.value + 1e-9 < assigned * 5) {
+      return { line: "—", breakdown: null, techFoodHint: null };
+    }
     const durationMs = accelerateTimers.value
       ? DEV_CRAFT_DURATION_MS
       : SMELTER_CRAFT_DURATION_MS;
     const n = assigned;
     const label = n === 1 ? "1 lingot" : `${n} lingots`;
-    return `${label} / ${formatRemaining(durationMs)}`;
+    return {
+      line: `${label} / ${formatRemaining(durationMs)}`,
+      breakdown: null,
+      techFoodHint: null
+    };
   }
   if (tile.buildingId === "forge") {
-    if (assigned <= 0) return "—";
-    if (displayedIronIngot.value + 1e-9 < assigned * 5) return "—";
+    if (assigned <= 0) return { line: "—", breakdown: null, techFoodHint: null };
+    if (displayedIronIngot.value + 1e-9 < assigned * 5) {
+      return { line: "—", breakdown: null, techFoodHint: null };
+    }
     const durationMs = accelerateTimers.value
       ? DEV_CRAFT_DURATION_MS
       : FORGE_CRAFT_DURATION_MS;
     const n = assigned;
     const label = n === 1 ? "1 outil" : `${n} outils`;
-    return `${label} / ${formatRemaining(durationMs)}`;
+    return {
+      line: `${label} / ${formatRemaining(durationMs)}`,
+      breakdown: null,
+      techFoodHint: null
+    };
   }
   if (tile.buildingId === "brickworks") {
-    if (assigned <= 0) return "—";
-    if (displayedClay.value + 1e-9 < assigned * 5) return "—";
+    if (assigned <= 0) return { line: "—", breakdown: null, techFoodHint: null };
+    if (displayedClay.value + 1e-9 < assigned * 5) {
+      return { line: "—", breakdown: null, techFoodHint: null };
+    }
     const durationMs = accelerateTimers.value
       ? DEV_CRAFT_DURATION_MS
       : BRICKWORKS_CRAFT_DURATION_MS;
     const n = assigned;
     const label = n === 1 ? "1 brique" : `${n} briques`;
-    return `${label} / ${formatRemaining(durationMs)}`;
+    return {
+      line: `${label} / ${formatRemaining(durationMs)}`,
+      breakdown: null,
+      techFoodHint: null
+    };
   }
   if (tile.buildingId === "library") {
-    return continuous(
-      assigned > 0,
-      assigned * LIBRARY_SCIENCE_PER_WORKER_PER_MINUTE,
-      "science"
-    );
+    const amount = assigned * LIBRARY_SCIENCE_PER_WORKER_PER_MINUTE;
+    return {
+      line: continuous(assigned > 0, amount, "science"),
+      breakdown: null,
+      techFoodHint: null
+    };
   }
   return null;
+});
+
+const selectedProductionLine = computed(
+  () => selectedProductionView.value?.line ?? null
+);
+
+const selectedProductionBreakdown = computed(() => {
+  const parts = selectedProductionView.value?.breakdown;
+  if (!parts) return null;
+  const bits: string[] = [
+    `base ${formatProductionAmount(parts.base)}`
+  ];
+  if (parts.fusionBonus > 0) {
+    bits.push(`fusion +${formatProductionAmount(parts.fusionBonus)}`);
+  }
+  if (parts.techBonus > 0) {
+    bits.push(`tech +${formatProductionAmount(parts.techBonus)}`);
+  }
+  return bits.join(" · ");
+});
+
+const selectedTechFoodHint = computed(
+  () => selectedProductionView.value?.techFoodHint ?? null
+);
+
+const villageTechFoodHint = computed((): string | null => {
+  const tile = selectedWorldTile.value;
+  if (!tile || tile.buildingId !== "village") return null;
+  const tiles = world.value?.tiles;
+  if (!tiles?.length) return null;
+  const unlocked = world.value?.research.unlockedTechIds ?? ["foundations"];
+  const now = nowTick.value;
+  const influenced = computeInfluencedTiles(tiles, now);
+  let farms = 0;
+  for (const t of tiles) {
+    if (t.buildingId !== "farm") continue;
+    if (isBuildingUnderConstruction(t.constructionCompletesAt, now)) continue;
+    if (isBuildingOrphan(t, influenced, now)) continue;
+    farms++;
+  }
+  const food = techFoodBonusBreakdown({
+    unlockedTechIds: unlocked,
+    pastureTileCount: countPastureTiles(tiles),
+    completedFarmCount: farms
+  });
+  if (food.total <= 0) return null;
+  const bits: string[] = [];
+  if (food.pasture > 0) {
+    bits.push(`pâturage +${formatProductionAmount(food.pasture)}`);
+  }
+  if (food.plantation > 0) {
+    bits.push(`plantation +${formatProductionAmount(food.plantation)}`);
+  }
+  return `Bonus tech : +${formatProductionAmount(food.total)} nourriture / min (${bits.join(" · ")})`;
 });
 
 function formatProductionAmount(amount: number): string {
@@ -2389,62 +2630,6 @@ const destroyRefundPreview = computed(() => {
     workers: tile.assignedWorkers ?? 0
   };
 });
-
-function spawnDestroyFloats(
-  q: number,
-  r: number,
-  refunds: { wood: number; workers: number },
-  origin?: { x: number; y: number } | null
-) {
-  const point =
-    origin ??
-    preview.value?.projectTile(q, r) ??
-    overlayPositions.value.get(`${q},${r}`) ??
-    null;
-  if (!point) return;
-
-  const chips: Omit<DestroyFloat, "id">[] = [];
-  if (refunds.wood > 0) {
-    chips.push({
-      kind: "wood",
-      label: `+${Math.floor(refunds.wood)}`,
-      icon: "i-lucide-tree-pine",
-      x: point.x,
-      y: point.y,
-      offsetX: 0,
-      delayMs: 0
-    });
-  }
-  if (refunds.workers > 0) {
-    chips.push({
-      kind: "workers",
-      label: `+${refunds.workers}`,
-      icon: "i-lucide-users",
-      x: point.x,
-      y: point.y,
-      offsetX: chips.length === 0 ? 0 : 20,
-      delayMs: chips.length === 0 ? 0 : 90
-    });
-  }
-  if (chips.length === 0) return;
-
-  // Décale le premier chip si les deux sont présents.
-  if (chips.length === 2) chips[0]!.offsetX = -20;
-
-  const spawned: DestroyFloat[] = chips.map((chip) => ({
-    ...chip,
-    id: ++destroyFloatSeq
-  }));
-  destroyFloats.value = [...destroyFloats.value, ...spawned];
-
-  for (const chip of spawned) {
-    const timer = setTimeout(() => {
-      destroyFloats.value = destroyFloats.value.filter((f) => f.id !== chip.id);
-      destroyFloatTimers.delete(timer);
-    }, 1400 + chip.delayMs);
-    destroyFloatTimers.add(timer);
-  }
-}
 
 const anyWheelOpen = computed(
   () =>
@@ -2833,6 +3018,11 @@ async function placeBuildingAt(buildingId: PlaceableBuildingId, tile: SelectedTi
     }
     preview.value?.applyBuilding(result.tile.q, result.tile.r, buildingId);
     tutorialOnBuildingPlaced(buildingId);
+    celebrateTileFeel(result.tile.q, result.tile.r, {
+      kind: "build",
+      label: "Chantier",
+      icon: "i-lucide-hammer"
+    });
     closeConstructionMenu();
     selected.value = {
       ...tile,
@@ -2855,6 +3045,22 @@ async function setWorkers(count: number) {
     const result = await assignWorkers(id, { q: tile.q, r: tile.r }, count);
     if (!result) {
       expandError.value = worldError.value ?? "Impossible d’assigner.";
+      return;
+    }
+    if (!prefersReducedMotion()) {
+      const key = `${tile.q},${tile.r}`;
+      workerBadgePulseKey.value = key;
+      if (workerBadgePulseTimer) clearTimeout(workerBadgePulseTimer);
+      workerBadgePulseTimer = setTimeout(() => {
+        if (workerBadgePulseKey.value === key) workerBadgePulseKey.value = null;
+        workerBadgePulseTimer = null;
+      }, 380);
+      workerStepperPulse.value = true;
+      if (workerStepperPulseTimer) clearTimeout(workerStepperPulseTimer);
+      workerStepperPulseTimer = setTimeout(() => {
+        workerStepperPulse.value = false;
+        workerStepperPulseTimer = null;
+      }, 280);
     }
   } finally {
     assigning.value = false;
@@ -3185,7 +3391,10 @@ watch(
       class="map-badge pointer-events-none absolute z-20"
       :class="[
         `map-badge--${badge.kind}`,
-        badge.needsWorkers ? 'map-badge--needs-workers' : null
+        badge.needsWorkers ? 'map-badge--needs-workers' : null,
+        workerBadgePulseKey === `${badge.q},${badge.r}` && badge.kind === 'workers'
+          ? 'map-badge--pulse'
+          : null
       ]"
       :style="{ left: `${badge.x}px`, top: `${badge.y}px` }"
       aria-hidden="true"
@@ -3198,7 +3407,7 @@ watch(
     </div>
 
     <div
-      v-for="floater in destroyFloats"
+      v-for="floater in mapFloats"
       :key="floater.id"
       class="destroy-float pointer-events-none absolute z-40"
       :class="`destroy-float--${floater.kind}`"
@@ -3258,7 +3467,7 @@ watch(
         <div class="play-cloud-header__puff play-cloud-header__puff--4" />
       </div>
 
-      <div class="play-cloud-header__content pointer-events-auto">
+      <div class="play-cloud-header__content">
         <div class="play-cloud-header__rail">
           <div class="play-cloud-header__identity">
             <div class="play-cloud-header__identity-top">
@@ -3433,17 +3642,6 @@ watch(
 
         <div class="play-cloud-header__end">
           <nav class="play-top-actions" aria-label="Raccourcis">
-            <button
-              type="button"
-              class="play-top-actions__btn"
-              :class="{ 'play-top-actions__btn--active': economyPanelOpen }"
-              title="Économie"
-              aria-label="Ouvrir l’économie détaillée"
-              :aria-expanded="economyPanelOpen"
-              @click="openEconomyPanel"
-            >
-              <UIcon name="i-lucide-chart-column" class="play-top-actions__icon" />
-            </button>
             <NuxtLink
               to="/news"
               class="play-top-actions__btn"
@@ -4041,9 +4239,17 @@ watch(
                 >
                   {{ selectedWorkerPanel.hint }}
                 </p>
-                <p v-else-if="selected.hasVillage" class="building-sheet__hint">
-                  Cœur de ton territoire.
-                </p>
+                <template v-else-if="selected.hasVillage">
+                  <p class="building-sheet__hint">
+                    Cœur de ton territoire.
+                  </p>
+                  <p
+                    v-if="villageTechFoodHint && !destroyConfirm"
+                    class="building-sheet__hint building-sheet__hint--tech"
+                  >
+                    {{ villageTechFoodHint }}
+                  </p>
+                </template>
                 <p v-else-if="destroyConfirm" class="building-sheet__hint">
                   Confirmation requise
                 </p>
@@ -4189,7 +4395,10 @@ watch(
                 </span>
               </p>
             </div>
-            <div class="flex items-center gap-2">
+            <div
+              class="flex items-center gap-2"
+              :class="{ 'building-sheet__steppers--pulse': workerStepperPulse }"
+            >
               <button
                 type="button"
                 class="building-sheet__stepper"
@@ -4227,13 +4436,25 @@ watch(
             </div>
           </div>
 
-          <p
-            v-if="selectedProductionLine && !destroyConfirm && !selectedConstruction"
-            class="building-sheet__metric mt-3"
-          >
-            Production :
-            <span class="font-mono">{{ selectedProductionLine }}</span>
-          </p>
+            <p
+              v-if="selectedProductionLine && !destroyConfirm && !selectedConstruction"
+              class="building-sheet__metric mt-3"
+            >
+              Production :
+              <span class="font-mono">{{ selectedProductionLine }}</span>
+            </p>
+            <p
+              v-if="selectedProductionBreakdown && !destroyConfirm && !selectedConstruction"
+              class="building-sheet__rate-breakdown"
+            >
+              {{ selectedProductionBreakdown }}
+            </p>
+            <p
+              v-if="selectedTechFoodHint && !destroyConfirm && !selectedConstruction"
+              class="building-sheet__hint building-sheet__hint--tech mt-1"
+            >
+              {{ selectedTechFoodHint }}
+            </p>
 
           <div
             v-if="(canDestroySelectedBuilding && !destroyConfirm) || showDebugBugOnSheet"

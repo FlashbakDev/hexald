@@ -2,7 +2,8 @@ export type NotificationKind =
   | "tech_unlocked"
   | "construction_complete"
   | "population_growth"
-  | "stock_full";
+  | "stock_full"
+  | "craft_complete";
 
 export type NotificationPreferences = Record<NotificationKind, boolean>;
 
@@ -29,6 +30,12 @@ export const NOTIFICATION_OPTIONS: readonly NotificationOption[] = [
     icon: "i-lucide-hammer"
   },
   {
+    id: "craft_complete",
+    label: "Crafts",
+    description: "Quand un atelier termine une production",
+    icon: "i-lucide-factory"
+  },
+  {
     id: "population_growth",
     label: "Population",
     description: "Quand un habitant rejoint le village",
@@ -45,6 +52,7 @@ export const NOTIFICATION_OPTIONS: readonly NotificationOption[] = [
 const DEFAULT_PREFS: NotificationPreferences = {
   tech_unlocked: true,
   construction_complete: true,
+  craft_complete: true,
   population_growth: true,
   stock_full: true
 };

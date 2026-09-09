@@ -203,23 +203,31 @@ Fiche : [`LOT-03-economie-lisible.md`](./LOT-03-economie-lisible.md).
 
 ## LOT 4 — Fiabiliser les bonus technologiques existants
 
-**Statut :** ready
+**Statut :** done
 
 Auditer pâturage, plantation/ferme, lumber, carrière+maçonnerie, mine+maçonnerie : application serveur réelle, pas de doublons, tests, affichage UI du breakdown (base + tech + fusion).
 
 **DoD :** aucune tech ne prétend offrir un bonus sans effet réel ou invisible.
 
+Fiche : [`LOT-04-bonus-technologiques.md`](./LOT-04-bonus-technologiques.md).
+
 ---
 
 ## LOT 5 — Feedback et plaisir de jeu
+
+**Statut :** done
 
 Améliorer le game feel des actions fréquentes (sélection, chantier, pose, fin de build, workers, craft, tech, pop, région) sans changer profondément les règles. Animations / badges / pulses avec retenue. Sons seulement si infra déjà légère.
 
 **DoD :** construire quelque chose est plus satisfaisant qu’avant à valeurs numériques égales.
 
+Fiche : [`LOT-05-feedback-game-feel.md`](./LOT-05-feedback-game-feel.md).
+
 ---
 
 ## LOT 6 — Améliorer le parcours des 20 premières minutes
+
+**Statut :** ready
 
 Auditer le parcours nouveau joueur après le tutoriel. Éviter « tuto terminé → je ne sais plus quoi faire ». Recommandations contextuelles légères (pas un système de quêtes).
 

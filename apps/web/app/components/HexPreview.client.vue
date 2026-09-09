@@ -147,6 +147,7 @@ defineExpose({
     api?.setBuildHighlights(valid, invalid),
   setInfluenceHighlights: (coords: readonly HexCoord[]) =>
     api?.setInfluenceHighlights(coords),
+  pulseTile: (q: number, r: number) => api?.pulseTile(q, r),
   setDeviceTiltEnabled: (next: boolean) => tilt.setEnabled(next),
   deviceTilt: tilt
 });

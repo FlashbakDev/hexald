@@ -1038,6 +1038,14 @@ html {
   gap: 1rem;
   padding: max(0.55rem, env(safe-area-inset-top)) 1.15rem 0;
   color: #1c2b28;
+  /* Conteneur layout only — hits pass through to the map. */
+  pointer-events: none;
+}
+
+.play-cloud-header__identity,
+.play-cloud-header__resources,
+.play-cloud-header__end {
+  pointer-events: auto;
 }
 
 @media (min-width: 640px) {
@@ -1390,11 +1398,16 @@ html {
 }
 
 .play-cloud-header__end {
+  position: fixed;
+  top: max(0.55rem, env(safe-area-inset-top));
+  right: max(0.55rem, env(safe-area-inset-right));
+  z-index: 55;
   display: flex;
   flex-shrink: 0;
   flex-direction: column;
   align-items: flex-end;
   gap: 0.45rem;
+  pointer-events: auto;
 }
 
 .play-top-actions {
@@ -2898,7 +2911,8 @@ html {
   height: auto;
   min-height: 0;
   inset: 0 auto auto 0;
-  width: min(16.5rem, 48vw);
+  width: max-content;
+  max-width: min(16.5rem, 48vw);
   pointer-events: none;
 }
 
@@ -2920,15 +2934,17 @@ html {
 }
 
 .game-shell--play-landscape .play-cloud-header__rail {
+  flex: 0 0 auto;
   flex-direction: column;
   align-items: flex-start;
   gap: 0.55rem;
-  width: 100%;
+  width: max-content;
+  max-width: 100%;
 }
 
 .game-shell--play-landscape .play-cloud-header__identity {
-  max-width: none;
-  width: 100%;
+  max-width: 100%;
+  width: max-content;
 }
 
 .game-shell--play-landscape .play-cloud-header__identity-text {
@@ -2963,19 +2979,8 @@ html {
 }
 
 .game-shell--play-landscape .play-cloud-header__end {
-  position: fixed;
-  top: auto;
-  right: auto;
-  bottom: max(0.55rem, env(safe-area-inset-bottom));
-  left: max(0.55rem, env(safe-area-inset-left));
-  z-index: 55;
-  pointer-events: auto;
-}
-
-.game-shell--play-landscape .play-top-actions {
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0.35rem;
+  top: max(0.4rem, env(safe-area-inset-top));
+  right: max(0.55rem, env(safe-area-inset-right));
 }
 
 .game-shell--play-landscape .play-top-actions__btn {
@@ -2986,13 +2991,6 @@ html {
 .game-shell--play-landscape .play-top-actions__icon {
   width: 1rem;
   height: 1rem;
-}
-
-.game-shell--play-landscape .play-settings__menu {
-  top: auto;
-  bottom: calc(100% + 0.4rem);
-  right: auto;
-  left: 0;
 }
 
 .game-shell--play-landscape .play-cloud-header__res {
@@ -3023,6 +3021,7 @@ html {
   right: 0 !important;
   bottom: 0 !important;
   left: auto !important;
+  z-index: 70 !important;
   width: min(17rem, 52vw);
   max-width: 100%;
   height: 100%;
@@ -3079,9 +3078,11 @@ html {
 .game-shell--play-landscape
   .tech-frise-sheet:not(.tech-frise-sheet--embedded)
   .building-sheet__content {
+  display: flex;
+  flex-direction: column;
   height: 100%;
   max-height: 100%;
-  overflow-y: auto;
+  overflow: hidden;
   overscroll-behavior: contain;
   padding:
     max(0.85rem, env(safe-area-inset-top))
@@ -3483,6 +3484,19 @@ html {
   line-height: 1.2;
 }
 
+.building-sheet__rate-breakdown {
+  margin-top: 0.2rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  line-height: 1.3;
+  color: #6b7c76;
+  font-variant-numeric: tabular-nums;
+}
+
+.building-sheet__hint--tech {
+  color: #4a7c6f;
+}
+
 .building-sheet__close {
   display: flex;
   flex-shrink: 0;
@@ -3529,6 +3543,29 @@ html {
 
 .building-sheet__stepper:disabled {
   opacity: 0.35;
+}
+
+.building-sheet__steppers--pulse .building-sheet__stepper:not(:disabled) {
+  animation: building-stepper-pulse 0.28s ease;
+}
+
+@keyframes building-stepper-pulse {
+  0% {
+    transform: scale(1);
+  }
+  45% {
+    transform: scale(1.08);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .map-badge--pulse .map-badge__chip,
+  .building-sheet__steppers--pulse .building-sheet__stepper {
+    animation: none;
+  }
 }
 
 .building-sheet-enter-active,
@@ -3583,6 +3620,22 @@ html {
 
 .map-badge--workers .map-badge__icon {
   color: #3d7a9a;
+}
+
+.map-badge--pulse .map-badge__chip {
+  animation: map-badge-pulse 0.38s ease;
+}
+
+@keyframes map-badge-pulse {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.12);
+  }
+  100% {
+    transform: scale(1);
+  }
 }
 
 .map-badge--needs-workers .map-badge__chip {
@@ -3661,6 +3714,18 @@ html {
 
 .destroy-float--workers .destroy-float__icon {
   color: #2d5248;
+}
+
+.destroy-float--build .destroy-float__icon {
+  color: #4a7c6f;
+}
+
+.destroy-float--ready .destroy-float__icon {
+  color: #2f9e6a;
+}
+
+.destroy-float--craft .destroy-float__icon {
+  color: #3d7a9a;
 }
 
 @keyframes destroy-float-rise {
@@ -4132,14 +4197,23 @@ html {
   );
 }
 
-/* Frise technologique ? hauteur = contenu (graphe a son propre min-height) */
+/* Frise technologique — hauteur bornée, nœuds scalés pour tenir */
 .tech-frise-sheet {
   bottom: 0;
   min-height: 0;
+  max-height: min(82dvh, 100%);
+}
+
+.tech-frise-sheet:not(.tech-frise-sheet--embedded) .tech-frise-sheet__content {
+  display: flex;
+  flex-direction: column;
+  max-height: inherit;
+  overflow: hidden;
 }
 
 .tech-frise-sheet--embedded {
   bottom: auto;
+  max-height: none;
   overflow: hidden;
   border: 1px solid rgb(28 43 40 / 0.1);
   border-radius: 1rem;
@@ -4153,7 +4227,7 @@ html {
 
 .tech-frise-sheet--embedded .tech-frise__graph {
   min-height: 12rem;
-  max-height: none;
+  max-height: min(70dvh, 36rem);
   overflow-x: auto;
   overflow-y: hidden;
   scrollbar-width: thin;
@@ -4179,6 +4253,7 @@ html {
 .tech-frise-sheet__content {
   min-height: 0;
   justify-content: flex-start;
+  flex: 1;
 }
 
 @media (max-width: 768px) {
@@ -4189,31 +4264,47 @@ html {
 
 .tech-frise-sheet__head {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
+}
+
+.tech-frise-sheet__title-row {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.55rem 0.75rem;
 }
 
 .tech-frise-sheet__prod {
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
-  margin: 0.15rem 0 0;
+  margin: 0;
   font-size: 0.72rem;
   font-weight: 600;
   color: #4a7c6f;
 }
 
+.tech-frise-sheet__footer {
+  margin-top: auto;
+  padding-top: 0.55rem;
+  display: flex;
+  justify-content: center;
+}
+
 .tech-frise-sheet__notice {
   display: inline-block;
   width: fit-content;
-  max-width: min(100%, 22rem);
-  margin: 0.4rem 0 0;
-  padding: 0.28rem 0.55rem;
+  max-width: min(100%, 28rem);
+  margin: 0;
+  padding: 0.35rem 0.7rem;
   border-radius: 999px;
-  font-size: 0.65rem;
-  line-height: 1.3;
+  font-size: 0.68rem;
+  line-height: 1.35;
   font-weight: 600;
+  text-align: center;
 }
 
 .tech-frise-sheet__notice--pause {
@@ -4229,12 +4320,31 @@ html {
 }
 
 .tech-frise__graph {
+  --tech-frise-scale: 1;
+  --tech-frise-node-min-h: calc(3.25rem * var(--tech-frise-scale));
+  --tech-frise-node-min-w: calc(7.25rem * var(--tech-frise-scale));
+  --tech-frise-node-max-w: calc(8.5rem * var(--tech-frise-scale));
+  --tech-frise-node-pad-y: calc(0.35rem * var(--tech-frise-scale));
+  --tech-frise-node-pad-x: calc(0.4rem * var(--tech-frise-scale));
+  --tech-frise-node-radius: calc(0.55rem * var(--tech-frise-scale));
+  --tech-frise-portrait: calc(2rem * var(--tech-frise-scale));
+  --tech-frise-main-gap: calc(0.4rem * var(--tech-frise-scale));
+  --tech-frise-col-gap: calc(0.55rem * var(--tech-frise-scale));
+  --tech-frise-cols-gap: calc(2.35rem * var(--tech-frise-scale));
+  --tech-frise-title-size: calc(0.62rem * var(--tech-frise-scale));
+  --tech-frise-meta-size: calc(0.55rem * var(--tech-frise-scale));
+  --tech-frise-unlock: calc(1.1rem * var(--tech-frise-scale));
+  --tech-frise-unlock-sm: calc(1rem * var(--tech-frise-scale));
+  --tech-frise-check: calc(0.85rem * var(--tech-frise-scale));
+  --tech-frise-icon: calc(0.875rem * var(--tech-frise-scale));
+  --tech-frise-unlock-icon: calc(0.625rem * var(--tech-frise-scale));
   position: relative;
   margin-top: 0.45rem;
-  min-height: 7rem;
+  min-height: 0;
+  flex: 1 1 auto;
   overflow-x: auto;
   overflow-y: hidden;
-  padding: 0.5rem 0.15rem;
+  padding: calc(0.5rem * var(--tech-frise-scale)) 0.15rem;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
 }
@@ -4282,17 +4392,17 @@ html {
   z-index: 1;
   display: flex;
   align-items: stretch;
-  gap: 2.35rem;
+  gap: var(--tech-frise-cols-gap);
   flex: 0 0 auto;
   min-height: 100%;
-  padding: 0.15rem 0.5rem;
+  padding: calc(0.15rem * var(--tech-frise-scale)) calc(0.5rem * var(--tech-frise-scale));
 }
 
 .tech-frise__column {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  gap: 0.55rem;
+  gap: var(--tech-frise-col-gap);
   flex: 0 0 auto;
   min-height: 100%;
 }
@@ -4302,12 +4412,12 @@ html {
   display: flex;
   align-items: center;
   width: 100%;
-  min-width: 7.25rem;
-  max-width: 8.5rem;
-  min-height: 3.25rem;
-  padding: 0.35rem 0.4rem;
+  min-width: var(--tech-frise-node-min-w);
+  max-width: var(--tech-frise-node-max-w);
+  min-height: var(--tech-frise-node-min-h);
+  padding: var(--tech-frise-node-pad-y) var(--tech-frise-node-pad-x);
   border: 1px solid rgb(28 43 40 / 0.12);
-  border-radius: 0.55rem;
+  border-radius: var(--tech-frise-node-radius);
   background: #fff;
   color: #2d5248;
   box-shadow: 0 2px 8px rgb(28 43 40 / 0.06);
@@ -4324,21 +4434,21 @@ html {
 .tech-frise__node-main {
   display: flex;
   align-items: center;
-  gap: 0.4rem;
+  gap: var(--tech-frise-main-gap);
   width: 100%;
 }
 
 .tech-frise__portrait {
   position: relative;
   flex: 0 0 auto;
-  width: 2rem;
-  height: 2rem;
+  width: var(--tech-frise-portrait);
+  height: var(--tech-frise-portrait);
 }
 
 .tech-frise__ring {
   display: block;
-  width: 2rem;
-  height: 2rem;
+  width: var(--tech-frise-portrait);
+  height: var(--tech-frise-portrait);
   transform: rotate(-90deg);
 }
 
@@ -4373,6 +4483,11 @@ html {
   color: #2d5248;
 }
 
+.tech-frise__portrait-icon :is(svg, .iconify) {
+  width: var(--tech-frise-icon) !important;
+  height: var(--tech-frise-icon) !important;
+}
+
 .tech-frise__node-body {
   min-width: 0;
   flex: 1;
@@ -4380,15 +4495,15 @@ html {
 
 .tech-frise__node-title {
   margin: 0;
-  font-size: 0.62rem;
+  font-size: var(--tech-frise-title-size);
   font-weight: 700;
   line-height: 1.15;
   color: #1c2b28;
 }
 
 .tech-frise__node-meta {
-  margin: 0.12rem 0 0;
-  font-size: 0.55rem;
+  margin: calc(0.12rem * var(--tech-frise-scale)) 0 0;
+  font-size: var(--tech-frise-meta-size);
   font-weight: 600;
   line-height: 1.2;
   color: #6b7c76;
@@ -4398,41 +4513,46 @@ html {
 .tech-frise__unlocks {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.2rem;
-  margin-top: 0.22rem;
+  gap: calc(0.2rem * var(--tech-frise-scale));
+  margin-top: calc(0.22rem * var(--tech-frise-scale));
 }
 
 .tech-frise__unlock {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 1.1rem;
-  height: 1.1rem;
+  width: var(--tech-frise-unlock);
+  height: var(--tech-frise-unlock);
   border: 1px solid rgb(28 43 40 / 0.1);
-  border-radius: 0.3rem;
+  border-radius: calc(0.3rem * var(--tech-frise-scale));
   background: rgb(28 43 40 / 0.03);
   color: #4a7c6f;
   flex-shrink: 0;
 }
 
-/* Nouveau b?timent ? carr? arrondi (d?faut). */
-.tech-frise__unlock--building {
-  border-radius: 0.35rem;
+.tech-frise__unlock :is(svg, .iconify) {
+  width: var(--tech-frise-unlock-icon) !important;
+  height: var(--tech-frise-unlock-icon) !important;
 }
 
-/* Augmentation / bonus (et branche tech) ? rond. */
+/* Nouveau bâtiment — carré arrondi (défaut). */
+.tech-frise__unlock--building {
+  border-radius: calc(0.35rem * var(--tech-frise-scale));
+}
+
+/* Augmentation / bonus (et branche tech) — rond. */
 .tech-frise__unlock--passive_bonus,
 .tech-frise__unlock--tech_branch {
   border-radius: 999px;
 }
 
-/* Am?lioration de b?timent / cit? ? losange. */
+/* Amélioration de bâtiment / cité — losange. */
 .tech-frise__unlock--city_improvement {
-  width: 1rem;
-  height: 1rem;
-  margin: 0.1rem;
+  width: var(--tech-frise-unlock-sm);
+  height: var(--tech-frise-unlock-sm);
+  margin: calc(0.1rem * var(--tech-frise-scale));
   border: 1px solid rgb(28 43 40 / 0.12);
-  border-radius: 0.2rem;
+  border-radius: calc(0.2rem * var(--tech-frise-scale));
   background: rgb(28 43 40 / 0.04);
   clip-path: none;
   box-shadow: none;
@@ -4486,18 +4606,23 @@ html {
 
 .tech-frise__node-check {
   position: absolute;
-  right: -0.1rem;
-  bottom: -0.1rem;
+  right: calc(-0.1rem * var(--tech-frise-scale));
+  bottom: calc(-0.1rem * var(--tech-frise-scale));
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 0.85rem;
-  height: 0.85rem;
+  width: var(--tech-frise-check);
+  height: var(--tech-frise-check);
   border: 1.5px solid #fff;
   border-radius: 999px;
   background: #2563eb;
   color: #fff;
   box-shadow: 0 1px 4px rgb(37 99 235 / 0.35);
+}
+
+.tech-frise__node-check :is(svg, .iconify) {
+  width: calc(0.625rem * var(--tech-frise-scale)) !important;
+  height: calc(0.625rem * var(--tech-frise-scale)) !important;
 }
 
 .tech-frise__node--available:not(:disabled) {

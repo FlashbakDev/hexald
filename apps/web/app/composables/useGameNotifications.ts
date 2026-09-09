@@ -1,6 +1,18 @@
 import type { Ref } from "vue";
-import type { ResourceId, TechId, WorldSnapshot, WorldTileSnapshot } from "@hexald/shared";
-import { getBuildingDefinition, getTechNode, resources } from "@hexald/content";
+import type {
+  BuildingId,
+  ResourceId,
+  TechId,
+  WorldSnapshot,
+  WorldTileSnapshot
+} from "@hexald/shared";
+import {
+  getBuildingDefinition,
+  getProcessorStepForBuilding,
+  getTechNode,
+  recipeOutputCount,
+  resources
+} from "@hexald/content";
 import { isBuildingUnderConstruction } from "@hexald/game-core";
 import type { NotificationKind } from "~/composables/useNotificationPreferences";
 
@@ -19,6 +31,28 @@ type TrackedState = {
   population: number;
   fullStocks: Set<ResourceId>;
   underConstruction: Set<string>;
+  /** tileKey → craftCompletesAt ISO (pending crafts). */
+  pendingCrafts: Map<string, string>;
+};
+
+export type ConstructionCompleteEvent = {
+  tile: WorldTileSnapshot;
+  buildingId: BuildingId;
+  label: string;
+};
+
+export type CraftCompleteEvent = {
+  tile: WorldTileSnapshot;
+  buildingId: BuildingId;
+  buildingLabel: string;
+  resourceId: ResourceId;
+  resourceLabel: string;
+  amount: number;
+};
+
+export type GameNotificationHooks = {
+  onConstructionComplete?: (event: ConstructionCompleteEvent) => void;
+  onCraftComplete?: (event: CraftCompleteEvent) => void;
 };
 
 function tileKey(tile: WorldTileSnapshot): string {
@@ -42,6 +76,7 @@ function captureState(snapshot: WorldSnapshot, now: number): TrackedState {
   }
 
   const underConstruction = new Set<string>();
+  const pendingCrafts = new Map<string, string>();
   for (const tile of snapshot.tiles) {
     if (
       tile.buildingId &&
@@ -49,13 +84,20 @@ function captureState(snapshot: WorldSnapshot, now: number): TrackedState {
     ) {
       underConstruction.add(tileKey(tile));
     }
+    if (tile.buildingId && tile.craftCompletesAt) {
+      const ends = Date.parse(tile.craftCompletesAt);
+      if (!Number.isNaN(ends) && ends > now) {
+        pendingCrafts.set(tileKey(tile), tile.craftCompletesAt);
+      }
+    }
   }
 
   return {
     unlockedTechIds: new Set(snapshot.research.unlockedTechIds),
     population: snapshot.economy.population,
     fullStocks,
-    underConstruction
+    underConstruction,
+    pendingCrafts
   };
 }
 
@@ -64,7 +106,9 @@ function emitDiff(
   isEnabled: (kind: NotificationKind) => boolean,
   before: TrackedState,
   after: TrackedState,
-  snapshot: WorldSnapshot
+  snapshot: WorldSnapshot,
+  now: number,
+  hooks?: GameNotificationHooks
 ) {
   if (isEnabled("tech_unlocked")) {
     for (const techId of after.unlockedTechIds) {
@@ -79,7 +123,7 @@ function emitDiff(
     }
   }
 
-  if (isEnabled("construction_complete")) {
+  if (isEnabled("construction_complete") || hooks?.onConstructionComplete) {
     for (const tile of snapshot.tiles) {
       const key = tileKey(tile);
       if (
@@ -90,11 +134,54 @@ function emitDiff(
         continue;
       }
       const definition = getBuildingDefinition(tile.buildingId);
-      toast.add({
-        title: "Construction terminée",
-        description: definition?.label ?? tile.buildingId,
-        icon: "i-lucide-hammer",
-        color: "success"
+      const label = definition?.label ?? tile.buildingId;
+      if (isEnabled("construction_complete")) {
+        toast.add({
+          title: "Construction terminée",
+          description: label,
+          icon: "i-lucide-hammer",
+          color: "success"
+        });
+      }
+      hooks?.onConstructionComplete?.({
+        tile,
+        buildingId: tile.buildingId,
+        label
+      });
+    }
+  }
+
+  if (isEnabled("craft_complete") || hooks?.onCraftComplete) {
+    for (const [key, completesAt] of before.pendingCrafts) {
+      const ends = Date.parse(completesAt);
+      if (Number.isNaN(ends) || ends > now) continue;
+      const afterPending = after.pendingCrafts.get(key);
+      // Complet si plus de craft, ou nouveau cycle démarré (timestamp différent / plus tard).
+      if (afterPending === completesAt) continue;
+      const tile = snapshot.tiles.find((t) => tileKey(t) === key);
+      if (!tile?.buildingId) continue;
+      const step = getProcessorStepForBuilding(tile.buildingId);
+      if (!step) continue;
+      const workers = Math.max(1, Math.floor(tile.assignedWorkers ?? 1));
+      const amount = recipeOutputCount(step) * workers;
+      const definition = getBuildingDefinition(tile.buildingId);
+      const buildingLabel = definition?.label ?? tile.buildingId;
+      const outLabel = resourceLabel(step.output);
+      if (isEnabled("craft_complete")) {
+        toast.add({
+          title: buildingLabel,
+          description: `+${amount} ${outLabel}`,
+          icon: "i-lucide-factory",
+          color: "success"
+        });
+      }
+      hooks?.onCraftComplete?.({
+        tile,
+        buildingId: tile.buildingId,
+        buildingLabel,
+        resourceId: step.output,
+        resourceLabel: outLabel,
+        amount
       });
     }
   }
@@ -123,7 +210,10 @@ function emitDiff(
 }
 
 /** Toasts in-app sur changements d’état monde (refresh ou action). */
-export function useGameNotifications(world: Ref<WorldSnapshot | null>) {
+export function useGameNotifications(
+  world: Ref<WorldSnapshot | null>,
+  hooks?: GameNotificationHooks
+) {
   const toast = useToast();
   const { isEnabled } = useNotificationPreferences();
   let ready = false;
@@ -148,7 +238,7 @@ export function useGameNotifications(world: Ref<WorldSnapshot | null>) {
       }
 
       if (previous) {
-        emitDiff(toast, isEnabled, previous, next, snapshot);
+        emitDiff(toast, isEnabled, previous, next, snapshot, now, hooks);
       }
 
       previous = next;

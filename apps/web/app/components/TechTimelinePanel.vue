@@ -360,6 +360,69 @@ function updateEdgePaths() {
 }
 
 let resizeObserver: ResizeObserver | null = null;
+let fitScaleRaf = 0;
+
+function readFitScale(graph: HTMLElement): number {
+  const raw =
+    graph.style.getPropertyValue("--tech-frise-scale") ||
+    getComputedStyle(graph).getPropertyValue("--tech-frise-scale");
+  const value = Number.parseFloat(raw);
+  return Number.isFinite(value) && value > 0 ? value : 1;
+}
+
+/** Hauteur intrinsèque de la colonne la plus haute (échelle courante). */
+function measureColumnsContentHeight(columns: HTMLElement): number {
+  let maxH = 0;
+  for (const col of columns.querySelectorAll<HTMLElement>(".tech-frise__column")) {
+    const styles = getComputedStyle(col);
+    const gapY = Number.parseFloat(styles.rowGap || styles.gap) || 0;
+    const nodes = [...col.querySelectorAll<HTMLElement>(".tech-frise__node")];
+    let h = 0;
+    for (let i = 0; i < nodes.length; i++) {
+      h += nodes[i].offsetHeight;
+      if (i > 0) h += gapY;
+    }
+    maxH = Math.max(maxH, h);
+  }
+  const pad = getComputedStyle(columns);
+  maxH +=
+    (Number.parseFloat(pad.paddingTop) || 0) +
+    (Number.parseFloat(pad.paddingBottom) || 0);
+  return maxH;
+}
+
+/** Réduit les nœuds pour que la colonne la plus haute tienne dans le graphe. */
+function updateFitScale() {
+  const graph = graphEl.value;
+  const columns = graph?.querySelector(".tech-frise__columns");
+  if (!(graph instanceof HTMLElement) || !(columns instanceof HTMLElement)) return;
+
+  const available = graph.clientHeight;
+  if (available < 24) return;
+
+  const prev = readFitScale(graph);
+  const currentH = measureColumnsContentHeight(columns);
+  if (currentH < 8) return;
+
+  const needed = currentH / prev;
+  if (needed <= available) {
+    if (prev < 0.995) graph.style.setProperty("--tech-frise-scale", "1");
+    return;
+  }
+
+  const next = Math.min(1, Math.max(0.42, (available / needed) * 0.96));
+  if (Math.abs(next - prev) < 0.01) return;
+
+  graph.style.setProperty("--tech-frise-scale", next.toFixed(3));
+}
+
+function scheduleFitAndEdges() {
+  cancelAnimationFrame(fitScaleRaf);
+  fitScaleRaf = requestAnimationFrame(() => {
+    updateFitScale();
+    requestAnimationFrame(() => updateEdgePaths());
+  });
+}
 
 function onGraphWheel(event: WheelEvent) {
   const graph = graphEl.value;
@@ -383,12 +446,12 @@ function bindGraphObserver() {
   graph.removeEventListener("wheel", onGraphWheel);
   graph.addEventListener("wheel", onGraphWheel, { passive: false });
 
-  resizeObserver = new ResizeObserver(() => updateEdgePaths());
+  resizeObserver = new ResizeObserver(() => scheduleFitAndEdges());
   resizeObserver.observe(track);
   resizeObserver.observe(graph);
   nextTick(() => {
-    updateEdgePaths();
-    requestAnimationFrame(() => updateEdgePaths());
+    scheduleFitAndEdges();
+    requestAnimationFrame(() => scheduleFitAndEdges());
   });
 }
 
@@ -403,7 +466,7 @@ watch(
   async () => {
     if (!visible.value) return;
     await nextTick();
-    updateEdgePaths();
+    scheduleFitAndEdges();
   },
   { deep: true }
 );
@@ -415,6 +478,7 @@ onMounted(async () => {
 });
 
 onBeforeUnmount(() => {
+  cancelAnimationFrame(fitScaleRaf);
   graphEl.value?.removeEventListener("wheel", onGraphWheel);
   resizeObserver?.disconnect();
 });
@@ -491,7 +555,7 @@ onBeforeUnmount(() => {
 
       <div class="building-sheet__content tech-frise-sheet__content pointer-events-auto">
         <div class="tech-frise-sheet__head">
-          <div class="min-w-0">
+          <div class="tech-frise-sheet__title-row min-w-0">
             <p class="building-sheet__title">Technologies</p>
             <p v-if="!embedded" class="tech-frise-sheet__prod">
               <UIcon name="i-lucide-flask-conical" class="size-3.5 shrink-0" aria-hidden="true" />
@@ -499,18 +563,6 @@ onBeforeUnmount(() => {
             </p>
             <p v-else class="tech-frise-sheet__prod">
               Arbre live · {{ layoutColumns.reduce((n, c) => n + c.nodes.length, 0) }} techs
-            </p>
-            <p
-              v-if="unlockNotice"
-              class="tech-frise-sheet__notice tech-frise-sheet__notice--unlock"
-            >
-              {{ unlockNotice }}
-            </p>
-            <p
-              v-else-if="pauseHint"
-              class="tech-frise-sheet__notice tech-frise-sheet__notice--pause"
-            >
-              {{ pauseHint }}
             </p>
           </div>
           <button
@@ -638,6 +690,24 @@ onBeforeUnmount(() => {
             </div>
             </div>
           </div>
+        </div>
+
+        <div
+          v-if="!embedded && (unlockNotice || pauseHint)"
+          class="tech-frise-sheet__footer"
+        >
+          <p
+            v-if="unlockNotice"
+            class="tech-frise-sheet__notice tech-frise-sheet__notice--unlock"
+          >
+            {{ unlockNotice }}
+          </p>
+          <p
+            v-else-if="pauseHint"
+            class="tech-frise-sheet__notice tech-frise-sheet__notice--pause"
+          >
+            {{ pauseHint }}
+          </p>
         </div>
       </div>
     </aside>

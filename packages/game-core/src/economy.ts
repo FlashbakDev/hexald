@@ -271,6 +271,82 @@ function mineMasonryBonusForState(state: EconomyState): number {
   );
 }
 
+/** Parts d’un rate extracteur (1 site) — fusion × workers×base seulement, tech flat après. */
+export type ExtractorRateBreakdown = {
+  /** workers × catalogueRate (sans fusion). */
+  base: number;
+  /** Extra due au biome fusion (base × 0.2). */
+  fusionBonus: number;
+  /** Flat tech pour ce site (+1 si tech + complete). */
+  techBonus: number;
+  total: number;
+};
+
+export function extractorSiteTechBonusPerMinute(
+  buildingId: PlaceableExtractorId,
+  unlockedTechIds: readonly TechId[],
+  complete: boolean
+): number {
+  if (!complete) return 0;
+  if (buildingId === "lumber_camp") {
+    return lumberCampTechBonusFromUnlocks(unlockedTechIds, 1);
+  }
+  if (buildingId === "quarry") {
+    return quarryMasonryBonusFromUnlocks(unlockedTechIds, 1);
+  }
+  if (buildingId === "mine") {
+    return mineMasonryBonusFromUnlocks(unlockedTechIds, 1);
+  }
+  return 0;
+}
+
+export function extractorSiteRateBreakdown(input: {
+  buildingId: PlaceableExtractorId;
+  biome: BiomeId;
+  workers: number;
+  complete: boolean;
+  unlockedTechIds: readonly TechId[];
+}): ExtractorRateBreakdown {
+  const catalogueRate = buildingRateFromCatalog(input.buildingId);
+  const workers = Math.max(0, Math.floor(input.workers));
+  const base = catalogueRate > 0 ? workers * catalogueRate : 0;
+  const fused = base * tileProductionMultiplier(input.biome);
+  const fusionBonus = Math.max(0, fused - base);
+  const techBonus = extractorSiteTechBonusPerMinute(
+    input.buildingId,
+    input.unlockedTechIds,
+    input.complete
+  );
+  return {
+    base,
+    fusionBonus,
+    techBonus,
+    total: fused + techBonus
+  };
+}
+
+export type TechFoodBonusBreakdown = {
+  pasture: number;
+  plantation: number;
+  total: number;
+};
+
+export function techFoodBonusBreakdown(input: {
+  unlockedTechIds: readonly TechId[];
+  pastureTileCount: number;
+  completedFarmCount: number;
+}): TechFoodBonusBreakdown {
+  const pasture = pastureFoodBonusPerMinute(
+    input.unlockedTechIds,
+    input.pastureTileCount
+  );
+  const plantation = plantationFoodBonusPerMinute(
+    input.unlockedTechIds,
+    input.completedFarmCount
+  );
+  return { pasture, plantation, total: pasture + plantation };
+}
+
 function rateFromSites(
   state: EconomyState,
   buildingId: PlaceableExtractorId
@@ -503,14 +579,12 @@ export function wheatFoodEquivalentPerMinute(state: EconomyState): number {
   return Math.floor(wheatRate / WHEAT_TO_FOOD_EMERGENCY_RATIO);
 }
 
-function techFoodBonusPerMinute(state: EconomyState): number {
-  return (
-    pastureFoodBonusPerMinute(state.unlockedTechIds, state.pastureTileCount) +
-    plantationFoodBonusPerMinute(
-      state.unlockedTechIds,
-      completedSiteCount(state, "farm")
-    )
-  );
+export function techFoodBonusPerMinute(state: EconomyState): number {
+  return techFoodBonusBreakdown({
+    unlockedTechIds: state.unlockedTechIds,
+    pastureTileCount: state.pastureTileCount,
+    completedFarmCount: completedSiteCount(state, "farm")
+  }).total;
 }
 
 /** Prod food : HDV + cabanes + bonus tech pâturage / plantation + équivalent blé. */
